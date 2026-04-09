@@ -6,6 +6,16 @@ from dataclasses import dataclass, field
 
 
 @dataclass
+class NationalSpirit:
+    """民族精神 / 国家 idea"""
+    id: str                       # idea ID（建议 TAG_xxx 格式）
+    name: str                     # 显示名（本地化）
+    desc: str = ""                # 描述（本地化）
+    modifiers: dict[str, float] = field(default_factory=dict)  # {modifier_key: value}
+    picture: str = "generic_pp_unaligned"
+
+
+@dataclass
 class CountryData:
     """一个国家的数据"""
     tag: str                     # 3字母代码，如 KAR
@@ -19,6 +29,7 @@ class CountryData:
         "communism": 5,
         "neutrality": 80,
     })
+    national_spirits: list[NationalSpirit] = field(default_factory=list)
 
     def __post_init__(self):
         if not self.name:

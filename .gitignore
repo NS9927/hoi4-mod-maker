@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+*.hoi4proj
+output/
+build/
+dist/
+*.egg-info/
+.vscode/
+.idea/

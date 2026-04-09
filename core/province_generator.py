@@ -75,19 +75,122 @@ def generate_provinces(
         if fix_x_crossings(province_map) == 0:
             break
 
-    # 后处理：修复不连续省份
-    # 只对小省份做连通性检测，大量省份时跳过以保证速度
-    if next_id - 1 <= 1000:
-        _fix_non_contiguous_fast(province_map)
+    # 后处理：修复不连续省份（所有省份都跑，避免碎片占用 65536 边界配额）
+    _fix_non_contiguous_fast(province_map)
 
-    province_count = int(province_map.max())
+    # 合并碎片会改变像素，可能产生新的 X-crossings，再修一轮
+    for _ in range(5):
+        if fix_x_crossings(province_map) == 0:
+            break
+
+    # 后处理：压实 ID（消灭 gap）
+    # 关键：碎片合并后某些 ID 可能完全消失，必须重新编号成 1..N 连续
+    # 否则 definition.csv 会出现空洞 ID，触发"Province X has no pixels"错误，
+    # 并导致所有后续省份属性串位（HOI4 文档明确警告的灾难性 bug）
+    province_count = compact_province_ids(province_map)
     return province_map, province_count
+
+
+def auto_classify_water(tile_map: np.ndarray) -> int:
+    """
+    自动把"被陆地包围的 sea 像素"转换成 lake。
+    规则：找到 sea 像素的所有连通分量，最大的保留为 sea（主洋），
+    其余全部转为 lake（内陆水域）。
+
+    考虑横向 wrap：地图东西连接，所以 wrap 处的连通也算上。
+    返回转换的像素数。
+    """
+    from scipy.ndimage import label
+
+    sea_mask = tile_map == TILE_SEA
+    if not sea_mask.any():
+        return 0
+
+    # 4 连通标记
+    struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=np.int32)
+    labeled, n_comps = label(sea_mask, structure=struct)
+    if n_comps <= 1:
+        return 0
+
+    # 处理横向 wrap：把最左列和最右列上同行 sea 的连通分量合并
+    # 用 union-find 思路：找出哪些 label 通过 wrap 连接
+    parent = list(range(n_comps + 1))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    left_col = labeled[:, 0]
+    right_col = labeled[:, -1]
+    for y in range(tile_map.shape[0]):
+        l = left_col[y]
+        r = right_col[y]
+        if l > 0 and r > 0:
+            union(int(l), int(r))
+
+    # 重映射到根 label
+    root_map = np.zeros(n_comps + 1, dtype=np.int32)
+    for i in range(1, n_comps + 1):
+        root_map[i] = find(i)
+    merged = root_map[labeled]
+
+    # 找最大根连通分量
+    counts = np.bincount(merged.ravel())
+    counts[0] = 0  # 排除背景
+    main_root = int(counts.argmax())
+
+    # 把非主根的 sea 像素改成 lake
+    to_lake = sea_mask & (merged != main_root)
+    converted = int(to_lake.sum())
+    if converted > 0:
+        tile_map[to_lake] = TILE_LAKE
+    return converted
+
+
+def compact_province_ids(province_map: np.ndarray) -> int:
+    """
+    将 province_map 中的 ID 压实成 1..N 连续整数（消除 gap）。
+    原地修改。返回压实后的省份总数。
+
+    使用 np.unique 的 inverse 索引一次性向量化重映射。
+    """
+    unique_ids = np.unique(province_map)
+    # 第 0 个一定是 0（背景），保持为 0
+    if unique_ids[0] != 0:
+        # 没有 0 背景的情况：所有 ID 整体偏移
+        new_ids = np.arange(1, len(unique_ids) + 1, dtype=np.int32)
+        mapping = dict(zip(unique_ids.tolist(), new_ids.tolist()))
+    else:
+        # 0 → 0，其他 → 1..N 连续
+        new_ids = np.zeros(len(unique_ids), dtype=np.int32)
+        new_ids[1:] = np.arange(1, len(unique_ids), dtype=np.int32)
+        mapping = dict(zip(unique_ids.tolist(), new_ids.tolist()))
+
+    # 向量化重映射
+    if unique_ids.max() < 1_000_000:
+        # 小范围：用 LUT 加速
+        lut = np.zeros(unique_ids.max() + 1, dtype=np.int32)
+        for old, new in mapping.items():
+            lut[old] = new
+        province_map[:] = lut[province_map]
+    else:
+        # 极端范围：用 np.searchsorted
+        sorted_old = unique_ids
+        idx = np.searchsorted(sorted_old, province_map.ravel())
+        province_map[:] = new_ids[idx].reshape(province_map.shape)
+
+    return int(province_map.max())
 
 
 def _fix_non_contiguous_fast(province_map: np.ndarray) -> None:
     """
-    快速修复不连续省份。
-    只处理小碎片（<50像素），大碎片跳过以节省时间。
+    修复不连续省份：所有非主体碎片都合并到邻居。
+    HOI4 文档明确：每个不连通碎片单独占用 65536 边界配额，必须清零。
     """
     from scipy.ndimage import label
 
@@ -96,30 +199,24 @@ def _fix_non_contiguous_fast(province_map: np.ndarray) -> None:
     for pid, total_count in zip(unique_ids, counts):
         if pid <= 0:
             continue
-        # 跳过很大的省份（不太可能有碎片，即使有也不重要）
-        if total_count > 50000:
-            continue
 
         mask = province_map == pid
         labeled, num_features = label(mask)
         if num_features <= 1:
             continue
 
-        # 找最大分量
-        comp_counts = np.bincount(labeled.ravel())[1:]  # 跳过 0
+        # 找最大分量保留，其余全部合并到邻居
+        comp_counts = np.bincount(labeled.ravel())[1:]
         largest = int(np.argmax(comp_counts)) + 1
 
-        # 只处理小碎片
         for comp_id in range(1, num_features + 1):
             if comp_id == largest:
                 continue
-            if comp_counts[comp_id - 1] > 50:
-                continue  # 大碎片跳过
 
             fragment_mask = labeled == comp_id
             ys, xs = np.where(fragment_mask)
 
-            # 向量化找邻居
+            # 找碎片的邻居 ID
             all_neighbors = set()
             for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
                 ny = np.clip(ys + dy, 0, MAP_HEIGHT - 1)

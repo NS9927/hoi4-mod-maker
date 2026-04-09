@@ -1,0 +1,138 @@
+"""
+ExpandProvinceTool — 省份扩张工具（两步激活 + 画笔扩张）。
+
+工作流程：
+1. 第一次点击省份 A → 选中（黄色边框 + 半透明 allowed 区域 overlay）
+2. 第二次点击同一省份 A → 进入扩张模式，开始绘制
+3. 按住拖动 → 光标经过的像素归给省份 A
+4. ESC 或点击其他省份 → 退出扩张
+
+约束：
+- 只能扩张到省份的直接邻居范围（neighborhood mask）
+- 只能影响相同地块类型（陆地省份不会吃海洋像素）
+- 邻居被吃掉的像素自动减少；邻居完全消失会触发 ID 压实（导出时）
+
+为了向后兼容，工具名仍叫 lasso_province（注册名）。
+"""
+from __future__ import annotations
+
+import numpy as np
+
+from core.tools.base import Tool, ToolContext, CleanupLevel
+
+
+# 扩张笔刷半径（像素）。固定值，不依赖全局 brush_size 滑块以避免歧义。
+EXPAND_RADIUS = 4
+
+
+class LassoProvinceTool(Tool):
+    name = "lasso_province"
+    display_modes = ("province",)
+    cleanup_level = CleanupLevel.FAST
+    label = "省份扩张"
+    description = "点选省份 → 再点同一省份进入扩张 → 拖动画笔扩张边界"
+    cursor = "cross"
+
+    def get_undo_array_names(self, ctx: ToolContext) -> list[str]:
+        return ["province_map"]
+
+    def on_press(self, ctx: ToolContext, x: int, y: int) -> None:
+        md = ctx.map_data
+        pid_under = int(md.province_map[y, x])
+        if pid_under <= 0:
+            return
+
+        sel = ctx.state.get("pid", 0)
+
+        # Case 1: 没选过 / 选了别的省份 → 首次选中
+        if pid_under != sel:
+            ctx.state["pid"] = pid_under
+            ctx.state["tile"] = md.get_province_tile_type(pid_under)
+            ctx.state["allowed_mask"] = md.get_neighborhood_mask(pid_under)
+            ctx.state["active"] = False  # 还没进入扩张模式
+            ctx.state["painting"] = False
+            ctx.selected_province_id = pid_under
+            return
+
+        # Case 2: 已选中同一省份 → 进入扩张模式 + 立刻画第一笔
+        if not ctx.state.get("active"):
+            ctx.state["active"] = True
+            ctx.state["painting"] = True
+            self._paint_at(ctx, x, y)
+            return
+
+        # Case 3: 已在扩张模式 → 继续画
+        ctx.state["painting"] = True
+        self._paint_at(ctx, x, y)
+
+    def on_drag(self, ctx: ToolContext, x: int, y: int) -> None:
+        if not ctx.state.get("painting"):
+            return
+        self._paint_at(ctx, x, y)
+        ctx.expand_dirty(x, y)
+
+    def on_release(self, ctx: ToolContext, x: int, y: int) -> None:
+        ctx.state["painting"] = False
+        # 保留 active 和 pid，下次按下能继续画
+
+    def on_cancel(self, ctx: ToolContext) -> None:
+        ctx.state.clear()
+        ctx.dirty_bbox = None
+        ctx.selected_province_id = 0
+
+    def run_cleanup(self, ctx: ToolContext) -> None:
+        """覆盖默认清理：在 FAST 清理之外，额外做"压实 + 同步引用"。
+        防止扩张吃光邻居导致 ID gap。"""
+        # 先做基类的 FAST 清理（局部 X-crossing 修复）
+        super().run_cleanup(ctx)
+        # 然后压实 + 同步引用
+        sel = ctx.state.get("pid", 0)
+        mapping = ctx.map_data.compact_with_references(
+            state_mgr=ctx.state_mgr,
+            country_mgr=ctx.country_mgr,
+        )
+        # 选中的省份可能被改了 ID，跟踪
+        if sel in mapping:
+            new_sel = mapping[sel]
+            ctx.state["pid"] = new_sel
+            ctx.selected_province_id = new_sel
+            # 重算 allowed_mask（可能因为压实而需要更新）
+            if ctx.state.get("active") and new_sel > 0:
+                ctx.state["allowed_mask"] = ctx.map_data.get_neighborhood_mask(new_sel)
+
+    # ────── 笔刷 ──────
+
+    def _paint_at(self, ctx: ToolContext, cx: int, cy: int) -> None:
+        """在 (cx, cy) 周围画一个笔刷印章，把符合条件的像素归给选中省份。"""
+        md = ctx.map_data
+        sel_pid = ctx.state.get("pid", 0)
+        if sel_pid <= 0:
+            return
+        allowed: np.ndarray = ctx.state.get("allowed_mask")
+        sel_tile = ctx.state.get("tile", 0)
+        if allowed is None:
+            return
+
+        h, w = md.province_map.shape
+        x0 = max(0, cx - EXPAND_RADIUS)
+        y0 = max(0, cy - EXPAND_RADIUS)
+        x1 = min(w, cx + EXPAND_RADIUS + 1)
+        y1 = min(h, cy + EXPAND_RADIUS + 1)
+        if x0 >= x1 or y0 >= y1:
+            return
+
+        sub_pm = md.province_map[y0:y1, x0:x1]
+        sub_tm = md.tile_map[y0:y1, x0:x1]
+        sub_allowed = allowed[y0:y1, x0:x1]
+
+        mask = (
+            sub_allowed
+            & (sub_tm == sel_tile)
+            & (sub_pm != sel_pid)
+            & (sub_pm != 0)
+        )
+        sub_pm[mask] = sel_pid
+
+
+from core.tools.registry import register_tool
+register_tool(LassoProvinceTool())

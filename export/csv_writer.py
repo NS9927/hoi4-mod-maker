@@ -261,7 +261,8 @@ def write_buildings_txt(output_dir: str, first_land_province: int) -> None:
 
     with open(os.path.join(map_dir, "buildings.txt"), "w") as f:
         # StateID;建筑类型;X;Y;Z;旋转;相邻海省ID
-        f.write(f"1;infrastructure;100.0;10.0;100.0;0.0;0\n")
+        # 注意：infrastructure 不是 3D 建筑，不能出现在 buildings.txt 里；用 bunker 占位
+        f.write(f"1;bunker;100.0;10.0;100.0;0.0;0\n")
 
 
 def write_strategic_region(

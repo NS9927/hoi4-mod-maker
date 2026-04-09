@@ -116,6 +116,7 @@ class MainWindow(QMainWindow):
         self._add_action(file_menu, "保存项目", self._on_save_project, "Ctrl+S")
         file_menu.addSeparator()
         self._add_action(file_menu, tr("action_import_image"), self._on_import_image, "Ctrl+I")
+        self._add_action(file_menu, "从图片提取陆海...", self._on_import_landmask, "Ctrl+Shift+I")
         self._add_action(file_menu, tr("action_export_mod"), self._on_export_mod, "Ctrl+E")
         self._add_action(file_menu, "测试导出（最小MOD）", self._on_test_export, "Ctrl+T")
         file_menu.addSeparator()
@@ -199,6 +200,7 @@ class MainWindow(QMainWindow):
         tp.smooth_height_requested.connect(self._on_smooth_height)
         tp.export_requested.connect(self._on_export_mod)
         tp.split_province_requested.connect(self._on_split_province)
+        tp.lasso_province_toggled.connect(self._on_lasso_toggled)
 
         # State / Country 信号
         tp.auto_states_requested.connect(self._on_auto_states)
@@ -248,6 +250,10 @@ class MainWindow(QMainWindow):
             "river": "河流",
         }
         self._status_mode.setText(f"模式: {mode_names.get(mode, mode)}")
+
+        # 切换模式时关闭框架工具（避免和模式默认行为冲突）
+        # 扩张工具改为通过按钮显式启用，不再自动激活
+        self._canvas.set_framework_tool(None)
 
         # 切换到 state/country 模式时刷新颜色图
         if mode == "state":
@@ -375,29 +381,84 @@ class MainWindow(QMainWindow):
         self._status_info.setText(tr("status_ready"))
 
     def _show_validation_results(self, results: dict) -> None:
-        errors = []
-        info = []
+        """诊断对话框：可点击的问题列表，双击跳转到画布对应位置"""
+        from PyQt5.QtWidgets import (
+            QDialog, QVBoxLayout, QListWidget, QListWidgetItem,
+            QLabel, QDialogButtonBox,
+        )
+        from PyQt5.QtCore import Qt as _Qt
 
-        # 真正的错误（会导致崩溃）
-        if results["x_crossings"] > 0:
-            errors.append(tr("validate_x_crossing", results["x_crossings"]))
-        if results["too_small"] > 0:
-            errors.append(tr("validate_too_small", results["too_small"]))
-        if results["not_contiguous"] > 0:
-            errors.append(tr("validate_not_contiguous", results["not_contiguous"]))
+        dlg = QDialog(self)
+        dlg.setWindowTitle(tr("validate_title"))
+        dlg.resize(520, 520)
+        v = QVBoxLayout(dlg)
 
-        # 统计信息（不是错误）
-        coastal_count = results.get("coastal_mismatch", 0)
+        # 顶部统计
         province_count = int(self._canvas.province_map.max())
-        info.append(f"省份总数: {province_count}")
-        info.append(f"沿海省份: {coastal_count} 个（自动标记，无需处理）")
+        coastal_count = results.get("coastal_mismatch", 0)
+        warn = results.get("count_warning", "")
+        info_text = f"省份总数：{province_count}    沿海：{coastal_count}"
+        if warn:
+            info_text += f"\n⚠ {warn}"
+        v.addWidget(QLabel(info_text))
 
-        if errors:
-            msg = "发现问题:\n" + "\n".join(errors) + "\n\n" + "\n".join(info)
-            QMessageBox.warning(self, tr("validate_title"), msg)
-        else:
-            msg = "验证通过，无问题\n\n" + "\n".join(info)
-            QMessageBox.information(self, tr("validate_title"), msg)
+        # 问题列表
+        v.addWidget(QLabel("双击问题项跳转到地图对应位置："))
+        list_w = QListWidget()
+        v.addWidget(list_w)
+
+        # 每个 item 存 (跳转类型, 数据)：("xy", (x,y)) 或 ("pid", pid)
+        def add_item(text: str, jump_type: str, data) -> None:
+            it = QListWidgetItem(text)
+            it.setData(_Qt.ItemDataRole.UserRole, (jump_type, data))
+            list_w.addItem(it)
+
+        # X-crossings：每个位置一项（最多前 50 个，避免列表爆炸）
+        x_positions = results.get("x_crossing_positions", [])
+        for i, (y, x) in enumerate(x_positions[:50]):
+            add_item(f"X-crossing #{i+1} at ({x}, {y})", "xy", (x, y))
+        if len(x_positions) > 50:
+            add_item(f"... 还有 {len(x_positions)-50} 个 X-crossing 未列出", "none", None)
+
+        # 过小省份
+        for pid in results.get("too_small_ids", [])[:50]:
+            add_item(f"过小省份 ID={pid}（< 8 像素）", "pid", pid)
+
+        # 不连通省份
+        for pid in results.get("not_contiguous_ids", [])[:50]:
+            add_item(f"不连通省份 ID={pid}（多个碎片，占用边界配额）", "pid", pid)
+
+        # 过大省份
+        for pid in results.get("too_large_ids", [])[:50]:
+            add_item(f"过大省份 ID={pid}（TOO LARGE BOX, > 地图 1/8）", "pid", pid)
+
+        # ID gap
+        gaps = results.get("id_gaps", [])
+        if gaps:
+            add_item(f"省份 ID 不连续：缺失 {len(gaps)} 个（导出时自动修复）", "none", None)
+
+        if list_w.count() == 0:
+            list_w.addItem("✓ 没有发现任何问题")
+
+        # 双击跳转
+        def on_double(item: QListWidgetItem) -> None:
+            payload = item.data(_Qt.ItemDataRole.UserRole)
+            if not payload:
+                return
+            jump_type, data = payload
+            if jump_type == "xy":
+                self._canvas.center_on_pixel(data[0], data[1], zoom=4.0)
+            elif jump_type == "pid":
+                self._canvas.center_on_province(data)
+
+        list_w.itemDoubleClicked.connect(on_double)
+
+        # 关闭按钮
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        btns.rejected.connect(dlg.reject)
+        btns.accepted.connect(dlg.accept)
+        v.addWidget(btns)
+        dlg.exec_()
 
     # ────────────────────── 省份点击 ──────────────────────
 
@@ -421,7 +482,11 @@ class MainWindow(QMainWindow):
                 self._status_info.setText("取消选择")
             else:
                 # 第二次点击：合并
-                ok = self._canvas.merge_provinces(self._merge_first_pid, pid)
+                ok = self._canvas.merge_provinces(
+                    self._merge_first_pid, pid,
+                    state_mgr=self._state_mgr,
+                    country_mgr=self._country_mgr,
+                )
                 if ok:
                     self._update_province_count()
                     self._status_info.setText(
@@ -638,6 +703,26 @@ class MainWindow(QMainWindow):
             self._canvas.province_map, self._state_mgr
         )
         self._canvas.set_country_colors(rgb)
+
+    # ────────────────────── 扩张工具 ──────────────────
+
+    def _on_lasso_toggled(self, on: bool) -> None:
+        """启用/禁用扩张工具。开启时拦截点击事件做扩张，关闭时恢复合并行为。"""
+        if on:
+            from core.tools import lasso_province  # noqa: F401
+            self._canvas.set_framework_tool(
+                "lasso_province",
+                undo_mgr=self._undo_mgr,
+                state_mgr=self._state_mgr,
+                country_mgr=self._country_mgr,
+            )
+            self._merge_first_pid = 0  # 清掉合并选中状态避免混乱
+            self._status_info.setText(
+                "扩张工具已启用：点选省份 → 再次点击激活 → 拖动扩张"
+            )
+        else:
+            self._canvas.set_framework_tool(None)
+            self._status_info.setText("扩张工具已关闭，恢复合并模式")
 
     # ────────────────────── 省份切割 ──────────────────
 
@@ -898,6 +983,62 @@ class MainWindow(QMainWindow):
             else:
                 QMessageBox.warning(self, tr("dlg_error"), "无法加载图片")
 
+    def _on_import_landmask(self) -> None:
+        """从真实地图（高度图/卫星图/掩膜图）提取陆海，写入 tile_map。
+
+        逻辑：读图 → 灰度 → 缩放到 5632×2048 → 阈值化 → 亮=陆/暗=海。
+        """
+        from PyQt5.QtWidgets import QInputDialog
+        from PIL import Image
+
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "选择陆海源图",
+            "", "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All Files (*)",
+        )
+        if not file_path:
+            return
+
+        threshold, ok = QInputDialog.getInt(
+            self, "陆海阈值",
+            "灰度阈值 (0-255)\n>= 阈值为陆地，< 阈值为海洋\n"
+            "建议：高度图用 1（任何非黑像素都是陆地）；卫星图用 90 左右",
+            value=1, min=0, max=255,
+        )
+        if not ok:
+            return
+
+        invert_reply = QMessageBox.question(
+            self, "反转?", "勾选 Yes 表示：暗色为陆地、亮色为海洋（默认 No）",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        invert = (invert_reply == QMessageBox.StandardButton.Yes)
+
+        try:
+            img = Image.open(file_path).convert("L")
+            img = img.resize((MAP_WIDTH, MAP_HEIGHT), Image.Resampling.LANCZOS)
+            arr = np.array(img, dtype=np.uint8)
+            land_mask = (arr < threshold) if invert else (arr >= threshold)
+        except Exception as e:
+            QMessageBox.warning(self, tr("dlg_error"), f"读取图片失败：{e}")
+            return
+
+        # 撤销快照
+        self._undo_mgr.push_snapshot("从图片提取陆海", {"tile_map": self._canvas.tile_map.copy()})
+
+        new_tm = np.where(land_mask, TILE_LAND, TILE_SEA).astype(np.uint8)
+        self._canvas.tile_map[:] = new_tm
+        # 自动把被陆地包围的 sea 转为 lake
+        from core.province_generator import auto_classify_water
+        lakes_converted = auto_classify_water(self._canvas.tile_map)
+        self._canvas.refresh_display()
+
+        land_n = int(land_mask.sum())
+        total = MAP_WIDTH * MAP_HEIGHT
+        self._status_info.setText(
+            f"陆海导入完成 — 陆地 {land_n/total*100:.1f}% / 海洋 {(1-land_n/total)*100:.1f}%"
+        )
+
     def _on_toggle_language(self) -> None:
         new_lang = "en" if get_language() == "zh" else "zh"
         set_language(new_lang)
@@ -915,7 +1056,7 @@ class MainWindow(QMainWindow):
             self, tr("action_about"),
             "HOI4 Fantasy World MOD Maker\n"
             "HOI4 幻想世界 MOD 制作工具\n\n"
-            "Version 0.2\n"
+            "Version 0.15\n"
             "Map size: 5632 × 2048"
         )
 
@@ -923,146 +1064,84 @@ class MainWindow(QMainWindow):
         count = int(self._canvas.province_map.max())
         self._status_provinces.setText(tr("status_provinces", count))
 
-    # ────────────────────── 测试导出 ──────────────────────
+    # ────────────────────── 渐进式测试导出 ──────────────────────
+
+    # 测试级别描述
+    TEST_LEVELS = [
+        ("Lv1: 最小完整MOD（1国家）",
+         "地图 + State + 1国家(AAA) + 补给 + 战略区域 + replace_path\n"
+         "最小可运行配置，测试基础文件格式是否正确"),
+        ("Lv2: +2个国家 +bookmark",
+         "在Lv1基础上加: 第2个国家(BBB) + bookmark选择界面\n"
+         "测试多国家和bookmark"),
+        ("Lv3: +意识形态 +State类别",
+         "在Lv2基础上加: ideologies, state_category 定义文件\n"
+         "测试自定义意识形态/State类别"),
+        ("Lv4: +更多replace_path",
+         "在Lv3基础上加: 更多replace_path（清空原版国策/事件等）\n"
+         "完整TC MOD"),
+    ]
 
     def _on_test_export(self) -> None:
-        """一键生成最小完整MOD并导出，用于测试游戏是否能正常加载"""
+        """渐进式测试导出 — 选择测试级别"""
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QRadioButton, QDialogButtonBox, QLabel, QGroupBox
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("渐进式测试导出")
+        dlg.setMinimumWidth(500)
+        layout = QVBoxLayout(dlg)
+
+        layout.addWidget(QLabel("选择测试级别（从低到高，逐级排查崩溃原因）:"))
+
+        group = QGroupBox()
+        group_layout = QVBoxLayout(group)
+        radios = []
+        for i, (title, desc) in enumerate(self.TEST_LEVELS):
+            rb = QRadioButton(f"{title}\n    {desc}")
+            rb.setStyleSheet("QRadioButton { padding: 6px 0; }")
+            if i == 0:
+                rb.setChecked(True)
+            radios.append(rb)
+            group_layout.addWidget(rb)
+        layout.addWidget(group)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        layout.addWidget(buttons)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        level = 1
+        for i, rb in enumerate(radios):
+            if rb.isChecked():
+                level = i + 1
+                break
+
         output_dir = QFileDialog.getExistingDirectory(
-            self, "选择测试导出目录",
-            DEFAULT_MOD_OUTPUT_PATH,
+            self, "选择测试导出目录", DEFAULT_MOD_OUTPUT_PATH,
         )
         if not output_dir:
             return
 
-        self._status_info.setText("正在生成测试MOD...")
+        self._status_info.setText(f"正在生成 Lv{level} 测试MOD...")
         QApplication.processEvents()
 
         try:
-            self._generate_test_mod(output_dir)
+            from export.test_exporter import export_test_mod
+            export_test_mod(output_dir, level)
             QMessageBox.information(
                 self, "测试导出",
-                f"测试MOD已导出到:\n{output_dir}\n\n"
-                "包含: 2块大陆, 200省份, 地形, 河流, 2个国家\n"
-                "启动游戏测试是否正常加载。"
+                f"Lv{level} 测试MOD已导出到:\n{output_dir}\n\n"
+                f"{self.TEST_LEVELS[level-1][0]}\n\n"
+                "启动游戏测试是否正常加载。\n"
+                "如果崩溃，降低级别重试；如果能进，升高级别继续。"
             )
         except Exception as e:
-            QMessageBox.critical(self, "导出失败", str(e))
+            import traceback
+            QMessageBox.critical(self, "导出失败", f"{e}\n\n{traceback.format_exc()}")
         finally:
             self._status_info.setText(tr("status_ready"))
-
-    def _generate_test_mod(self, output_dir: str) -> None:
-        """生成最小但完整的测试MOD"""
-        from core.province_generator import generate_provinces
-        from core.state_manager import StateManager
-        from core.country_manager import CountryManager
-        from core.river_manager import RIVER_SOURCE, RIVER_WIDTH_3, RIVER_MOUTH
-        from export.mod_exporter import export_full_mod
-
-        # 1. 创建地图 — 两块分开的大陆 + 湖泊
-        tile_map = np.full((MAP_HEIGHT, MAP_WIDTH), TILE_SEA, dtype=np.uint8)
-        # 大陆1: 左侧
-        tile_map[400:1200, 300:2200] = TILE_LAND
-        # 大陆2: 右侧（隔着海洋）
-        tile_map[600:1600, 3200:5000] = TILE_LAND
-        # 小岛
-        tile_map[200:350, 2500:2800] = TILE_LAND
-        # 湖泊（在大陆1内部）
-        tile_map[700:800, 1000:1200] = TILE_LAKE
-
-        # 2. 生成省份（少量，快速）
-        province_map, count = generate_provinces(tile_map, 200)
-
-        # 3. 地形 — 多种地形测试
-        from data.terrain_types import TERRAIN_PALETTE_INDEX, DEFAULT_TERRAIN_FOR_TILE
-        terrain_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
-        for tile_type, terrain_name in DEFAULT_TERRAIN_FOR_TILE.items():
-            terrain_map[tile_map == tile_type] = TERRAIN_PALETTE_INDEX[terrain_name]
-        # 大陆1北部设为森林
-        forest_idx = TERRAIN_PALETTE_INDEX["forest"]
-        terrain_map[400:700, 300:2200] = np.where(
-            tile_map[400:700, 300:2200] == TILE_LAND, forest_idx,
-            terrain_map[400:700, 300:2200]
-        )
-        # 大陆2南部设为沙漠
-        desert_idx = TERRAIN_PALETTE_INDEX["desert"]
-        terrain_map[1200:1600, 3200:5000] = np.where(
-            tile_map[1200:1600, 3200:5000] == TILE_LAND, desert_idx,
-            terrain_map[1200:1600, 3200:5000]
-        )
-        # 小岛设为丘陵
-        hills_idx = TERRAIN_PALETTE_INDEX["hills"]
-        terrain_map[200:350, 2500:2800] = np.where(
-            tile_map[200:350, 2500:2800] == TILE_LAND, hills_idx,
-            terrain_map[200:350, 2500:2800]
-        )
-
-        # 4. 高度图
-        from scipy.ndimage import gaussian_filter
-        height_map = np.full((MAP_HEIGHT, MAP_WIDTH), OCEAN_HEIGHT, dtype=np.float32)
-        height_map[tile_map == TILE_LAND] = LAND_BASE_HEIGHT
-        height_map[tile_map == TILE_LAKE] = SEA_LEVEL - 5
-        # 大陆2中部加山脉
-        height_map[900:1100, 3800:4500] = 200
-        height_map = gaussian_filter(height_map, sigma=6)
-        height_map[tile_map == TILE_SEA] = np.minimum(height_map[tile_map == TILE_SEA], SEA_LEVEL - 1)
-        height_map[tile_map == TILE_LAND] = np.maximum(height_map[tile_map == TILE_LAND], SEA_LEVEL + 1)
-        height_map = np.clip(height_map, 0, 255).astype(np.uint8)
-
-        # 5. 河流 — 一条简单的河
-        river_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
-        # 源头在山区
-        river_map[950, 4200] = RIVER_SOURCE
-        # 河道向西流
-        river_map[950, 3900:4200] = RIVER_WIDTH_3
-        # 入海口
-        river_map[950, 3200] = RIVER_MOUTH
-        river_map[950, 3201:3900] = RIVER_WIDTH_3
-
-        # 6. State — 自动分组（会按陆块分开）
-        sm = StateManager()
-        sm.auto_split(province_map, tile_map, per_state=10)
-
-        # 7. 国家 — 两个国家，分别占两块大陆
-        cm = CountryManager()
-        cm.create_country("AAA", "测试帝国", (200, 80, 80))
-        cm.create_country("BBB", "测试共和", (80, 80, 200))
-
-        # 按陆块分配国家
-        from scipy.ndimage import label as ndlabel
-        land_labeled, num_lm = ndlabel((tile_map == TILE_LAND).astype(np.int32))
-
-        for sid, state in sm.states.items():
-            if not state.provinces:
-                continue
-            # 找这个State的第一个省份在哪个陆块
-            pid = state.provinces[0]
-            ys, xs = np.where(province_map == pid)
-            if len(ys) == 0:
-                cm.assign_state(sid, "AAA")
-                continue
-            cy, cx = int(np.mean(ys)), int(np.mean(xs))
-            lm = land_labeled[cy, cx] if 0 <= cy < MAP_HEIGHT and 0 <= cx < MAP_WIDTH else 0
-            # 陆块1 → AAA, 其他 → BBB
-            if cx < 2600:
-                cm.assign_state(sid, "AAA")
-            else:
-                cm.assign_state(sid, "BBB")
-
-        # 设首都（每个国家第一个State的第一个省份）
-        for tag in ["AAA", "BBB"]:
-            states_of = cm.get_states_of_country(tag)
-            if states_of:
-                first_state = sm.get_state(states_of[0])
-                if first_state and first_state.provinces:
-                    cm.set_capital(tag, first_state.provinces[0])
-
-        # 8. 导出
-        export_full_mod(
-            tile_map, province_map, output_dir,
-            mod_name="TestMOD",
-            state_mgr=sm,
-            country_mgr=cm,
-            river_map=river_map,
-            terrain_map=terrain_map,
-            height_map=height_map,
-        )

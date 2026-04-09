@@ -271,6 +271,7 @@ class ToolPanel(QWidget):
     smooth_height_requested = pyqtSignal()
     export_requested = pyqtSignal()
     split_province_requested = pyqtSignal()  # 切割选中省份
+    lasso_province_toggled = pyqtSignal(bool)  # 套索工具开关
 
     # State / Country 信号
     auto_states_requested = pyqtSignal(int)       # per_state count
@@ -607,6 +608,20 @@ class ToolPanel(QWidget):
         ops_box.layout().addWidget(split_btn)
         self._split_btn = split_btn
         split_btn.clicked.connect(self.split_province_requested.emit)
+
+        # 扩张工具切换按钮（默认关闭，避免和合并冲突）
+        expand_btn = QPushButton("🖌 启用扩张工具")
+        expand_btn.setCheckable(True)
+        expand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        expand_btn.setToolTip(
+            "启用后：点击选中省份 → 再点击同一省份激活 → 拖动扩张边界\n"
+            "注意：启用扩张时点击合并功能将不可用，关闭后恢复"
+        )
+        expand_btn.toggled.connect(
+            lambda on: self.lasso_province_toggled.emit(on)
+        )
+        ops_box.layout().addWidget(expand_btn)
+        self._expand_btn = expand_btn
 
         lay.addWidget(ops_box)
 

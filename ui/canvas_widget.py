@@ -4,9 +4,15 @@
 性能优化：脏矩形局部更新，避免每次操作渲染整张地图
 """
 import numpy as np
-from PyQt5.QtWidgets import QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsEllipseItem
+from PyQt5.QtWidgets import (
+    QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
+    QGraphicsEllipseItem, QGraphicsPathItem,
+)
 from PyQt5.QtCore import Qt, QPoint, QRectF, QRect, pyqtSignal, QTimer
-from PyQt5.QtGui import QImage, QPixmap, QPainter, QColor, QWheelEvent, QMouseEvent, QPen
+from PyQt5.QtGui import (
+    QImage, QPixmap, QPainter, QColor, QWheelEvent, QMouseEvent,
+    QPen, QPainterPath, QBrush, QKeyEvent,
+)
 
 from data.constants import (
     MAP_WIDTH, MAP_HEIGHT,
@@ -72,12 +78,15 @@ class MapCanvas(QGraphicsView):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # 数据层
-        self._tile_map = np.full((MAP_HEIGHT, MAP_WIDTH), TILE_SEA, dtype=np.uint8)
-        self._province_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.int32)
-        self._terrain_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
-        self._height_map = np.full((MAP_HEIGHT, MAP_WIDTH), 40, dtype=np.uint8)
-        self._river_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
+        # 数据层 — 通过 MapData 集中管理
+        # 私有字段是 MapData 数组的别名（指向同一个 numpy 对象）
+        from core.map_data import MapData
+        self._map_data = MapData()
+        self._tile_map = self._map_data.tile_map
+        self._province_map = self._map_data.province_map
+        self._terrain_map = self._map_data.terrain_map
+        self._height_map = self._map_data.height_map
+        self._river_map = self._map_data.river_map
 
         # 河流编辑状态
         self._current_river_type = RIVER_SOURCE
@@ -93,12 +102,17 @@ class MapCanvas(QGraphicsView):
         # 显示/编辑模式
         self._display_mode = "land"
 
+        # 框架工具（新规范）：当不为 None 时，鼠标事件转发给它
+        self._framework_tool = None     # core.tools.base.Tool 实例
+        self._framework_ctx = None       # ToolContext
+
         # 当前状态
         self._zoom = 1.0
         self._current_tool = "brush"
         self._current_tile_type = TILE_LAND
         self._current_terrain_index = 0
         self._selected_province_id = 0  # 省份模式下选中的省份ID
+        self._selected_province_tile = 0  # 选中省份的地块类型（边界编辑时只能影响同类型像素）
         self._has_provinces = False     # 是否有省份数据（避免每笔都扫描整张图）
         self._current_height_value = 120
         self._brush_size = BRUSH_DEFAULT
@@ -145,6 +159,22 @@ class MapCanvas(QGraphicsView):
         self._brush_cursor.setVisible(False)
         self._scene.addItem(self._brush_cursor)
 
+        # 套索路径反馈（黄色虚线）
+        self._lasso_path_item = QGraphicsPathItem()
+        pen = QPen(QColor(255, 230, 0, 230), 2)
+        pen.setStyle(Qt.PenStyle.DashLine)
+        pen.setCosmetic(True)  # 不随缩放变粗细
+        self._lasso_path_item.setPen(pen)
+        self._lasso_path_item.setZValue(11)
+        self._lasso_path_item.setVisible(False)
+        self._scene.addItem(self._lasso_path_item)
+
+        # 套索 allowed 区域 overlay（半透明黄色填充）
+        self._lasso_overlay = QGraphicsPixmapItem()
+        self._lasso_overlay.setZValue(9)
+        self._lasso_overlay.setVisible(False)
+        self._scene.addItem(self._lasso_overlay)
+
         # 视图设置
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
@@ -161,12 +191,52 @@ class MapCanvas(QGraphicsView):
     # ========== 数据访问 ==========
 
     @property
+    def map_data(self):
+        """暴露 MapData 给外部使用高级查询方法（get_neighbors 等）。"""
+        return self._map_data
+
+    def set_framework_tool(self, tool_name: str | None, undo_mgr=None,
+                            state_mgr=None, country_mgr=None) -> None:
+        """启用/禁用一个框架工具。tool_name=None 关闭。"""
+        from core.tools import get_tool, ToolContext
+
+        if tool_name is None:
+            if self._framework_tool is not None and self._framework_ctx is not None:
+                self._framework_tool.on_cancel(self._framework_ctx)
+            self._framework_tool = None
+            self._framework_ctx = None
+            self._clear_lasso_visual()
+            self._render_province_overlay()
+            return
+
+        tool = get_tool(tool_name)
+        if tool is None:
+            return
+        if undo_mgr is None:
+            return
+        self._framework_tool = tool
+        self._framework_ctx = ToolContext(
+            map_data=self._map_data,
+            undo_mgr=undo_mgr,
+            state_mgr=state_mgr,
+            country_mgr=country_mgr,
+            display_mode=self._display_mode,
+            brush_size=self._brush_size,
+        )
+
+    def _set_layer(self, attr: str, data: np.ndarray, dtype) -> None:
+        """统一的图层替换：写入 MapData，同步本地别名。"""
+        new_arr = data.astype(dtype)
+        setattr(self._map_data, attr, new_arr)
+        setattr(self, "_" + attr, new_arr)
+
+    @property
     def tile_map(self) -> np.ndarray:
         return self._tile_map
 
     @tile_map.setter
     def tile_map(self, data: np.ndarray) -> None:
-        self._tile_map = data.astype(np.uint8)
+        self._set_layer("tile_map", data, np.uint8)
         if self._display_mode == "land":
             self._full_render()
 
@@ -176,7 +246,7 @@ class MapCanvas(QGraphicsView):
 
     @province_map.setter
     def province_map(self, data: np.ndarray) -> None:
-        self._province_map = data.astype(np.int32)
+        self._set_layer("province_map", data, np.int32)
         self._has_provinces = int(self._province_map.max()) > 0
         if self._display_mode == "province":
             self._full_render()
@@ -188,7 +258,7 @@ class MapCanvas(QGraphicsView):
 
     @terrain_map.setter
     def terrain_map(self, data: np.ndarray) -> None:
-        self._terrain_map = data.astype(np.uint8)
+        self._set_layer("terrain_map", data, np.uint8)
         if self._display_mode == "terrain":
             self._full_render()
 
@@ -198,7 +268,7 @@ class MapCanvas(QGraphicsView):
 
     @height_map.setter
     def height_map(self, data: np.ndarray) -> None:
-        self._height_map = data.astype(np.uint8)
+        self._set_layer("height_map", data, np.uint8)
         if self._display_mode == "height":
             self._full_render()
 
@@ -208,7 +278,7 @@ class MapCanvas(QGraphicsView):
 
     @river_map.setter
     def river_map(self, data: np.ndarray) -> None:
-        self._river_map = data.astype(np.uint8)
+        self._set_layer("river_map", data, np.uint8)
         if self._display_mode == "river":
             self._full_render()
 
@@ -475,11 +545,114 @@ class MapCanvas(QGraphicsView):
         rgba = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
         rgba[borders, 3] = 180  # 黑色半透明边界
 
+        # 高亮选中省份：用黄色描边它的边界
+        sel = self._selected_province_id
+        if sel > 0:
+            sel_mask = self._province_map == sel
+            sel_border = np.zeros_like(borders)
+            sel_border[:-1, :] |= sel_mask[:-1, :] != sel_mask[1:, :]
+            sel_border[1:, :]  |= sel_mask[:-1, :] != sel_mask[1:, :]
+            sel_border[:, :-1] |= sel_mask[:, :-1] != sel_mask[:, 1:]
+            sel_border[:, 1:]  |= sel_mask[:, :-1] != sel_mask[:, 1:]
+            rgba[sel_border] = (255, 230, 0, 255)  # 不透明黄色
+
         img = QImage(rgba.data, MAP_WIDTH, MAP_HEIGHT,
                      MAP_WIDTH * 4, QImage.Format.Format_ARGB32)
         img._ref = rgba
         self._province_pixmap_item.setPixmap(QPixmap.fromImage(img))
         self._province_pixmap_item.setVisible(True)
+
+    def _cleanup_after_province_edit(self) -> None:
+        """边界编辑结束后的安全清理：
+        1. 修复可能产生的 X-crossings
+        2. 修复可能产生的不连通碎片（边界编辑可能把对方省份切成两半）
+        3. 压实 ID（防止某省份被推到 0 像素消失后留下 gap）
+        4. 维护选中省份 ID 在压实后仍指向正确省份
+        """
+        from core.province_validator import fix_x_crossings
+        from core.province_generator import _fix_non_contiguous_fast, compact_province_ids
+
+        old_sel = self._selected_province_id
+
+        # 1. X-crossings
+        for _ in range(5):
+            if fix_x_crossings(self._province_map) == 0:
+                break
+
+        # 2. 不连通碎片
+        _fix_non_contiguous_fast(self._province_map)
+
+        # 3. 压实前先记录 selected 是否还存在
+        sel_existed = bool((self._province_map == old_sel).any()) if old_sel > 0 else False
+
+        # 4. 压实 ID（用映射表追踪 selected 的新 ID）
+        if old_sel > 0 and sel_existed:
+            unique_before = np.unique(self._province_map)
+            compact_province_ids(self._province_map)
+            unique_after = np.unique(self._province_map)
+            # 找出 old_sel 在压实后的新 ID
+            old_list = unique_before.tolist()
+            new_list = unique_after.tolist()
+            if old_sel in old_list:
+                idx = old_list.index(old_sel)
+                self._selected_province_id = int(new_list[idx])
+        else:
+            compact_province_ids(self._province_map)
+            if not sel_existed:
+                # 选中省份被推没了
+                self._selected_province_id = 0
+
+    # ────── 扩张工具可视反馈 ──────
+
+    def _show_expand_overlay(self) -> None:
+        """显示选中省份的 allowed 区域（半透明黄色）+ 进入扩张时变成绿色。"""
+        if self._framework_ctx is None:
+            return
+        mask = self._framework_ctx.state.get("allowed_mask")
+        if mask is None:
+            return
+        active = self._framework_ctx.state.get("active", False)
+        # active 状态用绿色（提示"现在能画了"），未 active 用黄色（提示"再点一次进入"）
+        color = (50, 220, 80, 70) if active else (255, 230, 0, 60)
+        rgba = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
+        rgba[mask] = color
+        img = QImage(rgba.data, MAP_WIDTH, MAP_HEIGHT,
+                     MAP_WIDTH * 4, QImage.Format.Format_ARGB32)
+        img._ref = rgba
+        self._lasso_overlay.setPixmap(QPixmap.fromImage(img))
+        self._lasso_overlay.setVisible(True)
+        # 不显示路径线
+        self._lasso_path_item.setVisible(False)
+
+    def _clear_lasso_visual(self) -> None:
+        """清除所有套索反馈元素。"""
+        self._lasso_path_item.setPath(QPainterPath())
+        self._lasso_path_item.setVisible(False)
+        self._lasso_overlay.setVisible(False)
+
+    def center_on_pixel(self, x: int, y: int, zoom: float | None = None) -> None:
+        """让画布中心对准地图坐标 (x, y)，可选放大到 zoom 倍。
+        用于验证对话框跳转到问题位置。"""
+        if not (0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT):
+            return
+        if zoom is not None:
+            self.resetTransform()
+            self.scale(zoom, zoom)
+        self.centerOn(float(x), float(y))
+
+    def center_on_province(self, pid: int) -> None:
+        """跳转到指定省份的中心，并选中它"""
+        if pid <= 0 or pid > self._province_map.max():
+            return
+        ys, xs = np.where(self._province_map == pid)
+        if len(ys) == 0:
+            return
+        cx = int(xs.mean())
+        cy = int(ys.mean())
+        self._selected_province_id = pid
+        self._selected_province_tile = int(self._tile_map[cy, cx])
+        self._render_province_overlay()
+        self.center_on_pixel(cx, cy, zoom=2.0)
 
     def split_province(self, pid: int) -> bool:
         """切割省份：沿中线把一个省份分成两半，新半用新ID"""
@@ -512,14 +685,23 @@ class MapCanvas(QGraphicsView):
         self._render_province_overlay()
         return True
 
-    def merge_provinces(self, pid_keep: int, pid_remove: int) -> bool:
-        """合并两个省份：pid_remove 的所有像素归入 pid_keep"""
+    def merge_provinces(self, pid_keep: int, pid_remove: int,
+                         state_mgr=None, country_mgr=None) -> bool:
+        """合并两个省份：pid_remove 的所有像素归入 pid_keep。
+        合并后立即压实 ID 并同步 state/country 引用，避免 ID gap。"""
         if pid_keep <= 0 or pid_remove <= 0 or pid_keep == pid_remove:
             return False
         mask = self._province_map == pid_remove
         if not np.any(mask):
             return False
         self._province_map[mask] = pid_keep
+        # 压实 + 同步引用
+        mapping = self._map_data.compact_with_references(
+            state_mgr=state_mgr, country_mgr=country_mgr,
+        )
+        # 更新 canvas 持有的选中省份 id
+        if self._selected_province_id in mapping:
+            self._selected_province_id = mapping[self._selected_province_id]
         self._full_render()
         self._render_province_overlay()
         return True
@@ -552,7 +734,11 @@ class MapCanvas(QGraphicsView):
 
     def _stamp_brush(self, cx: int, cy: int) -> None:
         """在单个位置盖一个方形笔刷印章（根据当前模式）"""
-        r = self._brush_size // 2
+        # 省份模式：固定 1 像素，不依赖刷子大小（边界编辑要精确）
+        if self._display_mode == "province":
+            r = 0
+        else:
+            r = self._brush_size // 2
         x0 = max(0, cx - r)
         y0 = max(0, cy - r)
         x1 = min(MAP_WIDTH, cx + r + 1)
@@ -584,11 +770,19 @@ class MapCanvas(QGraphicsView):
             return
 
         elif mode == "province":
-            # 省份模式：边界拖动（用画笔刷省份ID）
-            if self._selected_province_id > 0:
-                self._province_map[y0:y1, x0:x1] = self._selected_province_id
-            else:
+            # 省份模式：边界拖动 — 只能把"同类型地块的相邻省份像素"转给选中省份
+            # 例如：选中一个 land 省份，画笔只影响 land 像素，不会把海或湖变成陆地
+            if self._selected_province_id <= 0:
                 return
+            sub_pm = self._province_map[y0:y1, x0:x1]
+            sub_tm = self._tile_map[y0:y1, x0:x1]
+            # 条件：地块类型匹配 AND 不是背景 AND 不是已经属于选中省份
+            mask = (
+                (sub_tm == self._selected_province_tile)
+                & (sub_pm != 0)
+                & (sub_pm != self._selected_province_id)
+            )
+            sub_pm[mask] = self._selected_province_id
 
         elif mode == "river":
             if self._current_tool == "eraser":
@@ -688,6 +882,26 @@ class MapCanvas(QGraphicsView):
             event.accept()
             return
 
+        # 框架工具分发（新规范）
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self._framework_tool is not None
+                and not self._space_pressed):
+            sx, sy = self._scene_pos(event)
+            if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+                self._framework_ctx.dirty_bbox = None
+                self._framework_tool.begin_undo(self._framework_ctx)
+                self._framework_tool.on_press(self._framework_ctx, sx, sy)
+                self._is_drawing = True
+
+                # 扩张工具可视反馈：选中省份后显示 allowed 区域 overlay
+                if self._framework_ctx.state.get("pid"):
+                    self._show_expand_overlay()
+
+                self.stroke_started.emit()
+                self._render_province_overlay()
+                event.accept()
+                return
+
         if event.button() == Qt.MouseButton.LeftButton:
             if self._space_pressed or self._current_tool == "pan":
                 self._is_panning = True
@@ -726,7 +940,10 @@ class MapCanvas(QGraphicsView):
                     pid = int(self._province_map[sy, sx])
                     if pid > 0:
                         self._selected_province_id = pid
+                        # 记录该省份的地块类型，约束边界编辑只能影响同类型像素
+                        self._selected_province_tile = int(self._tile_map[sy, sx])
                         self.province_clicked.emit(pid)
+                        self._render_province_overlay()  # 高亮选中省份的边界
                         # 允许画笔模式下拖动修改边界
                         if self._current_tool in ("brush", "eraser"):
                             self._is_drawing = True
@@ -764,8 +981,9 @@ class MapCanvas(QGraphicsView):
         super().mousePressEvent(event)
 
     def _update_brush_cursor(self, sx: int, sy: int) -> None:
-        """更新画笔预览光标位置和大小"""
-        if self._current_tool in ("brush", "eraser") and self._display_mode in ("land", "terrain", "height", "river", "province"):
+        """更新画笔预览光标位置和大小。
+        省份模式不显示刷子框 — 它是边界编辑工具，不是绘画工具。"""
+        if self._current_tool in ("brush", "eraser") and self._display_mode in ("land", "terrain", "height", "river"):
             r = self._brush_size // 2
             self._brush_cursor.setRect(sx - r, sy - r, self._brush_size, self._brush_size)
             self._brush_cursor.setVisible(True)
@@ -788,6 +1006,21 @@ class MapCanvas(QGraphicsView):
             event.accept()
             return
 
+        # 框架工具分发
+        if self._is_drawing and self._framework_tool is not None:
+            if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+                self._framework_tool.on_drag(self._framework_ctx, sx, sy)
+                # 拖动期间持续刷新画布，让用户看到扩张效果
+                if self._framework_ctx.state.get("painting"):
+                    self._mark_dirty(
+                        max(0, sx - 10), max(0, sy - 10),
+                        min(MAP_WIDTH, sx + 11), min(MAP_HEIGHT, sy + 11),
+                    )
+                    self._flush_dirty()
+                    self._render_province_overlay()
+                event.accept()
+                return
+
         if self._is_drawing and self._current_tool in ("brush", "eraser"):
             self._paint_at(sx, sy)
             event.accept()
@@ -806,8 +1039,31 @@ class MapCanvas(QGraphicsView):
             if self._is_drawing:
                 self._is_drawing = False
                 self._last_draw_pos = None  # 清除插值起点
+
+                # 框架工具：先 release，再清理，再 end_undo，最后刷新
+                if self._framework_tool is not None:
+                    sx, sy = self._scene_pos(event)
+                    self._framework_tool.on_release(self._framework_ctx, sx, sy)
+                    self._framework_tool.run_cleanup(self._framework_ctx)
+                    self._framework_tool.end_undo(self._framework_ctx)
+                    # 同步选中状态到 canvas
+                    self._selected_province_id = self._framework_ctx.selected_province_id
+                    # overlay 跟随：还有 pid 就保留显示，否则清掉
+                    if self._framework_ctx.state.get("pid"):
+                        self._show_expand_overlay()
+                    else:
+                        self._clear_lasso_visual()
+                    self._mark_dirty(0, 0, MAP_WIDTH, MAP_HEIGHT)
+                    self._flush_dirty()
+                    if self._display_mode == "province":
+                        self._render_province_overlay()
+                    self.stroke_ended.emit()
+                    event.accept()
+                    return
+
                 self._flush_dirty()
-                # 省份/河流模式拖动结束后刷新
+                # 省份模式拖动结束后：只刷新边界，不做重清理
+                # （重清理移到导出时跑，避免每次松鼠标卡住）
                 if self._display_mode == "province":
                     self._render_province_overlay()
                 self.stroke_ended.emit()
@@ -858,6 +1114,15 @@ class MapCanvas(QGraphicsView):
             self._space_pressed = True
             if not self._is_drawing:
                 self.setCursor(Qt.CursorShape.OpenHandCursor)
+        # ESC：取消正在进行的套索/框架工具操作
+        elif event.key() == Qt.Key.Key_Escape:
+            if self._is_drawing and self._framework_tool is not None:
+                self._framework_tool.on_cancel(self._framework_ctx)
+                self._is_drawing = False
+                self._clear_lasso_visual()
+                # 不入撤销栈（因为是取消，pending 直接丢弃）
+                self._framework_ctx.undo_mgr._pending = None
+                self.stroke_ended.emit()
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event) -> None:

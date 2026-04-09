@@ -29,18 +29,19 @@ TERRAIN_TYPES = {
 }
 
 # terrain.bmp 使用 8 位索引色调色板
-# 索引号必须与原版 HOI4 terrain.bmp 一致（从原版实际数据逆向得到）
+# 索引号必须与原版 common/terrain/00_terrain.txt 的 color={} 值一致
+# 从原��� G:/SteamLibrary/.../common/terrain/00_terrain.txt 第323-356行实际验证
 TERRAIN_PALETTE_INDEX = {
-    "ocean":    15,   # 原版海洋索引
-    "lakes":    15,   # 湖泊也用海洋索引
-    "plains":   9,    # 平原
-    "forest":   1,    # 森林
-    "hills":    3,    # 丘陵
-    "mountain": 11,   # 山地
-    "desert":   7,    # 沙漠
-    "marsh":    10,   # 沼泽
-    "jungle":   21,   # 丛林
-    "urban":    2,    # 城市
+    "ocean":    15,   # ocean_15: type=ocean, color={15}
+    "lakes":    14,   # forest_14: type=lakes, color={14}
+    "plains":   0,    # terrain_0: type=plains, color={0}
+    "forest":   1,    # terrain_1: type=forest, color={1}
+    "hills":    17,   # hills_blend: type=hills, color={17}
+    "mountain": 11,   # desert: type=mountain, color={11}
+    "desert":   3,    # desert: type=desert, color={3}
+    "marsh":    9,    # terrain_9: type=marsh, color={9}
+    "jungle":   21,   # jungle_18: type=jungle, color={21}
+    "urban":    13,   # forest_13: type=urban, color={13}
 }
 
 # 根据地块类型自动分配的默认地形

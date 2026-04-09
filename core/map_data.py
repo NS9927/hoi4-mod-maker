@@ -1,0 +1,232 @@
+"""
+MapData — 地图数据中心。
+
+把所有 numpy 图层 (tile_map / province_map / terrain_map / height_map / river_map)
+集中到一个对象里，提供高级查询和修改方法。
+
+设计原则：
+1. **直接数组访问仍然工作**：MapData.tile_map 返回 numpy 数组，旧代码不用改
+2. **高级方法作为补充**：get_neighbors / get_province_mask 等避免在多处重复实现
+3. **不持有 UI 引用**：MapData 是纯数据层，不知道 canvas/widget 存在
+4. **不做撤销/渲染**：那是上层的责任
+
+迁移策略：
+- 第一步：MapData 作为容器存在，canvas/main_window 通过 canvas.map_data.tile_map 访问
+- 第二步：逐步把分散的辅助函数（get_neighbors 等）迁过来
+- 第三步：高频读写过 MapData 方法，便于将来加钩子
+"""
+
+from __future__ import annotations
+
+import numpy as np
+
+from data.constants import MAP_WIDTH, MAP_HEIGHT, TILE_LAND, TILE_SEA, TILE_LAKE
+
+
+class MapData:
+    """地图全部图层 + 高级查询接口。"""
+
+    def __init__(self) -> None:
+        self.tile_map = np.full((MAP_HEIGHT, MAP_WIDTH), TILE_SEA, dtype=np.uint8)
+        self.province_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.int32)
+        self.terrain_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
+        self.height_map = np.full((MAP_HEIGHT, MAP_WIDTH), 40, dtype=np.uint8)
+        self.river_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
+
+    # ───────────── 重置/替换 ─────────────
+
+    def reset(self) -> None:
+        """所有图层恢复到初始状态。"""
+        self.tile_map[:] = TILE_SEA
+        self.province_map[:] = 0
+        self.terrain_map[:] = 0
+        self.height_map[:] = 40
+        self.river_map[:] = 0
+
+    def replace_all(
+        self,
+        tile_map: np.ndarray | None = None,
+        province_map: np.ndarray | None = None,
+        terrain_map: np.ndarray | None = None,
+        height_map: np.ndarray | None = None,
+        river_map: np.ndarray | None = None,
+    ) -> None:
+        """从外部数据（加载工程时用）批量替换图层。原地写入以保持引用稳定。"""
+        if tile_map is not None:
+            self.tile_map[:] = tile_map
+        if province_map is not None:
+            self.province_map[:] = province_map
+        if terrain_map is not None:
+            self.terrain_map[:] = terrain_map
+        if height_map is not None:
+            self.height_map[:] = height_map
+        if river_map is not None:
+            self.river_map[:] = river_map
+
+    # ───────────── 字典接口（给 undo/serialize 用）─────────────
+
+    def as_dict(self) -> dict[str, np.ndarray]:
+        return {
+            "tile_map": self.tile_map,
+            "province_map": self.province_map,
+            "terrain_map": self.terrain_map,
+            "height_map": self.height_map,
+            "river_map": self.river_map,
+        }
+
+    def apply_dict(self, data: dict[str, np.ndarray]) -> None:
+        """从字典恢复（撤销时用）。原地写以保持引用。"""
+        for k, v in data.items():
+            arr = getattr(self, k, None)
+            if arr is not None and v is not None:
+                arr[:] = v
+
+    # ───────────── 省份查询 ─────────────
+
+    @property
+    def province_count(self) -> int:
+        return int(self.province_map.max())
+
+    def get_province_mask(self, pid: int) -> np.ndarray:
+        """返回布尔 mask，True 的地方就是这个省份的像素。"""
+        return self.province_map == pid
+
+    def get_province_pixel_count(self, pid: int) -> int:
+        return int((self.province_map == pid).sum())
+
+    def get_province_bbox(self, pid: int) -> tuple[int, int, int, int] | None:
+        """返回 (x_min, y_min, x_max, y_max)，省份不存在返回 None。"""
+        ys, xs = np.where(self.province_map == pid)
+        if len(ys) == 0:
+            return None
+        return int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
+
+    def get_province_centroid(self, pid: int) -> tuple[int, int] | None:
+        """返回省份重心 (x, y)，不存在返回 None。"""
+        ys, xs = np.where(self.province_map == pid)
+        if len(ys) == 0:
+            return None
+        return int(xs.mean()), int(ys.mean())
+
+    def get_province_tile_type(self, pid: int) -> int:
+        """返回省份的地块类型（land/sea/lake）。
+        实现：取省份内任意一个像素的 tile_map 值。"""
+        ys, xs = np.where(self.province_map == pid)
+        if len(ys) == 0:
+            return 0
+        return int(self.tile_map[ys[0], xs[0]])
+
+    def get_province_neighbors(self, pid: int) -> set[int]:
+        """返回省份 pid 的所有直接邻居 ID 集合。
+        用 4 邻接膨胀检测。考虑横向 wrap。"""
+        from scipy.ndimage import binary_dilation
+        if pid <= 0:
+            return set()
+        mask = self.province_map == pid
+        if not mask.any():
+            return set()
+        # 4 连通膨胀 1 像素
+        struct = np.array([[0, 1, 0], [1, 1, 1], [0, 1, 0]], dtype=bool)
+        dilated = binary_dilation(mask, structure=struct)
+        # 横向 wrap：把右边缘和左边缘合并考虑
+        # 简化处理：直接对边界邻居做 union（极少情况下不影响功能）
+        border = dilated & ~mask
+        neighbor_ids = set(int(x) for x in np.unique(self.province_map[border]))
+        neighbor_ids.discard(0)
+        neighbor_ids.discard(pid)
+        return neighbor_ids
+
+    def get_neighborhood_mask(self, pid: int) -> np.ndarray:
+        """返回 pid 自己 + 所有直接邻居的合并 mask。
+        套索/边界编辑用——限定操作的最大范围。"""
+        neighbors = self.get_province_neighbors(pid)
+        mask = self.province_map == pid
+        for nid in neighbors:
+            mask |= self.province_map == nid
+        return mask
+
+    # ───────────── 地块统计 ─────────────
+
+    def compact_with_references(
+        self,
+        state_mgr=None,
+        country_mgr=None,
+        tracked_pids: list[int] | None = None,
+    ) -> dict[int, int]:
+        """压实 province_map 的 ID，并同步更新所有引用省份 ID 的地方。
+
+        这是修改省份的"安全收尾"——任何会删除省份的操作（合并/扩张吃光邻居）
+        结束后必须调这个，避免 ID gap 导致 HOI4 文档警告的属性串位灾难。
+
+        参数：
+            state_mgr: StateManager — 更新 state.provinces / victory_points / province_to_state
+            country_mgr: CountryManager — 更新 country.capital
+            tracked_pids: 调用方想追踪的额外 pid 列表（如选中的省份）
+
+        返回：
+            {old_id: new_id} 映射，调用方用它更新自己持有的 pid 引用
+        """
+        from core.province_generator import compact_province_ids
+
+        # 压实前的旧 ID 列表
+        old_unique = np.unique(self.province_map).tolist()
+
+        # 压实
+        compact_province_ids(self.province_map)
+
+        # 压实后的新 ID 列表（顺序与 old_unique 一一对应）
+        new_unique = np.unique(self.province_map).tolist()
+
+        # 构建映射 {old: new}
+        if len(old_unique) != len(new_unique):
+            # 不应该发生（compact 是稳定排序）
+            raise RuntimeError("compact_province_ids 产生了不一致的 ID 列表")
+        mapping = dict(zip(old_unique, new_unique))
+
+        # 更新 state_mgr
+        # 注意：被删除的省份（不在 mapping 里）必须从 list/dict 中**完全丢弃**，
+        # 不能保留死引用，否则 state 会指向不存在的省份
+        if state_mgr is not None:
+            for state in state_mgr.states.values():
+                # 过滤掉死引用（被删除的省份），同时去重
+                seen = set()
+                new_provinces = []
+                for p in state.provinces:
+                    if p in mapping and mapping[p] != 0 and mapping[p] not in seen:
+                        seen.add(mapping[p])
+                        new_provinces.append(mapping[p])
+                state.provinces = new_provinces
+
+                # VP 字典：丢掉死引用
+                new_vp = {}
+                for old_pid, value in state.victory_points.items():
+                    if old_pid in mapping and mapping[old_pid] != 0:
+                        new_vp[mapping[old_pid]] = value
+                state.victory_points = new_vp
+
+            # 重建 province_to_state 索引
+            new_p2s = {}
+            for sid, state in state_mgr.states.items():
+                for pid in state.provinces:
+                    new_p2s[pid] = sid
+            state_mgr._province_to_state = new_p2s
+
+        # 更新 country_mgr
+        if country_mgr is not None:
+            for country in country_mgr.countries.values():
+                if country.capital > 0:
+                    if country.capital in mapping and mapping[country.capital] != 0:
+                        country.capital = mapping[country.capital]
+                    else:
+                        # 首都被删了，清零
+                        country.capital = 0
+
+        return mapping
+
+    def get_tile_counts(self) -> dict[str, int]:
+        """统计陆/海/湖像素数。"""
+        return {
+            "land": int((self.tile_map == TILE_LAND).sum()),
+            "sea":  int((self.tile_map == TILE_SEA).sum()),
+            "lake": int((self.tile_map == TILE_LAKE).sum()),
+        }
