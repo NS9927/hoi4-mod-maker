@@ -9,33 +9,29 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt5.QtWidgets import QApplication
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPalette, QColor
 
+from app.crash_handler import install_crash_handler
 from ui.main_window import MainWindow
 
 
 def main():
+    # 全局崩溃处理器 (弹窗显示原因 + 写 logs/crash_*.log)
+    install_crash_handler()
+
     # 高DPI支持
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
-    app.setApplicationName("HOI4 Fantasy MOD Maker")
+    app.setApplicationName("HOI4 MOD 制作工具")
     app.setOrganizationName("HOI4ModTools")
-    app.setStyle("Fusion")
 
-    # 暗色调色板基础
-    palette = QPalette()
-    palette.setColor(QPalette.ColorRole.Window, QColor("#0a0e17"))
-    palette.setColor(QPalette.ColorRole.WindowText, QColor("#e2e8f0"))
-    palette.setColor(QPalette.ColorRole.Base, QColor("#0d1525"))
-    palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#1a2235"))
-    palette.setColor(QPalette.ColorRole.Text, QColor("#e2e8f0"))
-    palette.setColor(QPalette.ColorRole.Button, QColor("#1a2235"))
-    palette.setColor(QPalette.ColorRole.ButtonText, QColor("#e2e8f0"))
-    palette.setColor(QPalette.ColorRole.Highlight, QColor("#3b82f6"))
-    palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#ffffff"))
-    app.setPalette(palette)
+    # 用 PyQtDarkTheme 专业暗色主题, 替代手写 QSS
+    import qdarktheme
+    app.setStyleSheet(qdarktheme.load_stylesheet(
+        "dark",
+        custom_colors={"primary": "#6c6cf0"},
+    ))
 
     window = MainWindow()
     window.showMaximized()

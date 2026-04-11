@@ -22,8 +22,8 @@ from data.constants import (
     DEFAULT_HOI4_PATH, DEFAULT_SUPPORTED_VERSION, REPLACE_PATHS,
 )
 from data.terrain_types import TERRAIN_PALETTE_INDEX, DEFAULT_TERRAIN_FOR_TILE
-from core.province_generator import generate_provinces, generate_province_colors
-from core.province_validator import get_coastal_provinces
+from domain.generators.province import generate_provinces, generate_province_colors
+from domain.validators.province import get_coastal_provinces
 from export.bmp_writer import (
     write_provinces_bmp, write_heightmap_bmp,
     write_terrain_bmp, write_rivers_bmp, write_trees_bmp,

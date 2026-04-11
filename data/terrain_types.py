@@ -79,3 +79,60 @@ RIVER_COLORS = {
 # (0, 0, 蓝色值)，值越小河流越宽
 RIVER_WIDTH_NARROW = 255    # 最窄
 RIVER_WIDTH_WIDE = 1        # 最宽
+
+
+class GraphicalTerrain(NamedTuple):
+    """terrain.bmp 的 graphical terrain 条目 (来自 00_terrain.txt terrain={} 块)"""
+    id: str                # 原版条目名: "terrain_0", "desert_mountain" 等
+    type: str              # provincial terrain 类型: plains/forest/mountain 等
+    palette_index: int     # terrain.bmp 调色板索引
+    texture: int           # atlas0.dds 贴图编号 (0-15)
+    name_cn: str           # 中文显示名
+    perm_snow: bool        # 永雪覆盖
+    spawn_city: bool       # 自动生成城市模型
+
+
+# 原版 00_terrain.txt terrain={} 块全部条目
+GRAPHICAL_TERRAINS: list[GraphicalTerrain] = [
+    GraphicalTerrain("terrain_0",             "plains",   0,  1,  "平原",           False, False),
+    GraphicalTerrain("terrain_1",             "forest",   1,  4,  "森林",           False, False),
+    GraphicalTerrain("desert_mountain",       "hills",    2,  3,  "沙漠丘陵",       False, False),
+    GraphicalTerrain("desert",                "desert",   3,  9,  "沙漠",           False, False),
+    GraphicalTerrain("terrain_4",             "forest",   4,  5,  "森林(变体)",     False, False),
+    GraphicalTerrain("terrain_5",             "plains",   5,  0,  "平原(变体)",     False, False),
+    GraphicalTerrain("terrain_6",             "mountain", 6,  11, "山地",           False, False),
+    GraphicalTerrain("terrain_7",             "desert",   7,  12, "沙漠(变体)",     False, False),
+    GraphicalTerrain("desert_hills",          "desert",   8,  14, "沙漠丘陵",       False, False),
+    GraphicalTerrain("terrain_9",             "marsh",    9,  6,  "沼泽",           False, False),
+    GraphicalTerrain("terrain_10",            "mountain", 10, 13, "山地(变体)",     False, False),
+    GraphicalTerrain("desert_mountain_11",    "mountain", 11, 11, "沙漠山地",       False, False),
+    GraphicalTerrain("desert_12",             "desert",   12, 8,  "沙漠(岩地)",     False, False),
+    GraphicalTerrain("forest_13",             "urban",    13, 10, "城市",           False, True),
+    GraphicalTerrain("forest_14",             "lakes",    14, 255, "湖泊",          False, False),
+    GraphicalTerrain("ocean_15",              "ocean",    15, 9,  "海洋",           False, False),
+    GraphicalTerrain("snow_16",               "mountain", 16, 11, "雪山",           True,  False),
+    GraphicalTerrain("hills_blend",           "hills",    17, 2,  "丘陵",           False, False),
+    GraphicalTerrain("mountain_variation_sand","mountain", 18, 7,  "沙色山地",      False, False),
+    GraphicalTerrain("plains_snow",           "plains",   19, 0,  "雪原",           True,  False),
+    GraphicalTerrain("mountain_variation_grass","mountain",20, 7,  "草地山地",      False, False),
+    GraphicalTerrain("jungle_18",             "jungle",   21, 4,  "丛林",           False, False),
+    GraphicalTerrain("jungle_blend_18",       "jungle",   22, 5,  "丛林(变体)",     False, False),
+    GraphicalTerrain("jungle_mountain",       "mountain", 27, 7,  "丛林山地",       False, False),
+    GraphicalTerrain("desert_mountain_tops",  "mountain", 31, 15, "沙漠山顶",       False, False),
+]
+
+# 调色板索引 → GraphicalTerrain 快速查找
+GRAPHICAL_TERRAIN_BY_INDEX: dict[int, GraphicalTerrain] = {
+    gt.palette_index: gt for gt in GRAPHICAL_TERRAINS
+}
+
+# 调色板索引 → provincial terrain type 名称 (用于 definition.csv)
+PALETTE_TO_TYPE: dict[int, str] = {
+    gt.palette_index: gt.type for gt in GRAPHICAL_TERRAINS
+}
+
+# 按 provincial terrain type 分组的可画变体 (排除 ocean/lakes)
+PAINTABLE_GROUPS: dict[str, list[GraphicalTerrain]] = {}
+for _gt in GRAPHICAL_TERRAINS:
+    if _gt.type not in ("ocean", "lakes"):
+        PAINTABLE_GROUPS.setdefault(_gt.type, []).append(_gt)

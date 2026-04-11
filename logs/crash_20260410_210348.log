@@ -1,0 +1,10 @@
+# 崩溃时间: 2026-04-10T21:03:48.007133
+# Python: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+# Platform: win32
+
+Traceback (most recent call last):
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\ui\main_window.py", line 1054, in _on_import_image
+    if self._canvas.load_reference_image(file_path):
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\ui\canvas_widget.py", line 378, in load_reference_image
+    Qt.TransformMode.SmoothTransformation)
+AttributeError: type object 'Qt' has no attribute 'TransformMode'

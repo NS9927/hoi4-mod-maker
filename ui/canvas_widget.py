@@ -6,7 +6,7 @@
 import numpy as np
 from PyQt5.QtWidgets import (
     QGraphicsView, QGraphicsScene, QGraphicsPixmapItem,
-    QGraphicsEllipseItem, QGraphicsPathItem,
+    QGraphicsEllipseItem, QGraphicsPathItem, QGraphicsRectItem,
 )
 from PyQt5.QtCore import Qt, QPoint, QRectF, QRect, pyqtSignal, QTimer
 from PyQt5.QtGui import (
@@ -20,8 +20,8 @@ from data.constants import (
     ZOOM_MIN, ZOOM_MAX, ZOOM_STEP,
     BRUSH_DEFAULT,
 )
-from data.terrain_types import TERRAIN_TYPES, TERRAIN_PALETTE_INDEX
-from core.river_manager import (
+from data.terrain_types import TERRAIN_TYPES, TERRAIN_PALETTE_INDEX, GRAPHICAL_TERRAINS, PALETTE_TO_TYPE
+from domain.managers.river import (
     RIVER_DISPLAY_COLORS, RIVER_SOURCE, RIVER_BG_LAND, RIVER_BG_SEA,
     RIVER_ERASE, VALID_RIVER_VALUES,
 )
@@ -34,16 +34,47 @@ _TILE_BGRA = {
     TILE_LAKE:      (210, 160, 100, 255),
 }
 
-# 构建 terrain 索引 → BGRA 颜色查找表
-_TERRAIN_INDEX_TO_BGRA = {}
-for _name, _idx in TERRAIN_PALETTE_INDEX.items():
-    _r, _g, _b = TERRAIN_TYPES[_name].color
-    _TERRAIN_INDEX_TO_BGRA[_idx] = (_b, _g, _r, 255)
-
-# 构建 terrain 颜色 LUT (numpy数组, 256 entries, BGRA)
+# 构建 terrain 索引 → BGRA 颜色查找表 (覆盖全部 graphical terrain)
+# 每个变体用独立的高饱和色，确保 canvas 上一眼能分辨
 _TERRAIN_COLOR_LUT = np.zeros((256, 4), dtype=np.uint8)
-for _idx, _bgra in _TERRAIN_INDEX_TO_BGRA.items():
-    _TERRAIN_COLOR_LUT[_idx] = _bgra
+_TERRAIN_DISPLAY_COLORS: dict[int, tuple[int, int, int]] = {
+    # plains 组: 绿色系
+    0:  (120, 180, 60),   # 平原
+    5:  (100, 160, 40),   # 平原(变体)
+    19: (180, 200, 220),  # 雪原 (偏白蓝)
+    # forest 组: 深绿
+    1:  (30, 130, 30),    # 森林
+    4:  (50, 150, 70),    # 森林(变体)
+    # hills 组: 黄橙
+    2:  (210, 180, 80),   # 沙漠丘陵
+    17: (230, 200, 60),   # 丘陵
+    # mountain 组: 灰棕分明
+    6:  (140, 130, 120),  # 山地
+    10: (160, 140, 100),  # 山地(变体)
+    11: (180, 150, 100),  # 沙漠山地
+    16: (200, 210, 230),  # 雪山 (偏白蓝)
+    18: (190, 170, 110),  # 沙色山地
+    20: (130, 150, 100),  # 草地山地
+    27: (80, 120, 70),    # 丛林山地
+    31: (110, 90, 60),    # 沙漠山顶 (深褐)
+    # desert 组: 黄沙系
+    3:  (220, 190, 100),  # 沙漠
+    7:  (200, 170, 80),   # 沙漠(变体)
+    8:  (210, 160, 90),   # 沙漠丘陵
+    12: (230, 210, 130),  # 沙漠(岩地)
+    # marsh: 暗青绿
+    9:  (70, 120, 90),    # 沼泽
+    # urban: 紫灰
+    13: (160, 130, 170),  # 城市
+    # jungle: 黄绿
+    21: (60, 140, 20),    # 丛林
+    22: (80, 160, 40),    # 丛林(变体)
+    # water (不可画但需要显示)
+    14: (60, 130, 200),   # 湖泊
+    15: (30, 80, 180),    # 海洋
+}
+for _idx, (_r, _g, _b) in _TERRAIN_DISPLAY_COLORS.items():
+    _TERRAIN_COLOR_LUT[_idx] = (_b, _g, _r, 255)  # BGRA
 
 # 河流颜色 LUT (索引 → BGRA)
 _RIVER_COLOR_LUT = np.zeros((256, 4), dtype=np.uint8)
@@ -80,7 +111,7 @@ class MapCanvas(QGraphicsView):
 
         # 数据层 — 通过 MapData 集中管理
         # 私有字段是 MapData 数组的别名（指向同一个 numpy 对象）
-        from core.map_data import MapData
+        from domain.map_data import MapData
         self._map_data = MapData()
         self._tile_map = self._map_data.tile_map
         self._province_map = self._map_data.province_map
@@ -90,6 +121,9 @@ class MapCanvas(QGraphicsView):
 
         # 河流编辑状态
         self._current_river_type = RIVER_SOURCE
+
+        # 地形画笔模式: False=按省份(默认), True=逐像素画笔
+        self._terrain_brush_mode = False
 
         # 显示缓冲区（BGRA）
         self._display_buffer = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
@@ -124,6 +158,22 @@ class MapCanvas(QGraphicsView):
         self._show_ref_image = True
         self._show_provinces = True
 
+        # 框选模式
+        self._selection_mode = False
+        self._selection_rect = None  # (x0, y0, x1, y1) scene coords
+        self._selection_start = None
+        self._selection_callback = None  # 框选完成后的回调
+
+        # 变换工具状态
+        self._transform_active = False    # 变换框是否激活
+        self._transform_selecting = False # 正在框选阶段
+        self._transform_box = None       # (x0, y0, x1, y1) 当前变换框
+        self._transform_snippet = None   # 剪切出的 tile_map 片段 (numpy)
+        self._transform_orig_box = None  # 原始框位置
+        self._transform_drag = None      # 当前拖拽类型: "move"/"tl"/"tr"/"bl"/"br"/"rotate"/None
+        self._transform_drag_start = None
+        self._transform_angle = 0.0      # 旋转角度（度）
+
         # 脏矩形（需要刷新的区域）
         self._dirty_rect = None  # (x0, y0, x1, y1) 或 None
 
@@ -141,15 +191,48 @@ class MapCanvas(QGraphicsView):
         self._map_pixmap_item = QGraphicsPixmapItem()
         self._scene.addItem(self._map_pixmap_item)
 
+        # 原版地图参考层 (底层)
+        self._vanilla_ref_item = QGraphicsPixmapItem()
+        self._vanilla_ref_item.setOpacity(0.3)
+        self._vanilla_ref_item.setZValue(1)
+        self._scene.addItem(self._vanilla_ref_item)
+
+        # 用户自定义参考图层 (上层)
         self._ref_pixmap_item = QGraphicsPixmapItem()
         self._ref_pixmap_item.setOpacity(0.4)
-        self._ref_pixmap_item.setZValue(1)
+        self._ref_pixmap_item.setZValue(2)
         self._scene.addItem(self._ref_pixmap_item)
 
         self._province_pixmap_item = QGraphicsPixmapItem()
         self._province_pixmap_item.setOpacity(0.6)
         self._province_pixmap_item.setZValue(2)
         self._scene.addItem(self._province_pixmap_item)
+
+        # 框选矩形（用于框选放大等功能）
+        self._selection_rect_item = QGraphicsRectItem()
+        self._selection_rect_item.setPen(QPen(QColor(255, 255, 0), 2, Qt.DashLine))
+        self._selection_rect_item.setBrush(QBrush(QColor(255, 255, 0, 30)))
+        self._selection_rect_item.setZValue(100)
+        self._selection_rect_item.setVisible(False)
+        self._scene.addItem(self._selection_rect_item)
+
+        # 变换框（边框 + 4 个角 handle）
+        self._transform_border = QGraphicsRectItem()
+        self._transform_border.setPen(QPen(QColor(0, 200, 255), 2))
+        self._transform_border.setBrush(QBrush(Qt.NoBrush))
+        self._transform_border.setZValue(101)
+        self._transform_border.setVisible(False)
+        self._scene.addItem(self._transform_border)
+
+        self._transform_handles: dict[str, QGraphicsRectItem] = {}
+        for hid in ("tl", "tr", "bl", "br"):
+            h = QGraphicsRectItem(-4, -4, 8, 8)
+            h.setPen(QPen(QColor(0, 200, 255), 1))
+            h.setBrush(QBrush(QColor(255, 255, 255)))
+            h.setZValue(102)
+            h.setVisible(False)
+            self._scene.addItem(h)
+            self._transform_handles[hid] = h
 
         # 画笔预览光标（半透明圆圈）
         self._brush_cursor = QGraphicsEllipseItem()
@@ -175,6 +258,13 @@ class MapCanvas(QGraphicsView):
         self._lasso_overlay.setVisible(False)
         self._scene.addItem(self._lasso_overlay)
 
+        # VP 标记叠加层 (Feature 10)
+        self._vp_overlay_item = QGraphicsPixmapItem()
+        self._vp_overlay_item.setZValue(5)
+        self._vp_overlay_item.setVisible(False)
+        self._scene.addItem(self._vp_overlay_item)
+        self._vp_data: dict[int, int] = {}  # {province_id: vp_value}
+
         # 视图设置
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, False)
         self.setDragMode(QGraphicsView.DragMode.NoDrag)
@@ -198,7 +288,7 @@ class MapCanvas(QGraphicsView):
     def set_framework_tool(self, tool_name: str | None, undo_mgr=None,
                             state_mgr=None, country_mgr=None) -> None:
         """启用/禁用一个框架工具。tool_name=None 关闭。"""
-        from core.tools import get_tool, ToolContext
+        from domain.tools import get_tool, ToolContext
 
         if tool_name is None:
             if self._framework_tool is not None and self._framework_ctx is not None:
@@ -291,7 +381,12 @@ class MapCanvas(QGraphicsView):
 
     @display_mode.setter
     def display_mode(self, mode: str) -> None:
-        if mode not in ("land", "terrain", "height", "province", "state", "country", "river"):
+        _VALID = (
+            "land", "terrain", "height", "province",
+            "state", "country", "river", "logistics",
+            "continent", "strategic_region", "colormap", "default_map",
+        )
+        if mode not in _VALID:
             return
         if mode == self._display_mode:
             return
@@ -314,10 +409,58 @@ class MapCanvas(QGraphicsView):
     def set_terrain_index(self, index: int) -> None:
         self._current_terrain_index = max(0, min(255, index))
 
+    def set_terrain_brush_mode(self, brush_mode: bool) -> None:
+        """切换地形编辑模式: True=画笔逐像素, False=按省份(默认)"""
+        self._terrain_brush_mode = brush_mode
+
     def set_height_value(self, value: int) -> None:
         self._current_height_value = max(0, min(255, value))
 
     # ========== State / Country 颜色设置 ==========
+
+    def set_vp_data(self, vp_dict: dict[int, int]) -> None:
+        """设置 VP 数据 {province_id: vp_value}，在 state/province 模式显示标记"""
+        self._vp_data = dict(vp_dict)
+        self._render_vp_overlay()
+
+    def _render_vp_overlay(self) -> None:
+        """渲染 VP 标记叠加层：红色圆圈 + 白色 VP 数值"""
+        if self._display_mode not in ("state", "province") or not self._vp_data:
+            self._vp_overlay_item.setVisible(False)
+            return
+
+        # 创建透明画布绘制 VP 标记
+        img = QImage(MAP_WIDTH, MAP_HEIGHT, QImage.Format.Format_ARGB32)
+        img.fill(QColor(0, 0, 0, 0))
+        painter = QPainter(img)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        for pid, vp_val in self._vp_data.items():
+            if vp_val <= 0:
+                continue
+            centroid = self._map_data.get_province_centroid(pid)
+            if centroid is None:
+                continue
+            cx, cy = centroid
+
+            # 红色填充圆
+            radius = max(6, min(14, 4 + vp_val))
+            painter.setPen(QPen(QColor(0, 0, 0), 2))
+            painter.setBrush(QBrush(QColor(220, 30, 30)))
+            painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
+
+            # 白色 VP 数值文字
+            from PyQt5.QtGui import QFont
+            font = QFont("Arial", max(8, min(12, 6 + vp_val // 2)))
+            font.setBold(True)
+            painter.setFont(font)
+            painter.setPen(QColor(255, 255, 255))
+            text_rect = QRectF(cx - 20, cy - 10, 40, 20)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(vp_val))
+
+        painter.end()
+        self._vp_overlay_item.setPixmap(QPixmap.fromImage(img))
+        self._vp_overlay_item.setVisible(True)
 
     def set_state_colors(self, rgb: np.ndarray) -> None:
         """存储 State 颜色 RGB 数组并触发渲染"""
@@ -337,24 +480,199 @@ class MapCanvas(QGraphicsView):
         pixmap = QPixmap(file_path)
         if pixmap.isNull():
             return False
-        scaled = pixmap.scaled(MAP_WIDTH, MAP_HEIGHT,
-                               Qt.AspectRatioMode.IgnoreAspectRatio,
-                               Qt.TransformMode.SmoothTransformation)
-        self._ref_pixmap_item.setPixmap(scaled)
+        self._ref_original_pixmap = pixmap
+        self._ref_scale = 1.0
+        self._ref_pixmap_item.setPixmap(pixmap)
         self._ref_pixmap_item.setVisible(self._show_ref_image)
+        # 默认居中
+        self._ref_pixmap_item.setPos(
+            (MAP_WIDTH - pixmap.width()) / 2,
+            (MAP_HEIGHT - pixmap.height()) / 2,
+        )
         return True
+
+    def load_vanilla_reference(self, file_path: str) -> bool:
+        """加载原版地图参考（独立于用户参考图，不互相覆盖）。"""
+        pixmap = QPixmap(file_path)
+        if pixmap.isNull():
+            return False
+        scaled = pixmap.scaled(MAP_WIDTH, MAP_HEIGHT,
+                               Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+        self._vanilla_ref_item.setPixmap(scaled)
+        self._vanilla_ref_item.setPos(0, 0)
+        self._vanilla_ref_item.setVisible(True)
+        return True
+
+    def set_vanilla_ref_opacity(self, opacity: float) -> None:
+        self._vanilla_ref_item.setOpacity(max(0.0, min(1.0, opacity)))
+
+    def toggle_vanilla_ref(self, visible: bool) -> None:
+        self._vanilla_ref_item.setVisible(visible)
 
     def set_ref_opacity(self, opacity: float) -> None:
         self._ref_pixmap_item.setOpacity(max(0.0, min(1.0, opacity)))
+
+    def set_ref_scale(self, scale: float) -> None:
+        """缩放参考图片 (1.0 = 原始大小)."""
+        scale = max(0.1, min(10.0, scale))
+        self._ref_scale = scale
+        if hasattr(self, '_ref_original_pixmap') and not self._ref_original_pixmap.isNull():
+            new_w = int(self._ref_original_pixmap.width() * scale)
+            new_h = int(self._ref_original_pixmap.height() * scale)
+            scaled = self._ref_original_pixmap.scaled(
+                new_w, new_h, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self._ref_pixmap_item.setPixmap(scaled)
+
+    def fit_ref_to_map(self) -> None:
+        """让参考图片铺满地图。"""
+        if hasattr(self, '_ref_original_pixmap') and not self._ref_original_pixmap.isNull():
+            scaled = self._ref_original_pixmap.scaled(
+                MAP_WIDTH, MAP_HEIGHT, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+            self._ref_pixmap_item.setPixmap(scaled)
+            self._ref_pixmap_item.setPos(0, 0)
+            self._ref_scale = MAP_WIDTH / self._ref_original_pixmap.width()
+
+    def move_ref_image(self, dx: int, dy: int) -> None:
+        """移动参考图片位置。"""
+        pos = self._ref_pixmap_item.pos()
+        self._ref_pixmap_item.setPos(pos.x() + dx, pos.y() + dy)
 
     def toggle_ref_image(self, visible: bool) -> None:
         self._show_ref_image = visible
         self._ref_pixmap_item.setVisible(visible)
 
+    # ── 变换工具 ──
+
+    def _update_transform_visuals(self) -> None:
+        """根据 _transform_box 更新变换框和 handle 位置。"""
+        if not self._transform_box:
+            self._transform_border.setVisible(False)
+            for h in self._transform_handles.values():
+                h.setVisible(False)
+            return
+
+        x0, y0, x1, y1 = self._transform_box
+        self._transform_border.setRect(QRectF(x0, y0, x1 - x0, y1 - y0))
+        self._transform_border.setVisible(True)
+
+        positions = {"tl": (x0, y0), "tr": (x1, y0), "bl": (x0, y1), "br": (x1, y1)}
+        for hid, (hx, hy) in positions.items():
+            self._transform_handles[hid].setPos(hx, hy)
+            self._transform_handles[hid].setVisible(True)
+
+    def _hit_test_transform(self, sx: float, sy: float) -> str | None:
+        """判断点击位置在变换框的哪个部分。返回 "move"/"tl"/"tr"/"bl"/"br"/None."""
+        if not self._transform_box:
+            return None
+        x0, y0, x1, y1 = self._transform_box
+        handle_r = 10 / self._zoom  # handle 热区半径（屏幕像素转场景像素）
+
+        # 检查 4 个角 handle
+        for hid, (hx, hy) in [("tl", (x0, y0)), ("tr", (x1, y0)),
+                               ("bl", (x0, y1)), ("br", (x1, y1))]:
+            if abs(sx - hx) < handle_r and abs(sy - hy) < handle_r:
+                return hid
+
+        # 检查是否在框内（移动）
+        if x0 <= sx <= x1 and y0 <= sy <= y1:
+            return "move"
+
+        # 框外附近 = 旋转（距离框边 < 30px）
+        margin = 30 / self._zoom
+        if (x0 - margin <= sx <= x1 + margin and y0 - margin <= sy <= y1 + margin):
+            return "rotate"
+        return None
+
+    def _apply_transform(self) -> None:
+        """将变换结果（缩放+旋转）写入 tile_map。"""
+        if self._transform_snippet is None or self._transform_box is None:
+            return
+
+        from scipy.ndimage import zoom, rotate
+
+        x0, y0, x1, y1 = [int(v) for v in self._transform_box]
+        x0 = max(0, x0); y0 = max(0, y0)
+        x1 = min(MAP_WIDTH, x1); y1 = min(MAP_HEIGHT, y1)
+        tw, th = x1 - x0, y1 - y0
+        if tw < 2 or th < 2:
+            return
+
+        # 1. 缩放 snippet 到目标尺寸
+        src_h, src_w = self._transform_snippet.shape
+        zy = th / src_h
+        zx = tw / src_w
+        scaled = zoom(self._transform_snippet.astype(np.float32), (zy, zx), order=0)
+        scaled = np.round(scaled).astype(np.uint8)
+
+        # 2. 旋转（如果有角度）
+        if abs(self._transform_angle) > 0.5:
+            # cval=TILE_SEA 填充旋转后的空白区域
+            rotated = rotate(scaled.astype(np.float32), -self._transform_angle,
+                             reshape=False, order=0, cval=float(TILE_SEA))
+            scaled = np.round(rotated).astype(np.uint8)
+
+        # 3. 先清除旧变换区域，再写入
+        # 清除整个可能被影响的区域
+        ox0, oy0, ox1, oy1 = self._transform_orig_box
+        self._tile_map[oy0:oy1, ox0:ox1] = TILE_SEA  # 清原位
+        # 也清当前框位置（可能被上次预览污染）
+        self._tile_map[y0:y1, x0:x1] = TILE_SEA
+
+        # 写入
+        sh, sw = scaled.shape
+        ph = min(sh, y1 - y0)
+        pw = min(sw, x1 - x0)
+        self._tile_map[y0:y0 + ph, x0:x0 + pw] = scaled[:ph, :pw]
+        self._map_data.tile_map = self._tile_map.copy()
+        self._full_render()
+
+    def _cancel_transform(self) -> None:
+        """取消变换，恢复原始状态。"""
+        if self._transform_snippet is not None and self._transform_orig_box is not None:
+            # 恢复原始片段到原始位置
+            ox0, oy0, ox1, oy1 = self._transform_orig_box
+            self._tile_map[oy0:oy1, ox0:ox1] = self._transform_snippet
+            self._map_data.tile_map = self._tile_map.copy()
+            self._full_render()
+        self._end_transform()
+
+    def _end_transform(self) -> None:
+        """清理变换状态。"""
+        self._transform_active = False
+        self._transform_selecting = False
+        self._transform_box = None
+        self._transform_snippet = None
+        self._transform_orig_box = None
+        self._transform_drag = None
+        self._transform_angle = 0.0
+        self._update_transform_visuals()
+
+    # ── 框选模式 ──
+
+    def start_selection_mode(self, callback) -> None:
+        """进入框选模式。用户拖拽出矩形后调用 callback(x0, y0, x1, y1)."""
+        self._selection_mode = True
+        self._selection_callback = callback
+        self._selection_rect_item.setVisible(False)
+        self.setCursor(Qt.CrossCursor)
+
+    def _finish_selection(self) -> None:
+        """框选完成，调用回调。"""
+        self._selection_mode = False
+        self._selection_rect_item.setVisible(False)
+        self.setCursor(Qt.CursorShape.CrossCursor)
+        if self._selection_rect and self._selection_callback:
+            x0, y0, x1, y1 = self._selection_rect
+            if x1 > x0 + 5 and y1 > y0 + 5:  # 最小 5px
+                self._selection_callback(x0, y0, x1, y1)
+        self._selection_rect = None
+        self._selection_callback = None
+
     # ========== 渲染（性能核心） ==========
 
     def _full_render(self) -> None:
         """全量渲染整个地图到显示缓冲区（根据当前模式）"""
+        # 新 mode 没有专用 renderer 的复用 land
         renderers = {
             "land": self._render_land_mode,
             "terrain": self._render_terrain_mode,
@@ -363,9 +681,16 @@ class MapCanvas(QGraphicsView):
             "state": self._render_state_mode,
             "country": self._render_country_mode,
             "river": self._render_river_mode,
+            "logistics": self._render_logistics_mode,
+            "continent": self._render_land_mode,
+            "strategic_region": self._render_land_mode,
+            "colormap": self._render_land_mode,
+            "default_map": self._render_land_mode,
         }
-        renderers[self._display_mode]()
+        renderers.get(self._display_mode, self._render_land_mode)()
         self._update_pixmap_from_buffer()
+        # VP 标记叠加 (Feature 10)
+        self._render_vp_overlay()
 
     def _partial_render(self, x0: int, y0: int, x1: int, y1: int) -> None:
         """局部渲染指定矩形区域（根据当前模式）"""
@@ -377,151 +702,106 @@ class MapCanvas(QGraphicsView):
             "state": self._partial_render_state,
             "country": self._partial_render_country,
             "river": self._partial_render_river,
+            "logistics": self._partial_render_logistics,
+            "continent": self._partial_render_land,
+            "strategic_region": self._partial_render_land,
+            "colormap": self._partial_render_land,
+            "default_map": self._partial_render_land,
         }
         renderers[self._display_mode](x0, y0, x1, y1)
         self._update_pixmap_from_buffer()
 
+    def _render_logistics_mode(self) -> None:
+        from features.map.logistics.renderer import render
+        render(self)
+
+    def _partial_render_logistics(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        from features.map.logistics.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
     # ---------- land 模式渲染 ----------
 
     def _render_land_mode(self) -> None:
-        """全量渲染 land 模式"""
-        for tile_type, (b, g, r, a) in _TILE_BGRA.items():
-            mask = self._tile_map == tile_type
-            self._display_buffer[mask, 0] = b
-            self._display_buffer[mask, 1] = g
-            self._display_buffer[mask, 2] = r
-            self._display_buffer[mask, 3] = a
+        from features.map.land.renderer import render
+        render(self)
+
 
     def _partial_render_land(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 land 模式"""
-        region = self._tile_map[y0:y1, x0:x1]
-        buf = self._display_buffer[y0:y1, x0:x1]
-        for tile_type, (b, g, r, a) in _TILE_BGRA.items():
-            mask = region == tile_type
-            buf[mask, 0] = b
-            buf[mask, 1] = g
-            buf[mask, 2] = r
-            buf[mask, 3] = a
+        from features.map.land.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- terrain 模式渲染 ----------
 
     def _render_terrain_mode(self) -> None:
-        """全量渲染 terrain 模式"""
-        self._display_buffer[:] = _TERRAIN_COLOR_LUT[self._terrain_map]
+        from features.map.terrain.renderer import render
+        render(self)
+
 
     def _partial_render_terrain(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 terrain 模式"""
-        self._display_buffer[y0:y1, x0:x1] = (
-            _TERRAIN_COLOR_LUT[self._terrain_map[y0:y1, x0:x1]]
-        )
+        from features.map.terrain.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- height 模式渲染 ----------
 
     def _render_height_mode(self) -> None:
-        """全量渲染 height 模式 — 灰度"""
-        self._display_buffer[:, :, 0] = self._height_map
-        self._display_buffer[:, :, 1] = self._height_map
-        self._display_buffer[:, :, 2] = self._height_map
-        self._display_buffer[:, :, 3] = 255
+        from features.map.height.renderer import render
+        render(self)
+
 
     def _partial_render_height(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 height 模式"""
-        region = self._height_map[y0:y1, x0:x1]
-        buf = self._display_buffer[y0:y1, x0:x1]
-        buf[:, :, 0] = region
-        buf[:, :, 1] = region
-        buf[:, :, 2] = region
-        buf[:, :, 3] = 255
+        from features.map.height.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- province 模式渲染 ----------
 
     def _render_province_mode(self) -> None:
-        """全量渲染 province 模式 — 按省份ID着色"""
-        indices = self._province_map % _PROVINCE_COLOR_LUT_SIZE
-        self._display_buffer[:] = _PROVINCE_COLOR_LUT[indices]
+        from features.map.province.renderer import render
+        render(self)
+
 
     def _partial_render_province(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 province 模式"""
-        indices = self._province_map[y0:y1, x0:x1] % _PROVINCE_COLOR_LUT_SIZE
-        self._display_buffer[y0:y1, x0:x1] = _PROVINCE_COLOR_LUT[indices]
+        from features.map.province.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- state 模式渲染 ----------
 
     def _render_state_mode(self) -> None:
-        """全量渲染 state 模式 — 使用预计算的 RGB 数组"""
-        if self._state_color_rgb is not None:
-            # RGB → BGRA
-            self._display_buffer[:, :, 0] = self._state_color_rgb[:, :, 2]  # B
-            self._display_buffer[:, :, 1] = self._state_color_rgb[:, :, 1]  # G
-            self._display_buffer[:, :, 2] = self._state_color_rgb[:, :, 0]  # R
-            self._display_buffer[:, :, 3] = 255
-        else:
-            # 无 State 数据，显示深灰
-            self._display_buffer[:, :, 0] = 40
-            self._display_buffer[:, :, 1] = 40
-            self._display_buffer[:, :, 2] = 40
-            self._display_buffer[:, :, 3] = 255
+        from features.map.state.renderer import render
+        render(self)
+
 
     def _partial_render_state(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 state 模式 — 使用存储的 RGB 数组"""
-        buf = self._display_buffer[y0:y1, x0:x1]
-        if self._state_color_rgb is not None:
-            region = self._state_color_rgb[y0:y1, x0:x1]
-            buf[:, :, 0] = region[:, :, 2]
-            buf[:, :, 1] = region[:, :, 1]
-            buf[:, :, 2] = region[:, :, 0]
-            buf[:, :, 3] = 255
-        else:
-            buf[:, :, :] = [40, 40, 40, 255]
+        from features.map.state.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- country 模式渲染 ----------
 
     def _render_country_mode(self) -> None:
-        """全量渲染 country 模式 — 使用预计算的 RGB 数组"""
-        if self._country_color_rgb is not None:
-            self._display_buffer[:, :, 0] = self._country_color_rgb[:, :, 2]
-            self._display_buffer[:, :, 1] = self._country_color_rgb[:, :, 1]
-            self._display_buffer[:, :, 2] = self._country_color_rgb[:, :, 0]
-            self._display_buffer[:, :, 3] = 255
-        else:
-            self._display_buffer[:, :, 0] = 60
-            self._display_buffer[:, :, 1] = 60
-            self._display_buffer[:, :, 2] = 60
-            self._display_buffer[:, :, 3] = 255
+        from features.map.country.renderer import render
+        render(self)
+
 
     def _partial_render_country(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 country 模式 — 使用存储的 RGB 数组"""
-        buf = self._display_buffer[y0:y1, x0:x1]
-        if self._country_color_rgb is not None:
-            region = self._country_color_rgb[y0:y1, x0:x1]
-            buf[:, :, 0] = region[:, :, 2]
-            buf[:, :, 1] = region[:, :, 1]
-            buf[:, :, 2] = region[:, :, 0]
-            buf[:, :, 3] = 255
-        else:
-            buf[:, :, :] = [60, 60, 60, 255]
+        from features.map.country.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- river 模式渲染 ----------
 
     def _render_river_mode(self) -> None:
-        """全量渲染 river 模式 — 陆地底图叠加河流"""
-        # 先渲染陆地作为底图
-        self._render_land_mode()
-        # 叠加河流
-        river_mask = self._river_map > 0
-        if np.any(river_mask):
-            colors = _RIVER_COLOR_LUT[self._river_map]
-            self._display_buffer[river_mask] = colors[river_mask]
+        from features.map.river.renderer import render
+        render(self)
+
 
     def _partial_render_river(self, x0: int, y0: int, x1: int, y1: int) -> None:
-        """局部渲染 river 模式"""
-        self._partial_render_land(x0, y0, x1, y1)
-        region = self._river_map[y0:y1, x0:x1]
-        river_mask = region > 0
-        if np.any(river_mask):
-            buf = self._display_buffer[y0:y1, x0:x1]
-            colors = _RIVER_COLOR_LUT[region]
-            buf[river_mask] = colors[river_mask]
+        from features.map.river.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
 
     # ---------- 通用渲染辅助 ----------
 
@@ -569,8 +849,8 @@ class MapCanvas(QGraphicsView):
         3. 压实 ID（防止某省份被推到 0 像素消失后留下 gap）
         4. 维护选中省份 ID 在压实后仍指向正确省份
         """
-        from core.province_validator import fix_x_crossings
-        from core.province_generator import _fix_non_contiguous_fast, compact_province_ids
+        from domain.validators.province import fix_x_crossings
+        from domain.generators.province import _fix_non_contiguous_fast, compact_province_ids
 
         old_sel = self._selected_province_id
 
@@ -762,8 +1042,14 @@ class MapCanvas(QGraphicsView):
                 self._tile_map[y0:y1, x0:x1] = self._current_tile_type
 
         elif mode == "terrain":
-            # 地形按省份为单位分配，不是逐像素
-            return
+            if not self._terrain_brush_mode:
+                # 按省份为单位分配，不走画笔
+                return
+            # 画笔模式：逐像素绘制 graphical terrain (不影响 provincial_terrain)
+            if self._current_tool == "eraser":
+                self._terrain_map[y0:y1, x0:x1] = 0
+            elif self._current_tool == "brush":
+                self._terrain_map[y0:y1, x0:x1] = self._current_terrain_index
 
         elif mode == "height":
             # 高度也按省份为单位分配
@@ -786,7 +1072,7 @@ class MapCanvas(QGraphicsView):
 
         elif mode == "river":
             if self._current_tool == "eraser":
-                self._river_map[y0:y1, x0:x1] = RIVER_NONE
+                self._river_map[y0:y1, x0:x1] = RIVER_ERASE
             elif self._current_tool == "brush":
                 self._river_map[y0:y1, x0:x1] = self._current_river_type
 
@@ -874,11 +1160,73 @@ class MapCanvas(QGraphicsView):
         pos = self.mapToScene(event.pos())
         return int(pos.x()), int(pos.y())
 
+    def _scene_pos_clamped(self, event: QMouseEvent) -> tuple[int, int]:
+        """返回限制在地图边界内的场景坐标"""
+        sx, sy = self._scene_pos(event)
+        return max(0, min(MAP_WIDTH - 1, sx)), max(0, min(MAP_HEIGHT - 1, sy))
+
+    def _is_in_bounds(self, sx: int, sy: int) -> bool:
+        """检查坐标是否在地图边界内"""
+        return 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT
+
+    def cleanup_mode_state(self) -> None:
+        """清理所有临时模式状态。模式切换时调用，防止状态残留导致异常。"""
+        # 变换工具状态
+        if self._transform_active:
+            self._end_transform()
+        self._transform_selecting = False
+        self._transform_box = None
+        self._transform_snippet = None
+        self._transform_orig_box = None
+        self._transform_drag = None
+        self._transform_drag_start = None
+        self._transform_angle = 0.0
+
+        # 框选状态
+        self._selection_mode = False
+        self._selection_rect = None
+        self._selection_start = None
+        self._selection_rect_item.setVisible(False)
+
+        # 绘制状态
+        self._is_drawing = False
+        self._last_draw_pos = None
+
+        # 框架工具
+        self._framework_tool = None
+
+        # 省份选中
+        self._selected_province_id = 0
+
+        # lasso / overlay 清理
+        self._clear_lasso_visual()
+
+        # 光标重置
+        self.setCursor(Qt.CursorShape.CrossCursor)
+
     def mousePressEvent(self, event: QMouseEvent) -> None:
         if event.button() == Qt.MouseButton.MiddleButton:
             self._is_panning = True
             self._pan_start = event.pos()
             self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+            return
+
+        # 框选模式拦截
+        if self._selection_mode and event.button() == Qt.MouseButton.LeftButton:
+            sx, sy = self._scene_pos(event)
+            self._selection_start = (int(sx), int(sy))
+            self._selection_rect_item.setRect(QRectF(sx, sy, 0, 0))
+            self._selection_rect_item.setVisible(True)
+            event.accept()
+            return
+
+        # Ctrl+左键：拖拽移动参考图
+        if (event.button() == Qt.MouseButton.LeftButton
+                and event.modifiers() & Qt.ControlModifier):
+            self._ref_dragging = True
+            self._ref_drag_start = event.pos()
+            self.setCursor(Qt.CursorShape.SizeAllCursor)
             event.accept()
             return
 
@@ -910,6 +1258,43 @@ class MapCanvas(QGraphicsView):
                 event.accept()
                 return
 
+            # 变换工具
+            if self._current_tool == "transform" and self._display_mode == "land":
+                sx, sy = self._scene_pos(event)
+
+                if self._transform_active:
+                    # 已有变换框 — 判断点击位置
+                    hit = self._hit_test_transform(sx, sy)
+                    if hit:
+                        self._transform_drag = hit
+                        self._transform_drag_start = (sx, sy)
+                        self._transform_box_start = tuple(self._transform_box)
+                        self._transform_angle_start = self._transform_angle
+                        if hit == "move":
+                            self.setCursor(Qt.CursorShape.SizeAllCursor)
+                        elif hit == "rotate":
+                            self.setCursor(Qt.CursorShape.CrossCursor)
+                        else:
+                            self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+                        event.accept()
+                        return
+                    else:
+                        # 点击远处框外 = 确认变换
+                        self._apply_transform()
+                        self.stroke_ended.emit()
+                        self._end_transform()
+                        event.accept()
+                        return
+
+                # 没有变换框 — 开始框选
+                self._transform_selecting = True
+                self._selection_start = (int(sx), int(sy))
+                self._selection_rect_item.setRect(QRectF(sx, sy, 0, 0))
+                self._selection_rect_item.setVisible(True)
+                self.stroke_started.emit()
+                event.accept()
+                return
+
             # 地形/高度/State/Country 模式：点击省份操作
             if self._display_mode in ("terrain", "height", "state", "country"):
                 sx, sy = self._scene_pos(event)
@@ -919,8 +1304,32 @@ class MapCanvas(QGraphicsView):
                         mask = self._province_map == pid
                         # 地形模式：点击省份 → 整个省份填充当前地形
                         if self._display_mode == "terrain":
+                            # 画笔模式：逐像素绘制，不按省份
+                            if self._terrain_brush_mode:
+                                # 进入画笔绘制流程（和 land 模式类似）
+                                self._is_drawing = True
+                                self.stroke_started.emit()
+                                self._paint_at(sx, sy)
+                                event.accept()
+                                return
+                            # 海洋/湖泊省份不可改地形
+                            tile_val = self._tile_map[sy, sx]
+                            if tile_val in (TILE_SEA, TILE_LAKE):
+                                event.accept()
+                                return
                             self.stroke_started.emit()
                             self._terrain_map[mask] = self._current_terrain_index
+                            # 同步省份级地形 (Feature A)
+                            ptype = PALETTE_TO_TYPE.get(self._current_terrain_index)
+                            if ptype:
+                                self._map_data.provincial_terrain[pid] = ptype
+                            # 联动高度：根据 graphical terrain 的 type 查 height_base
+                            if ptype and ptype in TERRAIN_TYPES:
+                                self._height_map[mask] = TERRAIN_TYPES[ptype].height_base
+                            # 自动平滑高度过渡
+                            from services.terrain_service import smooth_height
+                            self._height_map = smooth_height(self._height_map, sigma=3.0)
+                            self._map_data.height_map = self._height_map
                             self._full_render()
                             self.stroke_ended.emit()
                         # 高度模式：点击省份 → 整个省份设为当前高度值
@@ -933,22 +1342,16 @@ class MapCanvas(QGraphicsView):
                 event.accept()
                 return
 
-            # 省份模式：左键选中省份，拖动可修改边界
+            # 省份模式：左键只做选中 (扩张需走 lasso 框架工具, 不允许直接拖动改边界)
             if self._display_mode == "province":
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
                     pid = int(self._province_map[sy, sx])
                     if pid > 0:
                         self._selected_province_id = pid
-                        # 记录该省份的地块类型，约束边界编辑只能影响同类型像素
                         self._selected_province_tile = int(self._tile_map[sy, sx])
                         self.province_clicked.emit(pid)
-                        self._render_province_overlay()  # 高亮选中省份的边界
-                        # 允许画笔模式下拖动修改边界
-                        if self._current_tool in ("brush", "eraser"):
-                            self._is_drawing = True
-                            self.stroke_started.emit()
-                            self._paint_at(sx, sy)
+                        self._render_province_overlay()
                 event.accept()
                 return
 
@@ -983,7 +1386,7 @@ class MapCanvas(QGraphicsView):
     def _update_brush_cursor(self, sx: int, sy: int) -> None:
         """更新画笔预览光标位置和大小。
         省份模式不显示刷子框 — 它是边界编辑工具，不是绘画工具。"""
-        if self._current_tool in ("brush", "eraser") and self._display_mode in ("land", "terrain", "height", "river"):
+        if self._current_tool in ("brush", "eraser") and self._display_mode in ("land", "river"):
             r = self._brush_size // 2
             self._brush_cursor.setRect(sx - r, sy - r, self._brush_size, self._brush_size)
             self._brush_cursor.setVisible(True)
@@ -997,6 +1400,77 @@ class MapCanvas(QGraphicsView):
             self._update_brush_cursor(sx, sy)
         else:
             self._brush_cursor.setVisible(False)
+
+        # 变换工具框选拖拽
+        if self._transform_selecting and self._selection_start:
+            x0, y0 = self._selection_start
+            x1 = max(0, min(MAP_WIDTH, int(sx)))
+            y1 = max(0, min(MAP_HEIGHT, int(sy)))
+            rx0, ry0 = min(x0, x1), min(y0, y1)
+            rx1, ry1 = max(x0, x1), max(y0, y1)
+            self._selection_rect = (rx0, ry0, rx1, ry1)
+            self._selection_rect_item.setRect(QRectF(rx0, ry0, rx1 - rx0, ry1 - ry0))
+            event.accept()
+            return
+
+        # 变换工具拖拽（移动/缩放）
+        if self._transform_drag and self._transform_box:
+            dx = sx - self._transform_drag_start[0]
+            dy = sy - self._transform_drag_start[1]
+            bx0, by0, bx1, by1 = self._transform_box_start
+
+            if self._transform_drag == "move":
+                self._transform_box = (bx0 + dx, by0 + dy, bx1 + dx, by1 + dy)
+            elif self._transform_drag == "rotate":
+                # 以框中心为原点，计算起始角和当前角的差
+                import math
+                cx = (bx0 + bx1) / 2
+                cy = (by0 + by1) / 2
+                start_angle = math.atan2(
+                    self._transform_drag_start[1] - cy,
+                    self._transform_drag_start[0] - cx,
+                )
+                cur_angle = math.atan2(sy - cy, sx - cx)
+                delta_deg = math.degrees(cur_angle - start_angle)
+                self._transform_angle = self._transform_angle_start + delta_deg
+            elif self._transform_drag == "tl":
+                self._transform_box = (bx0 + dx, by0 + dy, bx1, by1)
+            elif self._transform_drag == "tr":
+                self._transform_box = (bx0, by0 + dy, bx1 + dx, by1)
+            elif self._transform_drag == "bl":
+                self._transform_box = (bx0 + dx, by0, bx1, by1 + dy)
+            elif self._transform_drag == "br":
+                self._transform_box = (bx0, by0, bx1 + dx, by1 + dy)
+
+            self._update_transform_visuals()
+
+            # 实时预览
+            self._apply_transform()
+
+            event.accept()
+            return
+
+        # 框选模式拖拽
+        if self._selection_mode and self._selection_start:
+            x0, y0 = self._selection_start
+            x1, y1 = max(0, min(MAP_WIDTH, int(sx))), max(0, min(MAP_HEIGHT, int(sy)))
+            rx0, ry0 = min(x0, x1), min(y0, y1)
+            rx1, ry1 = max(x0, x1), max(y0, y1)
+            self._selection_rect = (rx0, ry0, rx1, ry1)
+            self._selection_rect_item.setRect(QRectF(rx0, ry0, rx1 - rx0, ry1 - ry0))
+            event.accept()
+            return
+
+        # Ctrl+拖拽：移动参考图
+        if getattr(self, '_ref_dragging', False):
+            delta = event.pos() - self._ref_drag_start
+            self._ref_drag_start = event.pos()
+            # 屏幕像素转场景像素（考虑缩放）
+            scene_dx = delta.x() / self._zoom
+            scene_dy = delta.y() / self._zoom
+            self.move_ref_image(scene_dx, scene_dy)
+            event.accept()
+            return
 
         if self._is_panning:
             delta = event.pos() - self._pan_start
@@ -1029,6 +1503,48 @@ class MapCanvas(QGraphicsView):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event: QMouseEvent) -> None:
+        # 变换工具框选完成 — 激活变换框
+        if self._transform_selecting and self._selection_start:
+            self._transform_selecting = False
+            self._selection_start = None
+            self._selection_rect_item.setVisible(False)
+            if self._selection_rect:
+                x0, y0, x1, y1 = self._selection_rect
+                if x1 - x0 > 5 and y1 - y0 > 5:
+                    # 剪切选区内容
+                    self._transform_snippet = self._tile_map[y0:y1, x0:x1].copy()
+                    self._transform_orig_box = (x0, y0, x1, y1)
+                    self._transform_box = (float(x0), float(y0), float(x1), float(y1))
+                    # 清除原位置
+                    self._tile_map[y0:y1, x0:x1] = TILE_SEA
+                    self._full_render()
+                    self._transform_active = True
+                    self._update_transform_visuals()
+            self._selection_rect = None
+            event.accept()
+            return
+
+        # 变换工具拖拽释放
+        if self._transform_drag:
+            self._transform_drag = None
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            event.accept()
+            return
+
+        # 框选完成
+        if self._selection_mode and self._selection_start:
+            self._selection_start = None
+            self._finish_selection()
+            event.accept()
+            return
+
+        # 结束参考图拖拽
+        if getattr(self, '_ref_dragging', False):
+            self._ref_dragging = False
+            self.setCursor(Qt.CursorShape.CrossCursor)
+            event.accept()
+            return
+
         if event.button() in (Qt.MouseButton.MiddleButton, Qt.MouseButton.LeftButton):
             if self._is_panning:
                 self._is_panning = False
@@ -1101,6 +1617,15 @@ class MapCanvas(QGraphicsView):
         super().contextMenuEvent(event)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
+        # Ctrl+滚轮：缩放参考图
+        if event.modifiers() & Qt.ControlModifier:
+            delta = event.angleDelta().y()
+            scale_step = 0.1 if delta > 0 else -0.1
+            new_scale = getattr(self, '_ref_scale', 1.0) + scale_step
+            self.set_ref_scale(new_scale)
+            event.accept()
+            return
+
         factor = ZOOM_STEP if event.angleDelta().y() > 0 else 1.0 / ZOOM_STEP
         new_zoom = self._zoom * factor
         if ZOOM_MIN <= new_zoom <= ZOOM_MAX:
@@ -1115,7 +1640,19 @@ class MapCanvas(QGraphicsView):
             if not self._is_drawing:
                 self.setCursor(Qt.CursorShape.OpenHandCursor)
         # ESC：取消正在进行的套索/框架工具操作
+        elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            # Enter 确认变换
+            if self._transform_active:
+                self._apply_transform()
+                self.stroke_ended.emit()
+                self._end_transform()
+                return
         elif event.key() == Qt.Key.Key_Escape:
+            # ESC 取消变换
+            if self._transform_active:
+                self._cancel_transform()
+                self.stroke_ended.emit()
+                return
             if self._is_drawing and self._framework_tool is not None:
                 self._framework_tool.on_cancel(self._framework_ctx)
                 self._is_drawing = False

@@ -11,8 +11,8 @@ from data.constants import (
     DEFAULT_MOD_NAME, DEFAULT_MOD_VERSION, DEFAULT_SUPPORTED_VERSION,
 )
 from data.terrain_types import DEFAULT_TERRAIN_FOR_TILE
-from core.province_validator import get_coastal_provinces
-from core.province_generator import generate_province_colors
+from domain.validators.province import get_coastal_provinces
+from domain.generators.province import generate_province_colors
 
 _FALLBACK_SEASONS = """
 winter = { start_date=00.12.01 end_date=00.02.10
@@ -43,6 +43,8 @@ def write_definition_csv(
     tile_map: np.ndarray,
     output_dir: str,
     colors: dict[int, tuple[int, int, int]] | None = None,
+    continent_mgr=None,
+    terrain_map: np.ndarray | None = None,
 ) -> None:
     """
     生成 definition.csv 文件。
@@ -78,11 +80,15 @@ def write_definition_csv(
             if ptype in ("sea", "lake"):
                 is_coastal = "false"
 
-            # 默认地形
-            terrain = _default_terrain(ptype)
+            # 地形：优先从 terrain_map 查实际 graphical terrain 的 type
+            terrain = _resolve_terrain(ptype, pid, province_map, terrain_map)
 
-            # 大陆ID：海洋/湖泊=0，陆地=1（简化版，后续可编辑）
-            continent = 0 if ptype in ("sea", "lake") else 1
+            # 大陆ID：海洋/湖泊=0，陆地按 continent_mgr 指派（未指派则归 1 号大陆）
+            is_land = ptype not in ("sea", "lake")
+            if continent_mgr is not None:
+                continent = continent_mgr.get_province_continent_hoi4_id(pid, is_land)
+            else:
+                continent = 0 if not is_land else 1
 
             f.write(f"{pid};{r};{g};{b};{ptype};{is_coastal};{terrain};{continent}\n")
 
@@ -127,6 +133,35 @@ def _default_terrain(province_type: str) -> str:
         return "lakes"
     else:
         return "plains"
+
+
+def _resolve_terrain(
+    ptype: str,
+    pid: int,
+    province_map: np.ndarray,
+    terrain_map: np.ndarray | None,
+) -> str:
+    """从 terrain_map 解析省份的 provincial terrain type."""
+    # 海/湖强制
+    if ptype == "sea":
+        return "ocean"
+    if ptype == "lake":
+        return "lakes"
+
+    if terrain_map is None:
+        return "plains"
+
+    from data.terrain_types import PALETTE_TO_TYPE
+
+    # 取该省份区域内 terrain_map 的众数 (最多的那个索引)
+    mask = province_map == pid
+    indices = terrain_map[mask]
+    if indices.size == 0:
+        return "plains"
+
+    counts = np.bincount(indices)
+    dominant_index = int(counts.argmax())
+    return PALETTE_TO_TYPE.get(dominant_index, "plains")
 
 
 def write_adjacencies_csv(output_dir: str) -> None:
@@ -205,9 +240,7 @@ def write_empty_files(output_dir: str) -> None:
     with open(os.path.join(map_dir, "adjacency_rules.txt"), "w") as f:
         pass
 
-    # ambient_object.txt — 空文件
-    with open(os.path.join(map_dir, "ambient_object.txt"), "w") as f:
-        pass
+    # ambient_object.txt — 由 ambient_object writer 单独生成，这里不覆盖
 
     # seasons.txt — 从原版复制，如果没有则写最小可用内容
     vanilla_seasons = os.path.join(

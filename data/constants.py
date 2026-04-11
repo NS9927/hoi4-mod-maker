@@ -3,14 +3,29 @@ HOI4 地图 MOD 工具 — 全局常量定义
 """
 
 # 地图尺寸（必须是 256 的倍数，否则 HOI4 崩溃 — 见 参考/Troubleshooting.txt:100）
-# 小测试地图：2048×1024（vs 原版 5632×2048，省 5.5 倍像素）
-MAP_WIDTH = 2048
-MAP_HEIGHT = 1024
+# 原版 5632×2048
+MAP_WIDTH = 5632
+MAP_HEIGHT = 2048
 
-# 省份数量范围
-MIN_PROVINCES = 3000
-MAX_PROVINCES = 8000
-DEFAULT_PROVINCES = 5000
+# 地图尺寸预设
+MAP_SIZE_PRESETS = {
+    "小 (2048×1024)": (2048, 1024),
+    "中 (3072×1536)": (3072, 1536),
+    "大 (4096×2048)": (4096, 2048),
+    "原版 (5632×2048)": (5632, 2048),
+}
+
+
+def set_map_size(width: int, height: int) -> None:
+    """更新全局地图尺寸。必须在初始化画布数组之前调用。"""
+    import data.constants as _mod
+    _mod.MAP_WIDTH = width
+    _mod.MAP_HEIGHT = height
+
+# 省份数量范围 (vanilla 13382, HOI4 上限 21000, 14000 以上警告)
+MIN_PROVINCES = 1000
+MAX_PROVINCES = 15000
+DEFAULT_PROVINCES = 12000
 
 # 省份最小像素数
 MIN_PROVINCE_PIXELS = 8
@@ -152,14 +167,18 @@ REPLACE_PATHS = [
     "common/units/names_railway_guns",
     "common/units/codenames_operatives",
 
-    # --- scripted_effects（必须替换，vanilla 6 个"看似 generic"文件内容硬编码
-    # FRA/GER/SOV/MEX 等已删 TAG → 解析 404 errors → AI tick 撞 null → 多线程崩
-    # 策略：完全空 placeholder，TC MOD 用不到 vanilla scripted_effects）
-    "common/scripted_effects",
-    # --- scripted_triggers（同理，vanilla 引用已删 TAG）
-    "common/scripted_triggers",
-    # --- dynamic_modifiers（同理）
-    "common/dynamic_modifiers",
+    # --- 2026-04-09 移除 scripted_effects / scripted_triggers / dynamic_modifiers ---
+    # 参考: 参考/Troubleshooting.txt 行 87
+    # "A variety of crash types are caused by recklessly unloading folders with
+    #  replace_path, leading to the game detecting there not being any database
+    #  entries of a certain type. It's best practice to port over generic files..."
+    # 正确策略: 保留 vanilla (符号定义完整, 事件触发不匹配 AAA-EEE 就静默).
+
+    # --- events / common/national_focus 不 replace ---
+    # 2026-04-09 实测: replace 整个目录会破坏 load_focus_tree = generic_focus,
+    # 即使放 placeholder 也会因语法/namespace 缺失导致游戏无法加载.
+    # 真正危险的只有 1 个文件: events/GOE_Raj.txt 硬编码 733.controller.
+    # 解决方案: 文件级覆盖 (scrubber 里写同名空文件), 不用 replace_path.
 
     # --- raids（必须替换！2026-04-08 实测走时间崩溃根因）
     # vanilla common/raids/land_infiltration_custom.txt:1123 用

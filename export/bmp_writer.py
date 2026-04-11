@@ -6,7 +6,7 @@ import os
 import numpy as np
 
 from data.constants import MAP_WIDTH, MAP_HEIGHT
-from core.province_generator import generate_province_colors
+from domain.generators.province import generate_province_colors
 
 
 def write_provinces_bmp(
@@ -233,7 +233,7 @@ def write_rivers_bmp(output_dir: str, river_map: np.ndarray | None = None) -> No
     写入 rivers.bmp — 8 位索引色 BMP。
     如果 river_map 不为 None，使用实际河流数据；否则生成全白空白文件。
     """
-    from core.river_manager import RIVER_PALETTE
+    from domain.managers.river import RIVER_PALETTE
 
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
