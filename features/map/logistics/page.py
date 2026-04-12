@@ -29,7 +29,10 @@ def build_page(panel) -> QWidget:
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(10)
 
-    tip = QLabel("后勤系统管理: 海峡 / 铁路 / 补给节点")
+    tip = QLabel("后勤系统管理: 海峡 / 铁路 / 补给节点\n"
+                 "相邻关系: 定义海峡通道/运河/不可通行区域\n"
+                 "铁路: 连接省份的补给线路(1-5级)\n"
+                 "补给节点: 陆地省份上的物资中转站")
     tip.setStyleSheet(_DIM_LABEL_STYLE)
     tip.setWordWrap(True)
     lay.addWidget(tip)

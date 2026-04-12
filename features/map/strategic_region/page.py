@@ -29,7 +29,10 @@ def build_page(panel) -> QWidget:
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(6)
 
-    tip = QLabel("战略区域: 省份分组 + 天气 + 海军地形.")
+    tip = QLabel("战略区域: 省份分组 + 天气 + 海军地形.\n"
+                 "建议先点'自动生成'按 State 创建初始分组，\n"
+                 "再手动调整。每个区域可设天气和海军地形类型.\n"
+                 "用拾取模式点省份可移入选中的区域.")
     tip.setWordWrap(True)
     tip.setStyleSheet(_DIM_LABEL_STYLE)
     lay.addWidget(tip)

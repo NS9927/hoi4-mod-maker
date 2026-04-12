@@ -43,7 +43,9 @@ def build_page(panel) -> QWidget:
     lay.setSpacing(8)
 
     # 提示
-    hint = QLabel("河流规则: 必须1像素宽，只走上下左右\n每条河需要1个源头(绿)。红=支流汇入 黄=分叉")
+    hint = QLabel("河流规则: 必须1像素宽，只走上下左右(不能斜走)\n"
+                  "每条河需要1个源头(绿)。红=支流汇入 黄=分叉\n"
+                  "画笔大小仅影响橡皮擦范围，河流本身必须1像素宽")
     hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
     hint.setWordWrap(True)
     lay.addWidget(hint)

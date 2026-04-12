@@ -108,49 +108,19 @@ class InputMixin:
                 event.accept()
                 return
 
-            # 地形/高度/State/Country 模式：点击省份操作
+            # 地形/高度/State/Country 模式：点击省份 → 委托 controller 处理
             if self._display_mode in ("terrain", "height", "state", "country"):
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
                     pid = int(self._province_map[sy, sx])
                     if pid > 0:
-                        mask = self._province_map == pid
-                        # 地形模式：点击省份 → 整个省份填充当前地形
-                        if self._display_mode == "terrain":
-                            # 画笔模式：逐像素绘制，不按省份
-                            if self._terrain_brush_mode:
-                                # 进入画笔绘制流程（和 land 模式类似）
-                                self._is_drawing = True
-                                self.stroke_started.emit()
-                                self._paint_at(sx, sy)
-                                event.accept()
-                                return
-                            # 海洋/湖泊省份不可改地形
-                            tile_val = self._tile_map[sy, sx]
-                            if tile_val in (TILE_SEA, TILE_LAKE):
-                                event.accept()
-                                return
+                        # 地形画笔模式：逐像素绘制
+                        if self._display_mode == "terrain" and self._terrain_brush_mode:
+                            self._is_drawing = True
                             self.stroke_started.emit()
-                            self._terrain_map[mask] = self._current_terrain_index
-                            # 同步省份级地形 (Feature A)
-                            ptype = PALETTE_TO_TYPE.get(self._current_terrain_index)
-                            if ptype:
-                                self._map_data.provincial_terrain[pid] = ptype
-                            # 联动高度：根据 graphical terrain 的 type 查 height_base
-                            if ptype and ptype in TERRAIN_TYPES:
-                                self._height_map[mask] = TERRAIN_TYPES[ptype].height_base
-                            # 自动平滑高度过渡
-                            from services.terrain_service import smooth_height
-                            self._height_map = smooth_height(self._height_map, sigma=3.0)
-                            self._map_data.height_map = self._height_map
-                            self._full_render()
-                            self.stroke_ended.emit()
-                        # 高度模式：点击省份 → 整个省份设为当前高度值
-                        elif self._display_mode == "height":
-                            self.stroke_started.emit()
-                            self._height_map[mask] = self._current_height_value
-                            self._full_render()
-                            self.stroke_ended.emit()
+                            self._paint_at(sx, sy)
+                            event.accept()
+                            return
                         self.province_clicked.emit(pid)
                 event.accept()
                 return

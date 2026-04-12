@@ -109,6 +109,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 启动时显示欢迎页
         self._show_welcome()
 
+        # 让 canvas 和 project 共享同一个 MapData 实例
+        self._canvas.set_map_data(self._project.map_data)
+
         # 初始模式
         self._on_mode_changed("land")
 
@@ -385,6 +388,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_evt_render(self, event) -> None:
         full = event.data.get("full", False)
         bbox = event.data.get("bbox")
+        # 重新绑定 canvas 别名，防止 MapData 属性被替换后别名过期
+        self._canvas._rebind_aliases()
         if full or bbox is None:
             self._canvas._full_render()
         else:
@@ -398,16 +403,22 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_evt_state_changed(self, event) -> None:
         """State 数据变化 → 刷新 UI。"""
         action = event.data.get("action", "")
-        if action in ("refresh", "modified"):
+        if action == "refresh":
+            # 完全重建（auto_split / 加载项目）
+            self._invalidate_province_cache()
             self._refresh_state_list()
             self._refresh_state_colors()
-            if action == "modified":
-                sid = event.data.get("state_id", 0)
-                state = self._project.state_mgr.get_state(sid)
-                if state:
-                    self._tool_panel.update_state_info(
-                        state.name, state.manpower, state.category
-                    )
+        elif action == "modified":
+            sid = event.data.get("state_id", 0)
+            state = self._project.state_mgr.get_state(sid)
+            if state:
+                self._tool_panel.update_state_info(
+                    state.name, state.manpower, state.category
+                )
+            # 省份分配变化才刷新颜色图，属性修改不用
+            prop = event.data.get("property", "")
+            if prop in ("", "provinces", "assign"):
+                self._refresh_state_colors()
         elif action == "selected":
             sid = event.data.get("state_id", 0)
             state = self._project.state_mgr.get_state(sid)
@@ -499,8 +510,24 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             import traceback
             traceback.print_exc()
 
+    def _invalidate_province_cache(self) -> None:
+        """清除省份信息缓存（省份数据变化时调用）。"""
+        self._province_info_cache: dict = {}
+
     def _update_province_info(self, pid: int) -> None:
-        """计算并更新省份信息面板。"""
+        """计算并更新省份信息面板（使用缓存）。"""
+        if not hasattr(self, '_province_info_cache'):
+            self._province_info_cache = {}
+
+        # 缓存命中
+        if pid in self._province_info_cache:
+            cached = self._province_info_cache[pid]
+            self._tool_panel.update_province_info(
+                pid, cached["ptype"], cached["terrain"], cached["pixels"], cached["coastal"]
+            )
+            return
+
+        # 缓存未命中：计算
         pm = self._canvas.province_map
         tm = self._canvas.tile_map
         mask = pm == pid
@@ -540,6 +567,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             terrain_name = gt.name_cn if gt else "未知"
         else:
             terrain_name = "未知"
+
+        # 存缓存
+        self._province_info_cache[pid] = {
+            "ptype": ptype, "terrain": terrain_name,
+            "pixels": pixels, "coastal": coastal,
+        }
 
         self._tool_panel.update_province_info(pid, ptype, terrain_name, pixels, coastal)
 

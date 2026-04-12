@@ -198,8 +198,6 @@ class StateManager:
                 chunk = sorted_pids[i:i + per_state]
                 state = self.create_state(chunk)
                 state.manpower = len(chunk) * 50000
-                if chunk:
-                    state.victory_points[chunk[0]] = 1
 
     def build_state_color_map(self, province_map: np.ndarray) -> np.ndarray:
         """生成 State 颜色图（用于显示）"""

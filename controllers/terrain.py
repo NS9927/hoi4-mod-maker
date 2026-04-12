@@ -45,35 +45,53 @@ class TerrainController(BaseController):
 
         map_data = self.project.map_data
         province_map = map_data.province_map
+        tile_map = map_data.tile_map
         mask = province_map == pid
-
-        # 收集变化
-        terrain_map = map_data.terrain_map
         ys, xs = np.where(mask)
+        if len(ys) == 0:
+            return
+
+        # 海洋/湖泊省份不可改地形
+        from data.constants import TILE_SEA, TILE_LAKE
+        tile_val = int(tile_map[ys[0], xs[0]])
+        if tile_val in (TILE_SEA, TILE_LAKE):
+            return
+
+        # 收集地形变化
+        terrain_map = map_data.terrain_map
         terrain_changes = {}
         for i in range(len(ys)):
             y, x = int(ys[i]), int(xs[i])
             if int(terrain_map[y, x]) != self.current_terrain_index:
                 terrain_changes[(y, x)] = self.current_terrain_index
 
-        if terrain_changes:
-            # 同时更新 provincial_terrain
-            from data.terrain_types import TERRAIN_TYPES
-            terrain_type = None
-            for tt in TERRAIN_TYPES:
-                if tt.palette_index == self.current_terrain_index:
-                    terrain_type = tt.name
-                    break
+        if not terrain_changes:
+            return
 
-            prov_changes = {pid: terrain_type} if terrain_type else {}
-            cmd = PaintTerrainCommand(
-                map_data, terrain_changes,
-                provincial_terrain_changes=prov_changes,
-            )
-            self.history.execute(cmd)
-            self.project.mark_dirty()
-            self._emit_render(full=True)
-            self._emit_status(f"省份 {pid} 地形已设为 {terrain_type or '未知'}")
+        # 查 provincial terrain type
+        from data.terrain_types import PALETTE_TO_TYPE, TERRAIN_TYPES
+        ptype = PALETTE_TO_TYPE.get(self.current_terrain_index)
+        prov_changes = {pid: ptype} if ptype else {}
+
+        # 高度联动
+        height_changes = {}
+        if ptype and ptype in TERRAIN_TYPES:
+            target_h = TERRAIN_TYPES[ptype].height_base
+            height_map = map_data.height_map
+            for i in range(len(ys)):
+                y, x = int(ys[i]), int(xs[i])
+                if int(height_map[y, x]) != target_h:
+                    height_changes[(y, x)] = target_h
+
+        cmd = PaintTerrainCommand(
+            map_data, terrain_changes,
+            provincial_terrain_changes=prov_changes,
+            height_changes=height_changes,
+        )
+        self.history.execute(cmd)
+        self.project.mark_dirty()
+        self._emit_render(full=True)
+        self._emit_status(f"省份 {pid} 地形已设为 {ptype or '未知'}")
 
     def on_press(self, x: int, y: int, pid: int, button: str, modifiers: set) -> bool:
         """画笔模式下鼠标按下。"""

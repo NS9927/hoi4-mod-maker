@@ -21,34 +21,68 @@ class OverlayMixin:
     - _brush_cursor, _current_tool, _brush_size
     """
 
+    def _rebuild_border_cache(self) -> None:
+        """重建省份边界缓存 + base QPixmap（只在省份数据变化时调用）。"""
+        if self._province_map.max() == 0:
+            self._border_cache = None
+            self._border_base_pixmap = None
+            return
+        borders = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=bool)
+        borders[:-1, :] |= self._province_map[:-1, :] != self._province_map[1:, :]
+        borders[:, :-1] |= self._province_map[:, :-1] != self._province_map[:, 1:]
+        self._border_cache = borders
+        # 生成 base pixmap（只做一次，不用每次 copy 46MB）
+        rgba = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
+        rgba[borders, 3] = 180
+        img = QImage(rgba.data, MAP_WIDTH, MAP_HEIGHT,
+                     MAP_WIDTH * 4, QImage.Format.Format_ARGB32)
+        img._ref = rgba
+        self._border_base_pixmap = QPixmap.fromImage(img)
+
     def _render_province_overlay(self) -> None:
-        """渲染省份边界叠加层"""
+        """渲染省份边界叠加层（base pixmap + 高亮用 QPainter 画）"""
         if not self._show_provinces or self._province_map.max() == 0:
             self._province_pixmap_item.setVisible(False)
             return
 
-        borders = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=bool)
-        borders[:-1, :] |= self._province_map[:-1, :] != self._province_map[1:, :]
-        borders[:, :-1] |= self._province_map[:, :-1] != self._province_map[:, 1:]
+        if not hasattr(self, '_border_cache') or self._border_cache is None:
+            self._rebuild_border_cache()
+        if not hasattr(self, '_border_base_pixmap') or self._border_base_pixmap is None:
+            self._rebuild_border_cache()
 
-        rgba = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
-        rgba[borders, 3] = 180  # 黑色半透明边界
+        # 从 base pixmap 复制（QPixmap copy 很快，不涉及 numpy）
+        result = QPixmap(self._border_base_pixmap)
 
-        # 高亮选中省份：用黄色描边它的边界
+        # 高亮选中省份（用 QPainter 画黄色边框，不操作 numpy 数组）
         sel = self._selected_province_id
         if sel > 0:
-            sel_mask = self._province_map == sel
-            sel_border = np.zeros_like(borders)
-            sel_border[:-1, :] |= sel_mask[:-1, :] != sel_mask[1:, :]
-            sel_border[1:, :]  |= sel_mask[:-1, :] != sel_mask[1:, :]
-            sel_border[:, :-1] |= sel_mask[:, :-1] != sel_mask[:, 1:]
-            sel_border[:, 1:]  |= sel_mask[:, :-1] != sel_mask[:, 1:]
-            rgba[sel_border] = (255, 230, 0, 255)  # 不透明黄色
+            ys, xs = np.where(self._province_map == sel)
+            if len(ys) > 0:
+                y0 = max(0, int(ys.min()) - 1)
+                y1 = min(MAP_HEIGHT, int(ys.max()) + 2)
+                x0 = max(0, int(xs.min()) - 1)
+                x1 = min(MAP_WIDTH, int(xs.max()) + 2)
 
-        img = QImage(rgba.data, MAP_WIDTH, MAP_HEIGHT,
-                     MAP_WIDTH * 4, QImage.Format.Format_ARGB32)
-        img._ref = rgba
-        self._province_pixmap_item.setPixmap(QPixmap.fromImage(img))
+                # 在小区域内算高亮边界
+                sub = self._province_map[y0:y1, x0:x1]
+                sel_mask = sub == sel
+                sel_border = np.zeros_like(sel_mask)
+                sel_border[:-1, :] |= sel_mask[:-1, :] != sel_mask[1:, :]
+                sel_border[1:, :]  |= sel_mask[:-1, :] != sel_mask[1:, :]
+                sel_border[:, :-1] |= sel_mask[:, :-1] != sel_mask[:, 1:]
+                sel_border[:, 1:]  |= sel_mask[:, :-1] != sel_mask[:, 1:]
+
+                # 画黄色高亮到小区域
+                h_rgba = np.zeros((y1 - y0, x1 - x0, 4), dtype=np.uint8)
+                h_rgba[sel_border] = (0, 230, 255, 255)  # BGRA: yellow
+                h_img = QImage(h_rgba.data, x1 - x0, y1 - y0,
+                              (x1 - x0) * 4, QImage.Format.Format_ARGB32)
+                h_img._ref = h_rgba
+
+                painter = QPainter(result)
+                painter.drawImage(x0, y0, h_img)
+                painter.end()
+        self._province_pixmap_item.setPixmap(result)
         self._province_pixmap_item.setVisible(True)
 
     def set_vp_data(self, vp_dict: dict[int, int]) -> None:

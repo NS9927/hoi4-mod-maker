@@ -53,6 +53,7 @@ class StateController(BaseController):
             "state_changed",
             state_id=self.selected_state_id,
             action="modified",
+            property="assign",
         )
         self._emit_status(f"省份 {pid} 已分配到 State {self.selected_state_id}")
 

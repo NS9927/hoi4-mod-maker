@@ -28,7 +28,11 @@ def build_page(panel) -> QWidget:
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(8)
 
-    tip = QLabel("定义大陆 + 把省份指派到大陆.\nHOI4 的 continent.txt 和 definition.csv 用.")
+    tip = QLabel("定义大陆 + 把省份指派到大陆.\n"
+                 "HOI4 要求所有陆地省份必须属于某个大洲，\n"
+                 "影响 continent.txt 和 definition.csv.\n"
+                 "先创建大陆(如 europe, asia)，再用拾取模式\n"
+                 "点击省份分配到选中的大陆.")
     tip.setWordWrap(True)
     tip.setStyleSheet(_DIM_LABEL_STYLE)
     lay.addWidget(tip)

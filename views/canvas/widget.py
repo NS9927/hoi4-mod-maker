@@ -228,6 +228,32 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
     # ========== 数据访问 ==========
 
+    def set_map_data(self, map_data) -> None:
+        """替换底层 MapData 并重新绑定所有局部别名。
+
+        调用时机：MainWindow 初始化后 / 新建项目 / 加载项目，
+        让 canvas 和 project 共享同一个 MapData 实例，
+        这样 controller 通过 Command 修改 project.map_data 的数组时，
+        canvas 也能立即看到变化。
+        """
+        self._map_data = map_data
+        self._tile_map = map_data.tile_map
+        self._province_map = map_data.province_map
+        self._terrain_map = map_data.terrain_map
+        self._height_map = map_data.height_map
+        self._river_map = map_data.river_map
+        self._has_provinces = int(self._province_map.max()) > 0
+        # 清除所有缓存
+        self._border_cache = None
+        if hasattr(self, '_border_base_pixmap'):
+            self._border_base_pixmap = None
+        self._state_color_rgb = None
+        self._country_color_rgb = None
+        self._display_buffer = np.zeros(
+            (map_data.tile_map.shape[0], map_data.tile_map.shape[1], 4),
+            dtype=np.uint8,
+        )
+
     @property
     def map_data(self):
         """暴露 MapData 给外部使用高级查询方法（get_neighbors 等）。"""
@@ -263,10 +289,31 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         )
 
     def _set_layer(self, attr: str, data: np.ndarray, dtype) -> None:
-        """统一的图层替换：写入 MapData，同步本地别名。"""
-        new_arr = data.astype(dtype)
-        setattr(self._map_data, attr, new_arr)
-        setattr(self, "_" + attr, new_arr)
+        """统一的图层替换：写入 MapData，同步本地别名。
+
+        如果形状相同，原地写入以保持引用稳定（controller/command 持有的引用不会失效）。
+        形状不同时（地图尺寸变化）才替换整个数组。
+        """
+        existing = getattr(self._map_data, attr, None)
+        if existing is not None and existing.shape == data.shape:
+            existing[:] = data.astype(dtype)
+            # 别名仍指向同一对象，无需更新
+        else:
+            new_arr = data.astype(dtype)
+            setattr(self._map_data, attr, new_arr)
+            setattr(self, "_" + attr, new_arr)
+
+    def _rebind_aliases(self) -> None:
+        """重新绑定局部别名到 MapData 当前属性。
+
+        当 Command 或外部代码替换了 MapData 的某个属性（而非原地修改），
+        canvas 的 _tile_map 等局部别名会过期。调用此方法刷新。
+        """
+        self._tile_map = self._map_data.tile_map
+        self._province_map = self._map_data.province_map
+        self._terrain_map = self._map_data.terrain_map
+        self._height_map = self._map_data.height_map
+        self._river_map = self._map_data.river_map
 
     @property
     def tile_map(self) -> np.ndarray:
@@ -286,6 +333,10 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     def province_map(self, data: np.ndarray) -> None:
         self._set_layer("province_map", data, np.int32)
         self._has_provinces = int(self._province_map.max()) > 0
+        # 省份数据变了，清除边界缓存以便下次重建
+        self._border_cache = None
+        if hasattr(self, '_border_base_pixmap'):
+            self._border_base_pixmap = None
         if self._display_mode == "province":
             self._full_render()
         self._render_province_overlay()
@@ -420,7 +471,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         ph = min(sh, y1 - y0)
         pw = min(sw, x1 - x0)
         self._tile_map[y0:y0 + ph, x0:x0 + pw] = scaled[:ph, :pw]
-        self._map_data.tile_map = self._tile_map.copy()
+        # _tile_map 和 _map_data.tile_map 是同一个数组，无需额外同步
         self._full_render()
 
     def _cancel_transform(self) -> None:
@@ -429,7 +480,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             # 恢复原始片段到原始位置
             ox0, oy0, ox1, oy1 = self._transform_orig_box
             self._tile_map[oy0:oy1, ox0:ox1] = self._transform_snippet
-            self._map_data.tile_map = self._tile_map.copy()
+            # _tile_map 和 _map_data.tile_map 是同一个数组，无需额外同步
             self._full_render()
         self._end_transform()
 
@@ -707,6 +758,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 更新 canvas 持有的选中省份 id
         if self._selected_province_id in mapping:
             self._selected_province_id = mapping[self._selected_province_id]
+        self._border_cache = None  # 省份变了，清缓存
         self._full_render()
         self._render_province_overlay()
         return True

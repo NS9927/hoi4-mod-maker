@@ -26,7 +26,10 @@ def build_page(panel) -> QWidget:
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(6)
 
-    tip = QLabel("HOI4 引擎 default.map 配置.\n修改后下次导出生效.")
+    tip = QLabel("HOI4 引擎 default.map 配置.\n"
+                 "河流最大等级: 河流渲染时的最粗级别(默认5)\n"
+                 "树木调色板: 控制地图上森林/树木的显示色号\n"
+                 "修改后下次导出生效.")
     tip.setWordWrap(True)
     tip.setStyleSheet(_DIM_LABEL_STYLE)
     lay.addWidget(tip)

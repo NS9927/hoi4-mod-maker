@@ -24,7 +24,10 @@ def build_page(panel) -> QWidget:
     lay.setContentsMargins(0, 0, 0, 0)
     lay.setSpacing(8)
 
-    tip = QLabel("缩到战略视角时的全图色调.\n改颜色后下次导出生效.")
+    tip = QLabel("战略视角缩放时的全图底色(colormap).\n"
+                 "这是 HOI4 缩到最远时看到的颜色贴图，\n"
+                 "分别设置陆地/海洋/湖泊的底色.\n"
+                 "改颜色后下次导出生效.")
     tip.setWordWrap(True)
     tip.setStyleSheet(_DIM_LABEL_STYLE)
     lay.addWidget(tip)
