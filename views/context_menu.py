@@ -1,0 +1,151 @@
+"""
+右键省份弹出菜单 — 集中所有省份快捷操作。
+"""
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from PyQt5.QtWidgets import QMenu, QApplication, QInputDialog
+from PyQt5.QtCore import QPoint
+
+from data.terrain_types import TERRAIN_TYPES, GRAPHICAL_TERRAIN_BY_INDEX
+
+if TYPE_CHECKING:
+    from model.project import Project
+    from views.canvas.widget import MapCanvas
+
+
+class ProvinceContextMenu:
+    """右键省份弹出菜单。"""
+
+    def __init__(
+        self,
+        project: "Project",
+        controllers: dict[str, object],
+        canvas: "MapCanvas",
+    ) -> None:
+        self._project = project
+        self._controllers = controllers
+        self._canvas = canvas
+
+    def show(self, pid: int, screen_pos: QPoint) -> None:
+        """在指定屏幕位置弹出菜单。"""
+        if pid <= 0:
+            return
+
+        menu = QMenu()
+
+        # ── 省份信息 ──
+        info_action = menu.addAction(f"省份 {pid} 信息")
+        info_action.setEnabled(False)
+        menu.addSeparator()
+
+        # ── 地形设置 ──
+        terrain_menu = menu.addMenu("设置地形")
+        terrain_actions: dict[object, int] = {}
+        for gt in sorted(GRAPHICAL_TERRAIN_BY_INDEX.values(), key=lambda g: g.palette_index):
+            if gt.type in ("ocean", "lakes"):
+                continue
+            act = terrain_menu.addAction(f"{gt.name_cn} ({gt.type})")
+            terrain_actions[act] = gt.palette_index
+
+        menu.addSeparator()
+
+        # ── State 相关 ──
+        state_id = self._project.state_mgr.get_state_of_province(pid)
+        vp_action = None
+        capital_action = None
+        copy_action = None
+
+        if state_id:
+            state_info = menu.addAction(f"所属 State: {state_id}")
+            state_info.setEnabled(False)
+
+            vp_action = menu.addAction("设置胜利点...")
+
+            tag = self._project.country_mgr.get_state_owner(state_id)
+            if tag:
+                country_info = menu.addAction(f"所属国家: {tag}")
+                country_info.setEnabled(False)
+
+            capital_action = menu.addAction("设为首都")
+        else:
+            no_state = menu.addAction("(未分配 State)")
+            no_state.setEnabled(False)
+
+        menu.addSeparator()
+        copy_action = menu.addAction("复制省份ID")
+
+        # ── 执行 ──
+        chosen = menu.exec_(screen_pos)
+        if chosen is None:
+            return
+
+        self._handle_action(chosen, pid, terrain_actions, vp_action, capital_action, copy_action)
+
+    def _handle_action(
+        self,
+        action: object,
+        pid: int,
+        terrain_actions: dict[object, int],
+        vp_action: object | None,
+        capital_action: object | None,
+        copy_action: object | None,
+    ) -> None:
+        # 地形
+        if action in terrain_actions:
+            palette_idx = terrain_actions[action]
+            self._set_terrain(pid, palette_idx)
+            return
+
+        # VP
+        if action is vp_action:
+            self._set_vp(pid)
+            return
+
+        # 首都
+        if action is capital_action:
+            self._set_capital(pid)
+            return
+
+        # 复制 ID
+        if action is copy_action:
+            clipboard = QApplication.clipboard()
+            if clipboard is not None:
+                clipboard.setText(str(pid))
+            return
+
+    def _set_terrain(self, pid: int, palette_idx: int) -> None:
+        """整个省份设为指定地形。"""
+        import numpy as np
+        pm = self._canvas.province_map
+        mask = pm == pid
+        self._canvas.terrain_map[mask] = palette_idx
+
+        from data.terrain_types import PALETTE_TO_TYPE, TERRAIN_TYPES as TT
+        ptype = PALETTE_TO_TYPE.get(palette_idx)
+        if ptype:
+            self._canvas._map_data.provincial_terrain[pid] = ptype
+            if ptype in TT:
+                self._canvas.height_map[mask] = TT[ptype].height_base
+
+        self._canvas.refresh_display()
+
+    def _set_vp(self, pid: int) -> None:
+        """弹出对话框设置胜利点。"""
+        parent = self._canvas.window()
+        value, ok = QInputDialog.getInt(
+            parent, "设置胜利点",
+            f"省份 {pid} 的 VP 分值\n(1=小镇, 5=中等, 10=城市, 20=首都):",
+            1, 0, 50, 1,
+        )
+        if ok:
+            ctrl = self._controllers.get("state")
+            if ctrl is not None:
+                ctrl.set_vp(pid, value)
+
+    def _set_capital(self, pid: int) -> None:
+        """设为国家首都。"""
+        ctrl = self._controllers.get("country")
+        if ctrl is not None:
+            ctrl.on_province_right_clicked(pid, 0, 0)

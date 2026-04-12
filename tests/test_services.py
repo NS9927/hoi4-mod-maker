@@ -34,8 +34,9 @@ def test_terrain_service_auto_height_range():
     assert hm.dtype == np.uint8
     assert hm.min() >= 0
     assert hm.max() <= 255
-    # 陆地平均高度应该 > sea level
-    assert hm[500, 500] > SEA_LEVEL
+    # 陆地中心高度应该 > sea level
+    mid_y, mid_x = MAP_HEIGHT // 2, MAP_WIDTH // 2
+    assert hm[mid_y, mid_x] > SEA_LEVEL
 
 
 def test_export_service_validate_empty_map():
