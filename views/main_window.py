@@ -570,15 +570,82 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._show_editor()
 
     def _on_welcome_import_mod(self) -> None:
-        """欢迎页的导入MOD按钮：先创建空项目再导入。"""
-        # 先创建一个临时小项目（导入时会被覆盖）
-        from data.constants import MAP_SIZE_PRESETS
-        w, h = 2048, 1024  # 最小尺寸，导入时会被替换
-        self._project.new_project(w, h)
-        self._canvas.set_map_data(self._project.map_data)
+        """欢迎页的导入MOD按钮：直接选文件夹 → 导入 → 进编辑器。"""
+        from PyQt5.QtWidgets import QFileDialog, QProgressDialog
+        from services.import_service import validate_mod_directory, import_mod_map
+
+        mod_dir = QFileDialog.getExistingDirectory(
+            self, "选择 HOI4 MOD 或原版目录",
+            "", QFileDialog.Option.ShowDirsOnly,
+        )
+        if not mod_dir:
+            return
+
+        missing = validate_mod_directory(mod_dir)
+        if missing:
+            QMessageBox.warning(
+                self, "导入失败",
+                f"目录缺少必需文件:\n" + "\n".join(missing),
+            )
+            return
+
+        # 显示进度提示
+        progress = QProgressDialog("正在读取MOD地图文件...", None, 0, 0, self)
+        progress.setWindowTitle("导入MOD")
+        progress.setMinimumDuration(0)
+        progress.show()
+        QApplication.processEvents()
+
+        try:
+            result = import_mod_map(mod_dir)
+        except Exception as e:
+            progress.close()
+            import traceback
+            QMessageBox.critical(
+                self, "导入失败",
+                f"读取MOD文件时出错:\n{e}\n\n{traceback.format_exc()}"
+            )
+            return
+
+        progress.setLabelText("正在初始化地图...")
+        QApplication.processEvents()
+
+        new_w, new_h = result["width"], result["height"]
+
+        from data.constants import set_map_size
+        set_map_size(new_w, new_h)
+
+        # 创建项目并填充数据
+        self._project.new_project(new_w, new_h)
+        md = self._project.map_data
+        md.tile_map = result["tile_map"]
+        md.province_map = result["province_map"]
+        md.terrain_map = result["terrain_map"]
+        md.height_map = result["height_map"]
+        if result["river_map"] is not None:
+            md.river_map = result["river_map"]
+        md.provincial_terrain = result.get("provincial_terrain", {})
+
+        self._canvas.set_map_data(md)
+        self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
+
+        progress.setLabelText("正在渲染...")
+        QApplication.processEvents()
+
         self._show_editor()
-        # 触发导入
-        self._on_import_mod_map()
+        self._canvas.refresh_display()
+        self._update_province_count()
+        self._project.mark_dirty()
+
+        progress.close()
+
+        info_text = f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份)"
+        self._status_info.setText(info_text)
+
+        warnings_text = ""
+        if result["warnings"]:
+            warnings_text = "\n\n注意:\n" + "\n".join(f"- {w}" for w in result["warnings"])
+        QMessageBox.information(self, "导入完成", info_text + warnings_text)
 
     # ═══════════════════════ 快捷键 ═══════════════════════════
 
