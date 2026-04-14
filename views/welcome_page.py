@@ -108,7 +108,8 @@ class WelcomePage(QWidget):
         center.addWidget(title)
 
         # 版本
-        version = QLabel("v1.0")
+        from version import VERSION
+        version = QLabel(f"v{VERSION}")
         version.setStyleSheet(f"color: {_DIM}; font-size: 14px; background: transparent;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         center.addWidget(version)

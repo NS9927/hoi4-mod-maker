@@ -108,6 +108,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 启动时显示欢迎页
         self._show_welcome()
 
+        # 后台检查更新
+        QTimer.singleShot(2000, self._check_for_update)
+
         # 让 canvas 和 project 共享同一个 MapData 实例
         self._canvas.set_map_data(self._project.map_data)
 
@@ -635,6 +638,34 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._status_provinces.setText(tr("status_provinces", count))
 
     # ═══════════════════════ 欢迎页 ═══════════════════════════
+
+    def _check_for_update(self) -> None:
+        """后台检查 GitHub 是否有新版本。"""
+        import threading
+
+        def _check():
+            from services.update_checker import check_for_update
+            result = check_for_update()
+            if result:
+                # 回到主线程弹窗
+                QTimer.singleShot(0, lambda: self._show_update_dialog(result))
+
+        threading.Thread(target=_check, daemon=True).start()
+
+    def _show_update_dialog(self, info: dict) -> None:
+        """显示更新提示对话框。"""
+        import webbrowser
+        from version import VERSION
+        reply = QMessageBox.information(
+            self, "发现新版本",
+            f"当前版本：{VERSION}\n"
+            f"最新版本：{info['version']}\n\n"
+            f"更新内容：\n{info['body'][:500]}\n\n"
+            f"是否前往下载？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            webbrowser.open(info["url"])
 
     def _show_welcome(self) -> None:
         self._stack.setCurrentWidget(self._welcome_page)
