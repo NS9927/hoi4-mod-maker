@@ -17,9 +17,9 @@ from data.constants import REPLACE_PATHS, DEFAULT_HOI4_PATH
 
 
 def _build_division_names_with_phantoms() -> str:
-    """生成 names_divisions 文件内容: generic fallback + 28 个 vanilla scripted_effects
-    引用的幽灵 name groups (ENG_MAR_01/ITA_INF_01 等).
-    防止 vanilla 创建 division template 时找不到 name group → 坏 template → AI 崩.
+    """生成 names_divisions 文件内容: 只保留 generic fallback。
+    2026-04-14: 去掉所有国家特定的幽灵 name groups (ENG_MAR_01 等),
+    这些条目引用不存在的国家反而导致加载崩溃。vanilla 引用找不到时只警告不崩。
     """
     out = (
         "GENERIC_INF_DIVISION = {\n"
@@ -29,23 +29,6 @@ def _build_division_names_with_phantoms() -> str:
         '\tfallback_name = "%d Infantry Division"\n'
         "}\n\n"
     )
-    PHANTOM_GROUPS = [
-        "AFG_INF_01", "BUL_INF_04", "BUL_INF_06", "ENG_MAR_01", "ETH_ARB",
-        "GER_SS_01", "ITA_CAM_01", "ITA_CAM_02", "ITA_CAV_03", "ITA_INF_01",
-        "ITA_INF_02", "JAP_CAV_01", "JAP_INF_01", "JAP_MIL_02", "NOR_INF_01",
-        "NOR_MIL_01", "POL_INF_01", "PRC_GAR_01", "PRC_INF_01", "SOV_CAV_01",
-        "SOV_INF_01", "SOV_INF_03", "SOV_INF_04", "SOV_JAP_INF", "SOV_MEC_01",
-        "SOV_MOT_01", "SPD_INF_02", "USA_INF_01",
-    ]
-    for g in PHANTOM_GROUPS:
-        out += (
-            f"{g} = {{\n"
-            f'\tname = "{g}"\n'
-            "\tcan_use = { always = yes }\n"
-            '\tdivision_types = { "infantry" }\n'
-            f'\tfallback_name = "%d {g}"\n'
-            "}\n\n"
-        )
     return out
 
 
