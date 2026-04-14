@@ -84,6 +84,7 @@ class WelcomePage(QWidget):
     new_project_requested = pyqtSignal(int, int)   # width, height
     open_project_requested = pyqtSignal()
     open_recent_requested = pyqtSignal(str)         # path
+    import_mod_requested = pyqtSignal()              # 导入MOD地图
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -140,6 +141,11 @@ class WelcomePage(QWidget):
         btn_open.setStyleSheet(btn_style)
         btn_open.clicked.connect(lambda: self.open_project_requested.emit())
         center.addWidget(btn_open, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        btn_import = QPushButton("导入MOD地图")
+        btn_import.setStyleSheet(btn_style)
+        btn_import.clicked.connect(lambda: self.import_mod_requested.emit())
+        center.addWidget(btn_import, alignment=Qt.AlignmentFlag.AlignCenter)
 
         center.addSpacing(12)
 

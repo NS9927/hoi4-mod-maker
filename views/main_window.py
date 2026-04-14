@@ -121,6 +121,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._welcome_page.new_project_requested.connect(self._on_welcome_new)
         self._welcome_page.open_project_requested.connect(self._on_open_project)
         self._welcome_page.open_recent_requested.connect(self._on_welcome_open_recent)
+        self._welcome_page.import_mod_requested.connect(self._on_welcome_import_mod)
         self._stack.addWidget(self._welcome_page)
 
         # 编辑器 splitter
@@ -567,6 +568,17 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._load_project_file(path)
         save_recent_project(path)
         self._show_editor()
+
+    def _on_welcome_import_mod(self) -> None:
+        """欢迎页的导入MOD按钮：先创建空项目再导入。"""
+        # 先创建一个临时小项目（导入时会被覆盖）
+        from data.constants import MAP_SIZE_PRESETS
+        w, h = 2048, 1024  # 最小尺寸，导入时会被替换
+        self._project.new_project(w, h)
+        self._canvas.set_map_data(self._project.map_data)
+        self._show_editor()
+        # 触发导入
+        self._on_import_mod_map()
 
     # ═══════════════════════ 快捷键 ═══════════════════════════
 
