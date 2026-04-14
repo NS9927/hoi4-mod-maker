@@ -226,6 +226,16 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 初始全量渲染
         self._full_render()
 
+    # ========== 动态地图尺寸 ==========
+
+    @property
+    def map_h(self) -> int:
+        return self._display_buffer.shape[0]
+
+    @property
+    def map_w(self) -> int:
+        return self._display_buffer.shape[1]
+
     # ========== 数据访问 ==========
 
     def set_map_data(self, map_data) -> None:
@@ -249,10 +259,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             self._border_base_pixmap = None
         self._state_color_rgb = None
         self._country_color_rgb = None
-        self._display_buffer = np.zeros(
-            (map_data.tile_map.shape[0], map_data.tile_map.shape[1], 4),
-            dtype=np.uint8,
-        )
+        h, w = map_data.tile_map.shape[0], map_data.tile_map.shape[1]
+        self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
+        self._scene.setSceneRect(0, 0, w, h)
 
     @property
     def map_data(self):
@@ -302,6 +311,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             new_arr = data.astype(dtype)
             setattr(self._map_data, attr, new_arr)
             setattr(self, "_" + attr, new_arr)
+            # 地图尺寸变化时，同步 display_buffer 和 scene rect
+            h, w = new_arr.shape[:2]
+            if (h, w) != (self._display_buffer.shape[0], self._display_buffer.shape[1]):
+                self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
+                self._scene.setSceneRect(0, 0, w, h)
 
     def _rebind_aliases(self) -> None:
         """重新绑定局部别名到 MapData 当前属性。
@@ -440,7 +454,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
         x0, y0, x1, y1 = [int(v) for v in self._transform_box]
         x0 = max(0, x0); y0 = max(0, y0)
-        x1 = min(MAP_WIDTH, x1); y1 = min(MAP_HEIGHT, y1)
+        x1 = min(self.map_w, x1); y1 = min(self.map_h, y1)
         tw, th = x1 - x0, y1 - y0
         if tw < 2 or th < 2:
             return
@@ -641,8 +655,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
     def _update_pixmap_from_buffer(self) -> None:
         """将显示缓冲区写入 QPixmap"""
-        img = QImage(self._display_buffer.data, MAP_WIDTH, MAP_HEIGHT,
-                     MAP_WIDTH * 4, QImage.Format.Format_RGB32)
+        img = QImage(self._display_buffer.data, self.map_w, self.map_h,
+                     self.map_w * 4, QImage.Format.Format_RGB32)
         img._ref = self._display_buffer  # 防止 GC
         self._map_pixmap_item.setPixmap(QPixmap.fromImage(img))
 
@@ -689,7 +703,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     def center_on_pixel(self, x: int, y: int, zoom: float | None = None) -> None:
         """让画布中心对准地图坐标 (x, y)，可选放大到 zoom 倍。
         用于验证对话框跳转到问题位置。"""
-        if not (0 <= x < MAP_WIDTH and 0 <= y < MAP_HEIGHT):
+        if not (0 <= x < self.map_w and 0 <= y < self.map_h):
             return
         if zoom is not None:
             self.resetTransform()
@@ -727,11 +741,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         if x_range >= y_range:
             # 水平方向更宽，沿 x 中线切
             mid_x = (xs.min() + xs.max()) // 2
-            right_half = mask & (np.arange(MAP_WIDTH)[np.newaxis, :] > mid_x)
+            right_half = mask & (np.arange(self.map_w)[np.newaxis, :] > mid_x)
         else:
             # 垂直方向更高，沿 y 中线切
             mid_y = (ys.min() + ys.max()) // 2
-            right_half = mask & (np.arange(MAP_HEIGHT)[:, np.newaxis] > mid_y)
+            right_half = mask & (np.arange(self.map_h)[:, np.newaxis] > mid_y)
 
         if not np.any(right_half):
             return False
@@ -800,8 +814,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             r = self._brush_size // 2
         x0 = max(0, cx - r)
         y0 = max(0, cy - r)
-        x1 = min(MAP_WIDTH, cx + r + 1)
-        y1 = min(MAP_HEIGHT, cy + r + 1)
+        x1 = min(self.map_w, cx + r + 1)
+        y1 = min(self.map_h, cy + r + 1)
         if x0 >= x1 or y0 >= y1:
             return
 
@@ -879,7 +893,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._last_draw_pos = (scene_x, scene_y)
 
     def _flood_fill(self, x: int, y: int) -> None:
-        if x < 0 or x >= MAP_WIDTH or y < 0 or y >= MAP_HEIGHT:
+        if x < 0 or x >= self.map_w or y < 0 or y >= self.map_h:
             return
 
         mode = self._display_mode
@@ -905,11 +919,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             return
 
         stack = [(x, y)]
-        visited = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=bool)
+        visited = np.zeros((self.map_h, self.map_w), dtype=bool)
 
         while stack:
             cx, cy = stack.pop()
-            if cx < 0 or cx >= MAP_WIDTH or cy < 0 or cy >= MAP_HEIGHT:
+            if cx < 0 or cx >= self.map_w or cy < 0 or cy >= self.map_h:
                 continue
             if visited[cy, cx] or data[cy, cx] != target:
                 continue
@@ -918,7 +932,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             while left > 0 and data[cy, left - 1] == target and not visited[cy, left - 1]:
                 left -= 1
             right = cx
-            while right < MAP_WIDTH - 1 and data[cy, right + 1] == target and not visited[cy, right + 1]:
+            while right < self.map_w - 1 and data[cy, right + 1] == target and not visited[cy, right + 1]:
                 right += 1
 
             data[cy, left:right + 1] = fill_val
@@ -927,7 +941,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             for nx in range(left, right + 1):
                 if cy > 0 and not visited[cy - 1, nx] and data[cy - 1, nx] == target:
                     stack.append((nx, cy - 1))
-                if cy < MAP_HEIGHT - 1 and not visited[cy + 1, nx] and data[cy + 1, nx] == target:
+                if cy < self.map_h - 1 and not visited[cy + 1, nx] and data[cy + 1, nx] == target:
                     stack.append((nx, cy + 1))
 
         # 填充后全量渲染（因为区域不确定）
@@ -942,11 +956,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     def _scene_pos_clamped(self, event: QMouseEvent) -> tuple[int, int]:
         """返回限制在地图边界内的场景坐标"""
         sx, sy = self._scene_pos(event)
-        return max(0, min(MAP_WIDTH - 1, sx)), max(0, min(MAP_HEIGHT - 1, sy))
+        return max(0, min(self.map_w - 1, sx)), max(0, min(self.map_h - 1, sy))
 
     def _is_in_bounds(self, sx: int, sy: int) -> bool:
         """检查坐标是否在地图边界内"""
-        return 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT
+        return 0 <= sx < self.map_w and 0 <= sy < self.map_h
 
     def cleanup_mode_state(self) -> None:
         """清理所有临时模式状态。模式切换时调用，防止状态残留导致异常。"""
@@ -984,7 +998,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self.setCursor(Qt.CursorShape.CrossCursor)
 
     def fit_in_view(self) -> None:
-        self.fitInView(QRectF(0, 0, MAP_WIDTH, MAP_HEIGHT),
+        self.fitInView(QRectF(0, 0, self.map_w, self.map_h),
                        Qt.AspectRatioMode.KeepAspectRatio)
         transform = self.transform()
         self._zoom = transform.m11()

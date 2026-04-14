@@ -5,9 +5,6 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QPixmap
 
-from data.constants import MAP_WIDTH, MAP_HEIGHT
-
-
 class RefImageMixin:
     """参考图相关方法。假设 self 拥有:
     - _ref_pixmap_item, _vanilla_ref_item
@@ -25,8 +22,8 @@ class RefImageMixin:
         self._ref_pixmap_item.setVisible(self._show_ref_image)
         # 默认居中
         self._ref_pixmap_item.setPos(
-            (MAP_WIDTH - pixmap.width()) / 2,
-            (MAP_HEIGHT - pixmap.height()) / 2,
+            (self.map_w - pixmap.width()) / 2,
+            (self.map_h - pixmap.height()) / 2,
         )
         return True
 
@@ -35,7 +32,7 @@ class RefImageMixin:
         pixmap = QPixmap(file_path)
         if pixmap.isNull():
             return False
-        scaled = pixmap.scaled(MAP_WIDTH, MAP_HEIGHT,
+        scaled = pixmap.scaled(self.map_w, self.map_h,
                                Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
         self._vanilla_ref_item.setPixmap(scaled)
         self._vanilla_ref_item.setPos(0, 0)
@@ -66,10 +63,10 @@ class RefImageMixin:
         """让参考图片铺满地图。"""
         if hasattr(self, '_ref_original_pixmap') and not self._ref_original_pixmap.isNull():
             scaled = self._ref_original_pixmap.scaled(
-                MAP_WIDTH, MAP_HEIGHT, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
+                self.map_w, self.map_h, Qt.IgnoreAspectRatio, Qt.SmoothTransformation)
             self._ref_pixmap_item.setPixmap(scaled)
             self._ref_pixmap_item.setPos(0, 0)
-            self._ref_scale = MAP_WIDTH / self._ref_original_pixmap.width()
+            self._ref_scale = self.map_w / self._ref_original_pixmap.width()
 
     def move_ref_image(self, dx: int, dy: int) -> None:
         """移动参考图片位置。"""

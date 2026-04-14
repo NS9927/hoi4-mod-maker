@@ -7,7 +7,6 @@ from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QMouseEvent, QWheelEvent
 
 from data.constants import (
-    MAP_WIDTH, MAP_HEIGHT,
     TILE_SEA, TILE_LAKE,
     ZOOM_MIN, ZOOM_MAX, ZOOM_STEP,
 )
@@ -48,7 +47,7 @@ class InputMixin:
                 and self._framework_tool is not None
                 and not self._space_pressed):
             sx, sy = self._scene_pos(event)
-            if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                 self._framework_ctx.dirty_bbox = None
                 self._framework_tool.begin_undo(self._framework_ctx)
                 self._framework_tool.on_press(self._framework_ctx, sx, sy)
@@ -111,7 +110,7 @@ class InputMixin:
             # 地形/高度/State/Country 模式：点击省份 → 委托 controller 处理
             if self._display_mode in ("terrain", "height", "state", "country"):
                 sx, sy = self._scene_pos(event)
-                if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+                if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     pid = int(self._province_map[sy, sx])
                     if pid > 0:
                         # 地形画笔模式：逐像素绘制
@@ -128,7 +127,7 @@ class InputMixin:
             # 省份模式：左键只做选中 (扩张需走 lasso 框架工具, 不允许直接拖动改边界)
             if self._display_mode == "province":
                 sx, sy = self._scene_pos(event)
-                if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+                if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     pid = int(self._province_map[sy, sx])
                     if pid > 0:
                         self._selected_province_id = pid
@@ -168,7 +167,7 @@ class InputMixin:
 
     def mouseMoveEvent(self, event: QMouseEvent) -> None:
         sx, sy = self._scene_pos(event)
-        if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+        if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
             self.mouse_moved.emit(sx, sy)
             self._update_brush_cursor(sx, sy)
         else:
@@ -177,8 +176,8 @@ class InputMixin:
         # 变换工具框选拖拽
         if self._transform_selecting and self._selection_start:
             x0, y0 = self._selection_start
-            x1 = max(0, min(MAP_WIDTH, int(sx)))
-            y1 = max(0, min(MAP_HEIGHT, int(sy)))
+            x1 = max(0, min(self.map_w, int(sx)))
+            y1 = max(0, min(self.map_h, int(sy)))
             rx0, ry0 = min(x0, x1), min(y0, y1)
             rx1, ry1 = max(x0, x1), max(y0, y1)
             self._selection_rect = (rx0, ry0, rx1, ry1)
@@ -226,7 +225,7 @@ class InputMixin:
         # 框选模式拖拽
         if self._selection_mode and self._selection_start:
             x0, y0 = self._selection_start
-            x1, y1 = max(0, min(MAP_WIDTH, int(sx))), max(0, min(MAP_HEIGHT, int(sy)))
+            x1, y1 = max(0, min(self.map_w, int(sx))), max(0, min(self.map_h, int(sy)))
             rx0, ry0 = min(x0, x1), min(y0, y1)
             rx1, ry1 = max(x0, x1), max(y0, y1)
             self._selection_rect = (rx0, ry0, rx1, ry1)
@@ -255,13 +254,13 @@ class InputMixin:
 
         # 框架工具分发
         if self._is_drawing and self._framework_tool is not None:
-            if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                 self._framework_tool.on_drag(self._framework_ctx, sx, sy)
                 # 拖动期间持续刷新画布，让用户看到扩张效果
                 if self._framework_ctx.state.get("painting"):
                     self._mark_dirty(
                         max(0, sx - 10), max(0, sy - 10),
-                        min(MAP_WIDTH, sx + 11), min(MAP_HEIGHT, sy + 11),
+                        min(self.map_w, sx + 11), min(self.map_h, sy + 11),
                     )
                     self._flush_dirty()
                     self._render_province_overlay()
@@ -343,7 +342,7 @@ class InputMixin:
                         self._show_expand_overlay()
                     else:
                         self._clear_lasso_visual()
-                    self._mark_dirty(0, 0, MAP_WIDTH, MAP_HEIGHT)
+                    self._mark_dirty(0, 0, self.map_w, self.map_h)
                     self._flush_dirty()
                     if self._display_mode == "province":
                         self._render_province_overlay()
@@ -368,7 +367,7 @@ class InputMixin:
             self._is_drawing = False
             self._last_draw_pos = None
             sx, sy = self._scene_pos(event)
-            if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                 pid = int(self._province_map[sy, sx])
                 if pid > 0:
                     self.province_double_clicked.emit(pid)
@@ -380,7 +379,7 @@ class InputMixin:
         """右键省份 → 弹出上下文菜单（所有模式）"""
         pos = self.mapToScene(event.pos())
         sx, sy = int(pos.x()), int(pos.y())
-        if 0 <= sx < MAP_WIDTH and 0 <= sy < MAP_HEIGHT:
+        if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
             pid = int(self._province_map[sy, sx])
             if pid > 0:
                 self.province_right_clicked.emit(pid)

@@ -8,9 +8,6 @@ from PyQt5.QtGui import (
     QImage, QPixmap, QPainter, QColor, QPen, QPainterPath, QBrush,
 )
 
-from data.constants import MAP_WIDTH, MAP_HEIGHT
-
-
 class OverlayMixin:
     """叠加层相关方法。假设 self 拥有:
     - _province_pixmap_item, _province_map, _selected_province_id
@@ -60,9 +57,9 @@ class OverlayMixin:
             ys, xs = np.where(self._province_map == sel)
             if len(ys) > 0:
                 y0 = max(0, int(ys.min()) - 1)
-                y1 = min(MAP_HEIGHT, int(ys.max()) + 2)
+                y1 = min(self.map_h, int(ys.max()) + 2)
                 x0 = max(0, int(xs.min()) - 1)
-                x1 = min(MAP_WIDTH, int(xs.max()) + 2)
+                x1 = min(self.map_w, int(xs.max()) + 2)
 
                 # 在小区域内算高亮边界
                 sub = self._province_map[y0:y1, x0:x1]
@@ -108,7 +105,7 @@ class OverlayMixin:
             return
 
         # 创建透明画布
-        img = QImage(MAP_WIDTH, MAP_HEIGHT, QImage.Format.Format_ARGB32)
+        img = QImage(self.map_w, self.map_h, QImage.Format.Format_ARGB32)
         img.fill(QColor(0, 0, 0, 0))
         painter = QPainter(img)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -187,10 +184,10 @@ class OverlayMixin:
         active = self._framework_ctx.state.get("active", False)
         # active 状态用绿色（提示"现在能画了"），未 active 用黄色（提示"再点一次进入"）
         color = (50, 220, 80, 70) if active else (255, 230, 0, 60)
-        rgba = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
+        rgba = np.zeros((self.map_h, self.map_w, 4), dtype=np.uint8)
         rgba[mask] = color
-        img = QImage(rgba.data, MAP_WIDTH, MAP_HEIGHT,
-                     MAP_WIDTH * 4, QImage.Format.Format_ARGB32)
+        img = QImage(rgba.data, self.map_w, self.map_h,
+                     self.map_w * 4, QImage.Format.Format_ARGB32)
         img._ref = rgba
         self._lasso_overlay.setPixmap(QPixmap.fromImage(img))
         self._lasso_overlay.setVisible(True)
