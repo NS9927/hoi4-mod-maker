@@ -14,3 +14,7 @@ dist/
 .idea/
 *.zip
 logs/
+*.zip
+logs/*.log
+dist/
+build/
