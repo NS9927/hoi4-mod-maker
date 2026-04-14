@@ -27,20 +27,21 @@ _SECTION_STYLE = f"""
         background: {_INPUT_BG};
         border: 1px solid {_BORDER};
         border-radius: 6px;
-        margin-top: 14px;
-        padding-top: 14px;
-        color: {_DIM};
-        font-size: 11px;
+        margin-top: 16px;
+        padding-top: 18px;
+        color: {_GROUP_HEADER};
+        font-size: 12px;
+        font-weight: bold;
     }}
     QGroupBox::title {{
         subcontrol-origin: margin;
-        left: 8px;
-        padding: 0 4px;
+        left: 10px;
+        padding: 0 6px;
     }}
 """
 
-_LABEL_STYLE = f"color: {_TEXT}; font-size: 12px;"
-_DIM_LABEL_STYLE = f"color: {_DIM}; font-size: 11px;"
+_LABEL_STYLE = f"color: {_TEXT}; font-size: 13px;"
+_DIM_LABEL_STYLE = f"color: {_DIM}; font-size: 12px;"
 
 _SLIDER_STYLE = f"""
     QSlider::groove:horizontal {{
@@ -65,8 +66,8 @@ _TOOL_BTN_STYLE = f"""
         background: {_INPUT_BG};
         border: 1px solid {_BORDER};
         color: {_DIM};
-        padding: 5px 2px;
-        font-size: 11px;
+        padding: 6px 4px;
+        font-size: 12px;
         border-radius: 4px;
     }}
     QPushButton:checked {{
@@ -84,8 +85,8 @@ _PRIMARY_BTN_STYLE = f"""
         background: {_ACCENT};
         border: none;
         color: white;
-        padding: 7px 12px;
-        font-size: 12px;
+        padding: 8px 14px;
+        font-size: 13px;
         font-weight: 600;
         border-radius: 5px;
     }}
@@ -99,8 +100,8 @@ _SECONDARY_BTN_STYLE = f"""
         background: {_INPUT_BG};
         border: 1px solid {_BORDER};
         color: {_TEXT};
-        padding: 6px 10px;
-        font-size: 11px;
+        padding: 7px 12px;
+        font-size: 12px;
         border-radius: 5px;
     }}
     QPushButton:hover {{
@@ -171,10 +172,10 @@ _LIST_STYLE = f"""
         border: 1px solid {_BORDER};
         border-radius: 4px;
         color: {_TEXT};
-        font-size: 11px;
+        font-size: 12px;
     }}
     QListWidget::item {{
-        padding: 4px 6px;
+        padding: 5px 8px;
     }}
     QListWidget::item:selected {{
         background: {_ACCENT};
@@ -199,18 +200,18 @@ QMainWindow, QWidget {
     background-color: #1e1e2e;
     color: #e0e0f0;
     font-family: "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
-    font-size: 12px;
+    font-size: 13px;
 }
 
 /* 菜单栏 */
 QMenuBar {
     background-color: #18182a;
     border-bottom: 1px solid #3a3a4a;
-    padding: 2px;
-    font-size: 12px;
+    padding: 3px;
+    font-size: 13px;
 }
 QMenuBar::item {
-    padding: 4px 12px;
+    padding: 5px 14px;
     background: transparent;
     color: #e0e0f0;
 }
@@ -224,8 +225,9 @@ QMenu {
     padding: 4px;
 }
 QMenu::item {
-    padding: 6px 24px;
+    padding: 7px 28px;
     border-radius: 3px;
+    font-size: 13px;
 }
 QMenu::item:selected {
     background: rgba(108, 108, 240, 0.3);
@@ -240,7 +242,7 @@ QMenu::separator {
 QStatusBar {
     background-color: #18182a;
     border-top: 1px solid #3a3a4a;
-    font-size: 11px;
+    font-size: 12px;
     color: #8888a8;
 }
 QStatusBar::item {
@@ -259,23 +261,22 @@ QGroupBox {
 }
 QGroupBox::title {
     subcontrol-origin: margin;
-    left: 8px;
-    padding: 0 4px;
-    color: #8888a8;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    left: 10px;
+    padding: 0 6px;
+    color: #7c7cff;
+    font-size: 12px;
+    font-weight: bold;
 }
 
 /* 按钮 */
 QPushButton {
     background-color: #1e1e2e;
     border: 1px solid #3a3a4a;
-    border-radius: 4px;
-    padding: 6px 12px;
+    border-radius: 5px;
+    padding: 7px 14px;
     color: #e0e0f0;
-    font-size: 12px;
-    min-height: 20px;
+    font-size: 13px;
+    min-height: 22px;
 }
 QPushButton:hover {
     border-color: #6c6cf0;
@@ -348,9 +349,9 @@ QSpinBox, QDoubleSpinBox {
     background: #1e1e2e;
     border: 1px solid #3a3a4a;
     border-radius: 4px;
-    padding: 4px 6px;
+    padding: 5px 8px;
     color: #e0e0f0;
-    font-size: 12px;
+    font-size: 13px;
 }
 QSpinBox::up-button, QSpinBox::down-button,
 QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
@@ -362,11 +363,11 @@ QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {
 /* 标签 */
 QLabel {
     color: #e0e0f0;
-    font-size: 12px;
+    font-size: 13px;
 }
 QLabel#labelDim {
     color: #8888a8;
-    font-size: 11px;
+    font-size: 12px;
 }
 
 /* 滚动条 */
