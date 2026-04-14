@@ -249,6 +249,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 操作按钮 → 本窗口处理（含 UI 交互）
         tp.generate_provinces_requested.connect(self._on_generate_provinces)
         tp.validate_requested.connect(self._on_validate)
+        tp.quick_init_requested.connect(self._on_quick_init)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
         tp.auto_height_requested.connect(self._on_auto_height)
         tp.smooth_height_requested.connect(self._on_smooth_height)

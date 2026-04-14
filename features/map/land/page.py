@@ -37,6 +37,7 @@ class LandPage(QWidget):
     brush_size_changed = pyqtSignal(int)
     generate_provinces_requested = pyqtSignal(int)
     validate_requested = pyqtSignal()
+    quick_init_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -132,10 +133,61 @@ class LandPage(QWidget):
         spin_row.addWidget(self._province_count_spin)
         gen_box.layout().addLayout(spin_row)
 
+        # 海洋省份密度
+        sea_row = QHBoxLayout()
+        sea_lbl = QLabel("海洋密度:")
+        sea_lbl.setStyleSheet(_LABEL_STYLE)
+        sea_row.addWidget(sea_lbl)
+        self._sea_density_label = QLabel("15%")
+        self._sea_density_label.setStyleSheet(_DIM_LABEL_STYLE)
+        sea_row.addStretch()
+        sea_row.addWidget(self._sea_density_label)
+        gen_box.layout().addLayout(sea_row)
+
+        self._sea_density_slider = QSlider(Qt.Orientation.Horizontal)
+        self._sea_density_slider.setRange(5, 100)
+        self._sea_density_slider.setValue(15)
+        self._sea_density_slider.setStyleSheet(_SLIDER_STYLE)
+        self._sea_density_slider.valueChanged.connect(
+            lambda v: self._sea_density_label.setText(f"{v}%")
+        )
+        gen_box.layout().addWidget(self._sea_density_slider)
+
+        # 湖泊省份密度
+        lake_row = QHBoxLayout()
+        lake_lbl = QLabel("湖泊密度:")
+        lake_lbl.setStyleSheet(_LABEL_STYLE)
+        lake_row.addWidget(lake_lbl)
+        self._lake_density_label = QLabel("30%")
+        self._lake_density_label.setStyleSheet(_DIM_LABEL_STYLE)
+        lake_row.addStretch()
+        lake_row.addWidget(self._lake_density_label)
+        gen_box.layout().addLayout(lake_row)
+
+        self._lake_density_slider = QSlider(Qt.Orientation.Horizontal)
+        self._lake_density_slider.setRange(10, 100)
+        self._lake_density_slider.setValue(30)
+        self._lake_density_slider.setStyleSheet(_SLIDER_STYLE)
+        self._lake_density_slider.valueChanged.connect(
+            lambda v: self._lake_density_label.setText(f"{v}%")
+        )
+        gen_box.layout().addWidget(self._lake_density_slider)
+
         validate_btn = QPushButton("验证省份")
         validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_requested.emit)
         gen_box.layout().addWidget(validate_btn)
+
+        quick_init_btn = QPushButton("一键初始化（州+战略区+国家）")
+        quick_init_btn.setStyleSheet(
+            "QPushButton { background: #22c55e; color: white; padding: 8px;"
+            " border-radius: 4px; font-weight: bold; }"
+            "QPushButton:hover { background: #2ad66a; }"
+        )
+        quick_init_btn.setToolTip("自动生成州、战略区域、默认国家，一步到位可导出")
+        quick_init_btn.clicked.connect(self.quick_init_requested.emit)
+        gen_box.layout().addWidget(quick_init_btn)
+
         lay.addWidget(gen_box)
 
         # ── 原版地图参考 ──
@@ -243,3 +295,11 @@ class LandPage(QWidget):
     def _on_generate_provinces(self) -> None:
         count = self._province_count_spin.value()
         self.generate_provinces_requested.emit(count)
+
+    def get_generation_params(self) -> dict:
+        """返回省份生成的所有参数。"""
+        return {
+            "target_count": self._province_count_spin.value(),
+            "sea_scale": self._sea_density_slider.value() / 100.0,
+            "lake_scale": self._lake_density_slider.value() / 100.0,
+        }

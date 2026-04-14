@@ -31,12 +31,15 @@ class _GenerateThread(QThread):
     finished = pyqtSignal(object, int)
     error = pyqtSignal(str)
 
-    def __init__(self, tile_map, count, province_map=None, incremental=False):
+    def __init__(self, tile_map, count, province_map=None, incremental=False,
+                 sea_scale=0.15, lake_scale=0.3):
         super().__init__()
         self._tile_map = tile_map.copy()
         self._count = count
         self._province_map = province_map.copy() if province_map is not None else None
         self._incremental = incremental
+        self._sea_scale = sea_scale
+        self._lake_scale = lake_scale
 
     def run(self):
         try:
@@ -47,7 +50,10 @@ class _GenerateThread(QThread):
                 )
             else:
                 from domain.generators.province import generate_provinces
-                pm, cnt = generate_provinces(self._tile_map, self._count)
+                pm, cnt = generate_provinces(
+                    self._tile_map, self._count,
+                    sea_scale=self._sea_scale,
+                )
             self.finished.emit(pm, cnt)
         except Exception as e:
             self.error.emit(str(e))
@@ -98,10 +104,20 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText("正在生成省份...（后台运行中，请稍候）")
         QApplication.processEvents()
 
+        # 从 Land 页面读取密度参数
+        sea_scale = 0.15
+        lake_scale = 0.3
+        if hasattr(self._tool_panel, '_land_page') and self._tool_panel._land_page is not None:
+            params = self._tool_panel._land_page.get_generation_params()
+            sea_scale = params.get("sea_scale", 0.15)
+            lake_scale = params.get("lake_scale", 0.3)
+
         self._gen_thread = _GenerateThread(
             self._canvas.tile_map, count,
             province_map=self._canvas.province_map if incremental else None,
             incremental=incremental,
+            sea_scale=sea_scale,
+            lake_scale=lake_scale,
         )
         self._gen_thread.finished.connect(self._on_generate_done)
         self._gen_thread.error.connect(self._on_generate_error)
@@ -122,6 +138,50 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_generate_error(self, msg: str) -> None:
         QMessageBox.critical(self, tr("dlg_error"), msg)
         self._status_info.setText(tr("status_ready"))
+
+    def _on_quick_init(self) -> None:
+        """一键初始化：自动生成州 + 战略区域 + 默认国家。"""
+        pm = self._canvas.province_map
+        if int(pm.max()) == 0:
+            QMessageBox.warning(self, "一键初始化", "请先生成省份")
+            return
+
+        reply = QMessageBox.question(
+            self, "一键初始化",
+            "将自动生成：\n"
+            "- 州（按地理分组，每州约15个省份）\n"
+            "- 战略区域（按州分组）\n"
+            "- 默认国家 AAA（拥有所有领土）\n\n"
+            "已有的州/战略区域/国家数据将被覆盖。继续吗？",
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        self._status_info.setText("正在初始化...")
+        QApplication.processEvents()
+
+        try:
+            from views.export_dialog import auto_complete_project
+
+            class _FakeCanvas:
+                def __init__(self, md):
+                    self.map_data = md
+                    self.province_map = md.province_map
+                    self.tile_map = md.tile_map
+                    self.terrain_map = md.terrain_map
+                    self.height_map = md.height_map
+                    self.river_map = md.river_map
+
+            fc = _FakeCanvas(self._project.map_data)
+            log = auto_complete_project(self._project, fc)
+
+            self._canvas.refresh_display()
+            msg = "一键初始化完成：\n" + "\n".join(f"- {l}" for l in log)
+            self._status_info.setText("初始化完成")
+            QMessageBox.information(self, "一键初始化", msg)
+        except Exception as e:
+            import traceback
+            QMessageBox.critical(self, "初始化失败", f"{e}\n\n{traceback.format_exc()}")
 
     def _on_validate(self) -> None:
         self._status_info.setText(tr("status_validating"))

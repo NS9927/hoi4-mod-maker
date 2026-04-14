@@ -156,6 +156,7 @@ class ToolPanel(QWidget):
     height_value_changed = pyqtSignal(int)
     generate_provinces_requested = pyqtSignal(int)
     validate_requested = pyqtSignal()
+    quick_init_requested = pyqtSignal()
     auto_terrain_requested = pyqtSignal()
     auto_height_requested = pyqtSignal()
     smooth_height_requested = pyqtSignal()
@@ -344,6 +345,7 @@ class ToolPanel(QWidget):
         p.brush_size_changed.connect(self.brush_size_changed)
         p.generate_provinces_requested.connect(self.generate_provinces_requested)
         p.validate_requested.connect(self.validate_requested)
+        p.quick_init_requested.connect(self.quick_init_requested)
 
     def _connect_province_signals(self) -> None:
         p = self._province_page

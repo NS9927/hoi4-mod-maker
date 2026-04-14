@@ -22,6 +22,7 @@ def generate_provinces(
     target_count: int = 12000,
     land_density_ratio: float = 15.0,
     sea_scale: float = 0.15,
+    lake_scale: float = 0.3,
     lloyd_iterations: int = 2,
 ) -> tuple[np.ndarray, int]:
     """
@@ -32,6 +33,7 @@ def generate_provinces(
         target_count: 目标省份总数
         land_density_ratio: 陆地密度权重（vs 海洋 1.0）
         sea_scale: 海洋省份密度系数（0.15 = 海洋只生成 15% 的省份密度）
+        lake_scale: 湖泊省份密度系数（0.3 = 湖泊是陆地的 30% 密度）
         lloyd_iterations: Lloyd 松弛迭代次数（0=不松弛，2=推荐）
     """
     land_mask = tile_map == TILE_LAND
@@ -49,7 +51,7 @@ def generate_provinces(
     # 计算各区域省份数量 — 海洋用 sea_scale 压低
     land_weight = land_pixels * land_density_ratio
     sea_weight = sea_pixels * sea_scale
-    lake_weight = lake_pixels * 0.3
+    lake_weight = lake_pixels * lake_scale
     total_weight = land_weight + sea_weight + lake_weight or 1
 
     land_count = max(1, int(target_count * land_weight / total_weight)) if land_pixels > 0 else 0
