@@ -180,6 +180,90 @@ def _read_indexed_bmp(bmp_path: str) -> np.ndarray:
     return data
 
 
+def _extract_block_value(text: str, key: str) -> str:
+    """从 Clausewitz 脚本里提取 key={...} 或 key=value。"""
+    import re
+    # key = { ... }
+    m = re.search(rf'{key}\s*=\s*\{{([^}}]*)\}}', text, re.DOTALL)
+    if m:
+        return m.group(1).strip()
+    # key = value
+    m = re.search(rf'{key}\s*=\s*(\S+)', text)
+    if m:
+        return m.group(1).strip().strip('"')
+    return ""
+
+
+def _parse_state_file(path: str) -> dict | None:
+    """解析 history/states/*.txt，返回 {id, name, provinces, owner, manpower, category}。"""
+    with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+        text = f.read()
+
+    sid_str = _extract_block_value(text, "id")
+    if not sid_str:
+        return None
+    try:
+        sid = int(sid_str)
+    except ValueError:
+        return None
+
+    name = _extract_block_value(text, "name") or f"STATE_{sid}"
+    owner = _extract_block_value(text, "owner") or ""
+    manpower_str = _extract_block_value(text, "manpower")
+    manpower = int(manpower_str) if manpower_str.isdigit() else 100000
+    category = _extract_block_value(text, "state_category") or "town"
+
+    # 省份列表
+    provinces_str = _extract_block_value(text, "provinces")
+    province_ids = []
+    for token in provinces_str.split():
+        try:
+            province_ids.append(int(token))
+        except ValueError:
+            pass
+
+    if not province_ids:
+        return None
+
+    return {
+        "id": sid,
+        "name": name,
+        "provinces": province_ids,
+        "owner": owner,
+        "manpower": manpower,
+        "category": category,
+    }
+
+
+def _parse_strategic_region_file(path: str) -> dict | None:
+    """解析 map/strategicregions/*.txt，返回 {id, name, provinces}。"""
+    with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
+        text = f.read()
+
+    rid_str = _extract_block_value(text, "id")
+    if not rid_str:
+        return None
+    try:
+        rid = int(rid_str)
+    except ValueError:
+        return None
+
+    name = _extract_block_value(text, "name") or f"STRATEGICREGION_{rid}"
+    provinces_str = _extract_block_value(text, "provinces")
+    province_ids = []
+    for token in provinces_str.split():
+        try:
+            province_ids.append(int(token))
+        except ValueError:
+            pass
+
+    return {
+        "id": rid,
+        "name": name,
+        "provinces": province_ids,
+    }
+
+
 def import_mod_map(mod_dir: str) -> dict[str, Any]:
     """从 HOI4 mod/vanilla 目录导入地图图层。
 
@@ -299,6 +383,42 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
         river_map = np.full((h, w), 255, dtype=np.uint8)
         warnings.append("未找到 rivers.bmp，河流图层设为空")
 
+    # 8. 读取 states (可选)
+    states_dir = os.path.join(mod_dir, "history", "states")
+    states_data: list[dict] = []
+    if os.path.isdir(states_dir):
+        for fn in sorted(os.listdir(states_dir)):
+            if not fn.endswith(".txt"):
+                continue
+            try:
+                sd = _parse_state_file(os.path.join(states_dir, fn))
+                if sd:
+                    states_data.append(sd)
+            except Exception:
+                pass
+        if states_data:
+            warnings.append(f"读取了 {len(states_data)} 个 State 文件")
+    else:
+        warnings.append("未找到 history/states/ 目录")
+
+    # 9. 读取 strategic regions (可选)
+    sr_dir = os.path.join(mod_dir, "map", "strategicregions")
+    sr_data: list[dict] = []
+    if os.path.isdir(sr_dir):
+        for fn in sorted(os.listdir(sr_dir)):
+            if not fn.endswith(".txt"):
+                continue
+            try:
+                rd = _parse_strategic_region_file(os.path.join(sr_dir, fn))
+                if rd:
+                    sr_data.append(rd)
+            except Exception:
+                pass
+        if sr_data:
+            warnings.append(f"读取了 {len(sr_data)} 个战略区域文件")
+    else:
+        warnings.append("未找到 map/strategicregions/ 目录")
+
     return {
         "width": w,
         "height": h,
@@ -309,5 +429,7 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
         "river_map": river_map,
         "province_count": province_count,
         "provincial_terrain": provincial_terrain,
+        "states": states_data,
+        "strategic_regions": sr_data,
         "warnings": warnings,
     }

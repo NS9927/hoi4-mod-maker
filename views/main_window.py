@@ -717,6 +717,10 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._project.country_mgr.clear()
         self._project.continent_mgr.clear()
         self._project.strategic_region_mgr.clear()
+
+        # 填充导入的 states/strategic_regions/countries
+        from views.main_window_file_ops import _populate_imported_data
+        _populate_imported_data(self._project, result)
         self._project._dirty = False
 
         self._canvas.set_map_data(md)

@@ -17,6 +17,53 @@ from data.constants import (
 )
 
 
+def _populate_imported_data(project, result: dict) -> None:
+    """把导入的 states 和 strategic regions 数据填充到 project 的 manager 里。"""
+    from domain.managers.state import StateData
+
+    # 填充 states
+    for sd in result.get("states", []):
+        state = StateData(
+            id=sd["id"],
+            name=sd.get("name", f"STATE_{sd['id']}"),
+            provinces=sd.get("provinces", []),
+            manpower=sd.get("manpower", 100000),
+            category=sd.get("category", "town"),
+            owner_tag=sd.get("owner", ""),
+        )
+        project.state_mgr.states[sd["id"]] = state
+        for pid in state.provinces:
+            project.state_mgr._province_to_state[pid] = sd["id"]
+    # 更新 _next_id
+    if project.state_mgr.states:
+        project.state_mgr._next_id = max(project.state_mgr.states.keys()) + 1
+
+    # 填充 strategic regions
+    sr_mgr = project.strategic_region_mgr
+    for rd in result.get("strategic_regions", []):
+        r = sr_mgr.create_region(name=rd.get("name", ""))
+        # create_region 自动分配 ID，但我们要用原始 ID
+        # 先删掉自动分配的，再用原始 ID 放回
+        auto_id = r.id
+        sr_mgr._regions.pop(auto_id, None)
+        r.id = rd["id"]
+        r.province_ids = rd.get("provinces", [])
+        sr_mgr._regions[r.id] = r
+    if sr_mgr._regions:
+        sr_mgr._next_id = max(sr_mgr._regions.keys()) + 1
+
+    # 填充 country（从 states 的 owner 提取）
+    owners = set(sd.get("owner", "") for sd in result.get("states", []))
+    owners.discard("")
+    for tag in sorted(owners):
+        if tag not in project.country_mgr.countries:
+            project.country_mgr.create_country(tag, name=tag)
+        # 分配 state 到国家
+        for sd in result.get("states", []):
+            if sd.get("owner") == tag:
+                project.country_mgr.assign_state(sd["id"], tag)
+
+
 class MainWindowFileOpsMixin:
     """文件/导入/导出/测试导出操作，混入 MainWindow。"""
 
@@ -280,6 +327,9 @@ class MainWindowFileOpsMixin:
         self._project.strategic_region_mgr.clear()
         self._cmd_history.clear()
 
+        # 填充 states 数据
+        _populate_imported_data(self._project, result)
+
         # 让 canvas 使用同一个 map_data
         self._canvas.set_map_data(md)
         self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
@@ -287,7 +337,10 @@ class MainWindowFileOpsMixin:
         self._update_province_count()
         self._project.mark_dirty()
 
-        info_text = f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份)"
+        state_count = len(self._project.state_mgr.states)
+        sr_count = self._project.strategic_region_mgr.count()
+        info_text = (f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份, "
+                     f"{state_count} 州, {sr_count} 战略区域)")
         self._status_info.setText(info_text)
 
         warnings_text = ""
