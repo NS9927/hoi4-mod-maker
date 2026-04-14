@@ -56,6 +56,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._project = Project(event_bus=self._event_bus)
         self._cmd_history = CommandHistory(event_bus=self._event_bus)
 
+        # 选区模式标志
+        self._batch_state_mode = False
+        self._batch_state_pids: list[int] = []
+        self._sr_from_states_mode = False
+        self._sr_selected_states: list[int] = []
+
         # 旧版 undo manager（画布 stroke 仍在用，阶段 4 统一后删除）
         from domain.undo_manager import UndoManager
         self._undo_mgr = UndoManager(max_steps=30)
@@ -419,42 +425,35 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_province_clicked(self, pid: int) -> None:
         if pid <= 0:
             return
-        # 增量生成选区模式：点击省份加入/移出选区
+
         # 增量生成选区模式
         ctrl_prov: ProvinceController = self._controllers["province"]
         if ctrl_prov.regen_mode:
             ctrl_prov.toggle_regen_province(pid)
-            self._status_info.setText(
-                f'已选中 {len(ctrl_prov.regen_selected_pids)} 个省份'
-            )
+            self._status_info.setText(f'已选中 {len(ctrl_prov.regen_selected_pids)} 个省份')
             return
 
-        # 批量建州模式：点击省份加入选区
-        batch_pids = getattr(self, '_batch_state_pids', None)
-        if batch_pids is not None and hasattr(self, '_batch_state_pids'):
-            # 检查是否处于批量建州模式（通过按钮状态判断）
-            if self._tool_panel._state_page._batch_btn.isChecked():
-                if pid in batch_pids:
-                    batch_pids.remove(pid)
-                else:
-                    batch_pids.append(pid)
-                self._status_info.setText(f'已选中 {len(batch_pids)} 个省份建州')
-                return
+        # 批量建州模式
+        if self._batch_state_mode:
+            if pid in self._batch_state_pids:
+                self._batch_state_pids.remove(pid)
+            else:
+                self._batch_state_pids.append(pid)
+            self._status_info.setText(f'已选中 {len(self._batch_state_pids)} 个省份建州')
+            return
 
-        # 选州创建战略区域模式：点击省份 → 找到所属州 → 加入选区
-        sr_states = getattr(self, '_sr_selected_states', None)
-        if sr_states is not None and hasattr(self, '_sr_selected_states'):
-            if self._tool_panel._strategic_region_page._from_states_btn.isChecked():
-                sid = self._project.state_mgr.get_state_of_province(pid)
-                if sid > 0:
-                    if sid in sr_states:
-                        sr_states.remove(sid)
-                    else:
-                        sr_states.append(sid)
-                    self._status_info.setText(f'已选中 {len(sr_states)} 个州')
+        # 选州创建战略区域模式
+        if self._sr_from_states_mode:
+            sid = self._project.state_mgr.get_state_of_province(pid)
+            if sid > 0:
+                if sid in self._sr_selected_states:
+                    self._sr_selected_states.remove(sid)
                 else:
-                    self._status_info.setText(f'省份 {pid} 不属于任何州')
-                return
+                    self._sr_selected_states.append(sid)
+                self._status_info.setText(f'已选中 {len(self._sr_selected_states)} 个州')
+            else:
+                self._status_info.setText(f'省份 {pid} 不属于任何州')
+            return
 
         try:
             info = self._app.on_province_clicked(pid)
@@ -566,16 +565,16 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
     def _on_batch_state_toggled(self, on: bool) -> None:
         """开关批量选省份建州模式。"""
+        self._batch_state_mode = on
+        self._batch_state_pids = []
         if on:
-            self._batch_state_pids: list[int] = []
             self._status_info.setText("批量建州：点击省份多选，然后点确认")
         else:
-            self._batch_state_pids = []
             self._status_info.setText("回到查看模式")
 
     def _on_batch_state_confirmed(self) -> None:
         """确认用选中的省份创建新州。"""
-        pids = getattr(self, '_batch_state_pids', [])
+        pids = self._batch_state_pids
         if not pids:
             QMessageBox.warning(self, "批量建州", "请先点击省份选择区域")
             return
@@ -590,16 +589,16 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
     def _on_sr_from_states_toggled(self, on: bool) -> None:
         """开关选州创建战略区域模式。"""
+        self._sr_from_states_mode = on
+        self._sr_selected_states = []
         if on:
-            self._sr_selected_states: list[int] = []
             self._status_info.setText("选择州 → 创建战略区域：点击地图选择多个州，然后点确认")
         else:
-            self._sr_selected_states = []
             self._status_info.setText("回到查看模式")
 
     def _on_sr_from_states_confirmed(self) -> None:
         """确认用选中的州创建战略区域。"""
-        sids = getattr(self, '_sr_selected_states', [])
+        sids = self._sr_selected_states
         if not sids:
             QMessageBox.warning(self, "创建战略区域", "请先点击地图选择州")
             return
