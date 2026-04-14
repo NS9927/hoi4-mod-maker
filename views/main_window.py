@@ -145,7 +145,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._canvas = MapCanvas()
         self._splitter.addWidget(self._canvas)
 
-        self._splitter.setSizes([380, 1200])
+        self._splitter.setSizes([320, 1200])
         self._splitter.setStretchFactor(0, 0)
         self._splitter.setStretchFactor(1, 1)
 
@@ -260,6 +260,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.validate_requested.connect(self._on_validate)
         tp.quick_init_requested.connect(self._on_quick_init)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
+        tp.terrain_brush_size_changed.connect(
+            lambda s: setattr(self._controllers["terrain"], "brush_size", s)
+        )
+        tp.terrain_soft_edge_changed.connect(
+            lambda s: setattr(self._controllers["terrain"], "soft_edge", s)
+        )
         tp.auto_height_requested.connect(self._on_auto_height)
         tp.smooth_height_requested.connect(self._on_smooth_height)
         tp.export_requested.connect(self._on_export_mod)

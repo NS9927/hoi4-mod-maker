@@ -182,17 +182,12 @@ REPLACE_PATHS = [
     # 真正危险的只有 1 个文件: events/GOE_Raj.txt 硬编码 733.controller.
     # 解决方案: 文件级覆盖 (scrubber 里写同名空文件), 不用 replace_path.
 
-    # --- raids（必须替换！2026-04-08 实测走时间崩溃根因）
-    # vanilla common/raids/land_infiltration_custom.txt:1123 用
-    # `any_state_in = { array = global.great_wall_state }`，TC MOD 没这个
-    # 全局变量（由 CHI 历史事件初始化）→ scope 变 None → has_state_flag
-    # Invalid Scope error → 每 AI tick 刷几万次 → error.log 82692 行 →
-    # tbb worker race condition → 5x 速度直接崩。
+    # --- raids / decisions 必须 replace ---
+    # 不 replace → vanilla decisions 引用 state 1032/1035/1036 等不存在的 ID,
+    # 每 tick 刷几万行错误 → 走时间崩溃 (LastRead=client_ping).
+    # replace 后导出器必须同时拷贝 vanilla 的 decisions/categories/ 目录,
+    # 否则加载时找不到 decision category 定义 → 加载崩溃.
     "common/raids",
-
-    # --- decisions（vanilla GER.txt/ENG.txt/CHL.txt 硬编码 state 361 等
-    # vanilla state ID 在 scope block 里，即便 allowed={tag=GER} 过滤，
-    # 某些 state scope 仍被全局评估 → "State 361 not found" 每 tick 狂刷 → 崩）
     "common/decisions",
 
     # ════════════════════════════════════════════════════════════

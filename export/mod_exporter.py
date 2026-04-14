@@ -895,10 +895,12 @@ def _write_normal_map(hm, output_dir):
     h_small = hm.reshape(NH, 2, NW, 2).mean(axis=(1, 3)).astype(np.float32) / 255.0
 
     # 用 numpy 差分代替 scipy.sobel（更快，结果近似）
+    # strength 控制法线强度: vanilla 的 R/G std≈11, 需要足够大的梯度
+    strength = 12.0
     dx = np.zeros_like(h_small)
     dy = np.zeros_like(h_small)
-    dx[:, 1:-1] = (h_small[:, 2:] - h_small[:, :-2]) / 2.0
-    dy[1:-1, :] = -(h_small[2:, :] - h_small[:-2, :]) / 2.0
+    dx[:, 1:-1] = (h_small[:, 2:] - h_small[:, :-2]) * strength
+    dy[1:-1, :] = -(h_small[2:, :] - h_small[:-2, :]) * strength
 
     nx, ny, nz = -dx, -dy, np.ones_like(h_small)
     L = np.sqrt(nx**2 + ny**2 + nz**2)

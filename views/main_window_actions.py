@@ -319,18 +319,41 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         QMessageBox.information(self, "河流验证", "\n".join(warnings))
 
     def _on_auto_terrain(self) -> None:
-        from services.terrain_service import auto_terrain
-        self._status_info.setText("正在生成地形...")
+        from services.terrain_service import smart_auto_terrain, TerrainGenConfig
+        from commands.map.generate_terrain import GenerateTerrainCommand
+        self._status_info.setText("正在智能生成地形...")
         self.repaint()
-        self._canvas.terrain_map = auto_terrain(self._canvas.tile_map)
-        self._status_info.setText("地形生成完成")
+        map_data = self._project.map_data
+        # 从 terrain page 获取配置 (如果有)
+        config = None
+        terrain_page = self._tool_panel._terrain_page
+        if hasattr(terrain_page, 'get_gen_config'):
+            config = terrain_page.get_gen_config()
+        new_terrain = smart_auto_terrain(
+            map_data.height_map, map_data.tile_map, config
+        )
+        cmd = GenerateTerrainCommand(map_data, new_terrain)
+        self._cmd_history.execute(cmd)
+        self._project.mark_dirty()
+        # 通知 canvas 地形数据已变 (触发重新渲染)
+        self._canvas.terrain_map = map_data.terrain_map
+        self._status_info.setText("智能地形生成完成 (支持 Ctrl+Z 撤销)")
 
     def _on_auto_height(self) -> None:
-        from services.terrain_service import auto_height
-        self._status_info.setText("正在生成高度图...")
+        from services.terrain_service import smart_auto_height
+        self._status_info.setText("正在智能生成高度图...")
         self.repaint()
-        self._canvas.height_map = auto_height(self._canvas.tile_map)
-        self._status_info.setText("高度图生成完成")
+        config = None
+        height_page = self._tool_panel._height_page
+        if hasattr(height_page, 'get_height_config'):
+            config = height_page.get_height_config()
+        map_data = self._project.map_data
+        new_height = smart_auto_height(map_data.tile_map, config)
+        # 同时更新 map_data 和 canvas (两边共享同一个数组)
+        map_data.height_map[:] = new_height
+        self._canvas.height_map = map_data.height_map
+        self._project.mark_dirty()
+        self._status_info.setText("高度图生成完成 — 切到「地形」生成地形")
 
     def _on_smooth_height(self) -> None:
         from services.terrain_service import smooth_height

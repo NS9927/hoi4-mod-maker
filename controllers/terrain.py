@@ -23,7 +23,8 @@ class TerrainController(BaseController):
         super().__init__(project, command_history)
         self.current_terrain_index: int = 0
         self.brush_mode: bool = False
-        self.brush_size: int = 5
+        self.brush_size: int = 20
+        self.soft_edge: bool = False
         self._stroke_changes: dict[tuple[int, int], int] = {}
         self._is_painting: bool = False
 
@@ -117,17 +118,56 @@ class TerrainController(BaseController):
         return True
 
     def _apply_brush(self, x: int, y: int) -> None:
-        """在 (x, y) 处应用地形画笔。"""
-        terrain_map = self.project.map_data.terrain_map
+        """在 (x, y) 处应用圆形地形画笔 (NumPy 向量化)。"""
+        map_data = self.project.map_data
+        terrain_map = map_data.terrain_map
+        tile_map = map_data.tile_map
         h, w = terrain_map.shape
         r = self.brush_size // 2
+        if r < 1:
+            r = 1
 
-        for dy in range(-r, r + 1):
-            for dx in range(-r, r + 1):
-                ny, nx = y + dy, x + dx
-                if 0 <= ny < h and 0 <= nx < w:
-                    if int(terrain_map[ny, nx]) != self.current_terrain_index:
-                        self._stroke_changes[(ny, nx)] = self.current_terrain_index
+        # 计算影响区域边界
+        y0 = max(0, y - r)
+        y1 = min(h, y + r + 1)
+        x0 = max(0, x - r)
+        x1 = min(w, x + r + 1)
+
+        # 构建子区域坐标网格
+        ys = np.arange(y0, y1)
+        xs = np.arange(x0, x1)
+        yy, xx = np.meshgrid(ys, xs, indexing='ij')
+
+        # 圆形判定
+        dist_sq = (yy - y) ** 2 + (xx - x) ** 2
+        r_sq = r * r
+        circle = dist_sq <= r_sq
+
+        # 软边缘: 外圈 30% 区域随机丢弃
+        if self.soft_edge and r > 3:
+            inner_r = r * 0.7
+            inner_r_sq = inner_r * inner_r
+            in_ring = dist_sq > inner_r_sq
+            # 距离越远概率越低
+            dist = np.sqrt(dist_sq.astype(np.float32))
+            prob = 1.0 - (dist - inner_r) / (r - inner_r + 1e-6)
+            prob = np.clip(prob, 0, 1)
+            random_mask = np.random.random(dist_sq.shape) < prob
+            circle = circle & (~in_ring | random_mask)
+
+        # 海/湖保护
+        from data.constants import TILE_SEA, TILE_LAKE
+        sub_tile = tile_map[y0:y1, x0:x1]
+        circle = circle & (sub_tile != TILE_SEA) & (sub_tile != TILE_LAKE)
+
+        # 只改不同的像素
+        sub_terrain = terrain_map[y0:y1, x0:x1]
+        changed = circle & (sub_terrain != self.current_terrain_index)
+
+        # 收集变化
+        coords = np.argwhere(changed)
+        for cy, cx in coords:
+            self._stroke_changes[(y0 + int(cy), x0 + int(cx))] = self.current_terrain_index
 
     def _commit_stroke(self) -> None:
         """提交地形笔触。"""

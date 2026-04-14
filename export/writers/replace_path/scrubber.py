@@ -136,15 +136,22 @@ def write_replace_path_dirs(output_dir: str) -> None:
     with open(ach_path, "w", encoding="utf-8") as f:
         f.write("# Empty — TC MOD disables vanilla achievements\n")
 
-    # common/decisions replace 空
+    # common/decisions replace — 清空决议但保留 vanilla categories
+    # 决议本体清空 (vanilla 硬编码 state ID 每 tick 报错)
+    # categories 必须从 vanilla 拷贝 (否则加载崩溃)
     dec_dir = os.path.join(output_dir, "common", "decisions")
     os.makedirs(dec_dir, exist_ok=True)
     with open(os.path.join(dec_dir, "00_placeholder.txt"), "w", encoding="utf-8") as f:
         f.write("# Empty — TC MOD replaces vanilla decisions\n")
     dcat_dir = os.path.join(dec_dir, "categories")
     os.makedirs(dcat_dir, exist_ok=True)
-    with open(os.path.join(dcat_dir, "00_categories.txt"), "w", encoding="utf-8") as f:
-        f.write("# Empty\n")
+    # 拷贝 vanilla 的 decision categories (加载必需)
+    van_dcat = os.path.join(DEFAULT_HOI4_PATH, "common", "decisions", "categories")
+    if os.path.isdir(van_dcat):
+        for fn in os.listdir(van_dcat):
+            src = os.path.join(van_dcat, fn)
+            if os.path.isfile(src):
+                _sh.copy2(src, os.path.join(dcat_dir, fn))
 
     # events/GOE_Raj.txt 文件级覆盖 (走时间崩溃唯一根因)
     # vanilla 行 487: `has_war_with = 733.controller` 引用 state 733 (不存在),
@@ -192,15 +199,23 @@ def write_replace_path_dirs(output_dir: str) -> None:
             f.write(f"# Empty — TC MOD overrides vanilla {fn}\n")
             f.write("on_actions = {\n}\n")
 
-    # common/raids replace 空
+    # common/raids replace — 清空 raids 但保留 vanilla categories
     raids_dir = os.path.join(output_dir, "common", "raids")
     os.makedirs(raids_dir, exist_ok=True)
     with open(os.path.join(raids_dir, "00_placeholder.txt"), "w", encoding="utf-8") as f:
         f.write("# Empty — TC MOD disables vanilla raids system\n")
     cat_dir = os.path.join(raids_dir, "categories")
     os.makedirs(cat_dir, exist_ok=True)
-    with open(os.path.join(cat_dir, "00_categories.txt"), "w", encoding="utf-8") as f:
-        f.write("categories = {\n}\n")
+    # 拷贝 vanilla 的 raids categories
+    van_rcat = os.path.join(DEFAULT_HOI4_PATH, "common", "raids", "categories")
+    if os.path.isdir(van_rcat):
+        for fn in os.listdir(van_rcat):
+            src = os.path.join(van_rcat, fn)
+            if os.path.isfile(src):
+                _sh.copy2(src, os.path.join(cat_dir, fn))
+    if not os.listdir(cat_dir):
+        with open(os.path.join(cat_dir, "00_categories.txt"), "w", encoding="utf-8") as f:
+            f.write("categories = {\n}\n")
 
     # 自建 ai_templates, 无 allowed 过滤
     at_dir = os.path.join(output_dir, "common", "ai_templates")

@@ -11,6 +11,7 @@ from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPen, QColor
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QScrollArea, QButtonGroup,
+    QSlider, QCheckBox, QSpinBox,
 )
 
 from data.terrain_types import (
@@ -20,6 +21,8 @@ from data.terrain_types import (
 from ui.styles import (
     make_section as _make_section,
     _DIM, _SECTION_STYLE, _PRIMARY_BTN_STYLE, _TOOL_BTN_STYLE,
+    _SLIDER_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SPINBOX_STYLE,
+    _SECONDARY_BTN_STYLE,
 )
 
 # 从 vanilla atlas0.dds 提取的每个 texture tile 的真实平均色 (RGB)
@@ -64,6 +67,8 @@ class TerrainPage(QWidget):
     # 输出信号
     terrain_index_changed = pyqtSignal(int)
     terrain_brush_mode_changed = pyqtSignal(bool)
+    terrain_brush_size_changed = pyqtSignal(int)
+    terrain_soft_edge_changed = pyqtSignal(bool)
     auto_terrain_requested = pyqtSignal()
 
     def __init__(self, parent=None):
@@ -92,10 +97,37 @@ class TerrainPage(QWidget):
         brush_btn.setMinimumWidth(60)
         self._terrain_mode_group.addButton(brush_btn, 1)
         mode_row.addWidget(brush_btn)
-        self._terrain_mode_group.idClicked.connect(
-            lambda mid: self.terrain_brush_mode_changed.emit(mid == 1)
-        )
+        self._terrain_mode_group.idClicked.connect(self._on_mode_switched)
         outer.addLayout(mode_row)
+
+        # 画笔控件 (画笔模式下可见)
+        self._brush_box = _make_section("画笔设置")
+        bl = self._brush_box.layout()
+
+        size_row = QHBoxLayout()
+        size_lbl = QLabel("大小:")
+        size_lbl.setStyleSheet(_LABEL_STYLE)
+        size_row.addWidget(size_lbl)
+        self._brush_size_label = QLabel("20px")
+        self._brush_size_label.setStyleSheet(_DIM_LABEL_STYLE)
+        size_row.addStretch()
+        size_row.addWidget(self._brush_size_label)
+        bl.addLayout(size_row)
+
+        self._brush_size_slider = QSlider(Qt.Orientation.Horizontal)
+        self._brush_size_slider.setRange(1, 200)
+        self._brush_size_slider.setValue(20)
+        self._brush_size_slider.setStyleSheet(_SLIDER_STYLE)
+        self._brush_size_slider.valueChanged.connect(self._on_brush_size)
+        bl.addWidget(self._brush_size_slider)
+
+        self._soft_edge_cb = QCheckBox("柔边 (自然过渡)")
+        self._soft_edge_cb.setStyleSheet(f"color: {_DIM}; font-size: 12px;")
+        self._soft_edge_cb.toggled.connect(self.terrain_soft_edge_changed.emit)
+        bl.addWidget(self._soft_edge_cb)
+
+        self._brush_box.hide()  # 默认省份模式，隐藏画笔设置
+        outer.addWidget(self._brush_box)
 
         # 提示
         hint = QLabel("按省份: 点选地形后点击省份分配（同时设外观+属性）\n画笔: 逐像素画地形贴图（只影响外观）")
@@ -184,8 +216,94 @@ class TerrainPage(QWidget):
         scroll.setWidget(scroll_content)
         outer.addWidget(scroll)
 
-        # 自动生成
-        auto_btn = QPushButton("从陆地自动生成")
+        # ── 智能生成设置 ──
+        gen_box = _make_section("智能地形生成")
+        gl = gen_box.layout()
+
+        # 种子
+        seed_row = QHBoxLayout()
+        seed_lbl = QLabel("种子:")
+        seed_lbl.setStyleSheet(_LABEL_STYLE)
+        seed_row.addWidget(seed_lbl)
+        self._seed_spin = QSpinBox()
+        self._seed_spin.setRange(0, 99999)
+        self._seed_spin.setValue(42)
+        self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
+        seed_row.addWidget(self._seed_spin)
+        rand_btn = QPushButton("随机")
+        rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        rand_btn.setMaximumWidth(60)
+        rand_btn.clicked.connect(self._randomize_seed)
+        seed_row.addWidget(rand_btn)
+        gl.addLayout(seed_row)
+
+        # 噪声强度
+        noise_row = QHBoxLayout()
+        noise_lbl = QLabel("噪声强度:")
+        noise_lbl.setStyleSheet(_LABEL_STYLE)
+        noise_row.addWidget(noise_lbl)
+        self._noise_label = QLabel("20")
+        self._noise_label.setStyleSheet(_DIM_LABEL_STYLE)
+        noise_row.addStretch()
+        noise_row.addWidget(self._noise_label)
+        gl.addLayout(noise_row)
+
+        self._noise_slider = QSlider(Qt.Orientation.Horizontal)
+        self._noise_slider.setRange(0, 50)
+        self._noise_slider.setValue(20)
+        self._noise_slider.setStyleSheet(_SLIDER_STYLE)
+        self._noise_slider.valueChanged.connect(
+            lambda v: self._noise_label.setText(str(v))
+        )
+        gl.addWidget(self._noise_slider)
+
+        # 散点密度
+        scatter_row = QHBoxLayout()
+        scatter_lbl = QLabel("散点密度:")
+        scatter_lbl.setStyleSheet(_LABEL_STYLE)
+        scatter_row.addWidget(scatter_lbl)
+        self._scatter_label = QLabel("65%")
+        self._scatter_label.setStyleSheet(_DIM_LABEL_STYLE)
+        scatter_row.addStretch()
+        scatter_row.addWidget(self._scatter_label)
+        gl.addLayout(scatter_row)
+
+        self._scatter_slider = QSlider(Qt.Orientation.Horizontal)
+        self._scatter_slider.setRange(0, 100)
+        self._scatter_slider.setValue(65)
+        self._scatter_slider.setStyleSheet(_SLIDER_STYLE)
+        self._scatter_slider.valueChanged.connect(
+            lambda v: self._scatter_label.setText(f"{v}%")
+        )
+        gl.addWidget(self._scatter_slider)
+
+        auto_btn = QPushButton("智能地形生成")
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(self.auto_terrain_requested.emit)
-        outer.addWidget(auto_btn)
+        gl.addWidget(auto_btn)
+
+        outer.addWidget(gen_box)
+
+    # ── 槽函数 ──
+
+    def _on_mode_switched(self, mode_id: int) -> None:
+        is_brush = mode_id == 1
+        self.terrain_brush_mode_changed.emit(is_brush)
+        self._brush_box.setVisible(is_brush)
+
+    def _on_brush_size(self, size: int) -> None:
+        self._brush_size_label.setText(f"{size}px")
+        self.terrain_brush_size_changed.emit(size)
+
+    def _randomize_seed(self) -> None:
+        import random
+        self._seed_spin.setValue(random.randint(0, 99999))
+
+    def get_gen_config(self):
+        """返回当前 UI 参数构建的 TerrainGenConfig。"""
+        from services.terrain_service import TerrainGenConfig
+        return TerrainGenConfig(
+            noise_amplitude=float(self._noise_slider.value()),
+            scatter_strength=self._scatter_slider.value() / 100.0,
+            seed=self._seed_spin.value(),
+        )

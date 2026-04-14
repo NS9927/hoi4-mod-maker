@@ -9,7 +9,7 @@
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QSlider, QLabel, QButtonGroup,
-    QFrame, QStackedWidget,
+    QFrame, QStackedWidget, QScrollArea,
     QSizePolicy,
 )
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -67,7 +67,7 @@ _MODE_BTN_STYLE = f"""
 
 
 class _GroupedModeBar(QWidget):
-    """分组折叠模式导航栏. 竖列大按钮, 每组有标题 + 组内 mode 一个占一行."""
+    """分组折叠模式导航栏."""
     mode_changed = pyqtSignal(str)
 
     def __init__(
@@ -86,13 +86,11 @@ class _GroupedModeBar(QWidget):
         self._btn_group.setExclusive(True)
 
         for group_name, modes in groups:
-            # 组标题
             header = QPushButton(f"▼  {group_name}")
             header.setStyleSheet(_GROUP_HEADER_STYLE)
             header.setCursor(Qt.CursorShape.PointingHandCursor)
             layout.addWidget(header)
 
-            # 组内按钮容器
             container = QWidget()
             vbox = QVBoxLayout(container)
             vbox.setContentsMargins(0, 0, 0, 4)
@@ -111,14 +109,11 @@ class _GroupedModeBar(QWidget):
             layout.addWidget(container)
             self._group_widgets[group_name] = container
 
-            # 折叠功能
             header.setProperty("group_name", group_name)
             header.setProperty("collapsed", False)
             header.clicked.connect(
                 lambda checked=False, h=header, c=container: self._toggle_group(h, c)
             )
-
-        layout.addStretch(1)
 
         self._btn_group.buttonClicked.connect(
             lambda btn: self.mode_changed.emit(btn.property("mode_id"))
@@ -132,13 +127,11 @@ class _GroupedModeBar(QWidget):
         collapsed = header.property("collapsed")
         if collapsed:
             container.show()
-            text = header.text().replace("▶ ", "▼ ")
-            header.setText(text)
+            header.setText(header.text().replace("▶ ", "▼ "))
             header.setProperty("collapsed", False)
         else:
             container.hide()
-            text = header.text().replace("▼ ", "▶ ")
-            header.setText(text)
+            header.setText(header.text().replace("▼ ", "▶ "))
             header.setProperty("collapsed", True)
 
 
@@ -158,6 +151,8 @@ class ToolPanel(QWidget):
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
     auto_terrain_requested = pyqtSignal()
+    terrain_brush_size_changed = pyqtSignal(int)
+    terrain_soft_edge_changed = pyqtSignal(bool)
     auto_height_requested = pyqtSignal()
     smooth_height_requested = pyqtSignal()
     export_requested = pyqtSignal()
@@ -221,9 +216,8 @@ class ToolPanel(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setMinimumWidth(340)
+        self.setMinimumWidth(300)
         self.setMaximumWidth(520)
-        self.resize(320, self.height())
         self.setStyleSheet(f"background: {_BG};")
         self._init_ui()
 
@@ -233,13 +227,25 @@ class ToolPanel(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # 分组折叠模式栏
+        # 整体滚动区域 (模式栏 + 页面内容一起滚动)
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setFrameShape(QFrame.NoFrame)
+        self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
+        # 滚动内容容器
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout(scroll_content)
+        scroll_layout.setContentsMargins(0, 0, 0, 0)
+        scroll_layout.setSpacing(0)
+
+        # 分组折叠模式栏 (V1 原版样式)
         self._mode_tabs = _GroupedModeBar([
             ("地图绘制", [
                 ("land", "陆地与海洋"),
                 ("province", "省份"),
-                ("terrain", "地形"),
                 ("height", "高度"),
+                ("terrain", "地形"),
                 ("river", "河流"),
             ]),
             ("区域管理", [
@@ -255,17 +261,20 @@ class ToolPanel(QWidget):
             ]),
         ])
         self._mode_tabs.mode_changed.connect(self._on_mode_changed)
-        root.addWidget(self._mode_tabs)
+        scroll_layout.addWidget(self._mode_tabs)
 
-        # 堆叠容器
+        # 堆叠容器 (页面内容)
         self._stack = QStackedWidget()
         self._stack.setStyleSheet("background: transparent; border: none;")
-        root.addWidget(self._stack, 1)
+        scroll_layout.addWidget(self._stack, 1)
+
+        self._scroll.setWidget(scroll_content)
+        root.addWidget(self._scroll, 1)
 
         # 创建各页面实例并连接信号
         self._create_pages()
 
-        # 底部固定区域
+        # 底部固定区域 (不参与滚动)
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet(f"color: {_BORDER}; margin: 0;")
@@ -309,8 +318,8 @@ class ToolPanel(QWidget):
         page_list = [
             ("land", self._land_page),
             ("province", self._province_page),
-            ("terrain", self._terrain_page),
             ("height", self._height_page),
+            ("terrain", self._terrain_page),
             ("river", self._river_page),
             ("state", self._state_page),
             ("country", self._country_page),
@@ -363,6 +372,8 @@ class ToolPanel(QWidget):
         p = self._terrain_page
         p.terrain_index_changed.connect(self.terrain_index_changed)
         p.terrain_brush_mode_changed.connect(self.terrain_brush_mode_changed)
+        p.terrain_brush_size_changed.connect(self.terrain_brush_size_changed)
+        p.terrain_soft_edge_changed.connect(self.terrain_soft_edge_changed)
         p.auto_terrain_requested.connect(self.auto_terrain_requested)
 
     def _connect_height_signals(self) -> None:
