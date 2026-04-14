@@ -256,36 +256,46 @@ class MainWindowFileOpsMixin:
             return
 
         new_w, new_h = result["width"], result["height"]
+
+        # 更新全局地图尺寸
         from data.constants import set_map_size
         set_map_size(new_w, new_h)
 
-        self._canvas.tile_map = result["tile_map"]
-        self._canvas.province_map = result["province_map"]
-        self._canvas.terrain_map = result["terrain_map"]
-        self._canvas.height_map = result["height_map"]
-        self._canvas.river_map = result["river_map"]
-        self._canvas._map_data.provincial_terrain = result["provincial_terrain"]
+        # 通过 Project 统一更新（保持 canvas 和 project 的 map_data 同步）
+        from domain.map_data import MapData
+        md = MapData()
+        # 直接替换数组引用（尺寸可能不同，不能用 [:] 原地写入）
+        md.tile_map = result["tile_map"]
+        md.province_map = result["province_map"]
+        md.terrain_map = result["terrain_map"]
+        md.height_map = result["height_map"]
+        if result["river_map"] is not None:
+            md.river_map = result["river_map"]
+        md.provincial_terrain = result.get("provincial_terrain", {})
 
-        self._canvas._display_buffer = np.zeros((new_h, new_w, 4), dtype=np.uint8)
-        self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
-
+        self._project.map_data = md
         self._project.state_mgr.clear()
         self._project.country_mgr.clear()
+        self._project.continent_mgr.clear()
+        self._project.strategic_region_mgr._regions.clear()
         self._cmd_history.clear()
 
+        # 让 canvas 使用同一个 map_data
+        self._canvas.set_map_data(md)
+        self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
         self._canvas.refresh_display()
         self._update_province_count()
+        self._project.mark_dirty()
 
-        self._status_info.setText(
-            f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份)"
-        )
+        info_text = f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份)"
+        self._status_info.setText(info_text)
 
+        warnings_text = ""
         if result["warnings"]:
-            QMessageBox.information(
-                self, "导入完成",
-                f"地图已导入: {new_w}×{new_h}, {result['province_count']} 个省份\n\n"
-                "注意:\n" + "\n".join(f"- {w}" for w in result["warnings"]),
-            )
+            warnings_text = "\n\n注意:\n" + "\n".join(f"- {w}" for w in result["warnings"])
+        QMessageBox.information(
+            self, "导入完成", info_text + warnings_text
+        )
 
     # ═══════════════════════ 测试导出 ═══════════════════════
 
