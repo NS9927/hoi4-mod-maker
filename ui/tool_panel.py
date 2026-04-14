@@ -163,6 +163,8 @@ class ToolPanel(QWidget):
     split_province_requested = pyqtSignal()
     lasso_province_toggled = pyqtSignal(bool)
     merge_mode_toggled = pyqtSignal(bool)
+    regen_mode_toggled = pyqtSignal(bool)
+    regen_execute_requested = pyqtSignal()
 
     # State / Country 信号
     auto_states_requested = pyqtSignal(int)
@@ -348,6 +350,8 @@ class ToolPanel(QWidget):
         p.split_province_requested.connect(self.split_province_requested)
         p.lasso_province_toggled.connect(self.lasso_province_toggled)
         p.merge_mode_toggled.connect(self.merge_mode_toggled)
+        p.regen_mode_toggled.connect(self.regen_mode_toggled)
+        p.regen_execute_requested.connect(self.regen_execute_requested)
 
     def _connect_terrain_signals(self) -> None:
         p = self._terrain_page

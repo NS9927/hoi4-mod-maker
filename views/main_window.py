@@ -257,6 +257,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.split_province_requested.connect(self._on_split_province)
         tp.lasso_province_toggled.connect(self._on_lasso_toggled)
         tp.merge_mode_toggled.connect(self._on_merge_toggled)
+        tp.regen_mode_toggled.connect(self._on_regen_mode_toggled)
+        tp.regen_execute_requested.connect(self._on_regen_execute)
 
         # State 信号 → controller
         tp.auto_states_requested.connect(
@@ -411,6 +413,14 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_province_clicked(self, pid: int) -> None:
         if pid <= 0:
             return
+        # 增量生成选区模式：点击省份加入/移出选区
+        ctrl_prov: ProvinceController = self._controllers["province"]
+        if ctrl_prov.regen_mode:
+            ctrl_prov.toggle_regen_province(pid)
+            self._status_info.setText(
+                f'已选中 {len(ctrl_prov.regen_selected_pids)} 个省份'
+            )
+            return
         try:
             info = self._app.on_province_clicked(pid)
             if info:
@@ -487,6 +497,35 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         else:
             self._canvas.set_framework_tool(None)
             self._status_info.setText("回到查看模式")
+
+    def _on_regen_mode_toggled(self, on: bool) -> None:
+        ctrl: ProvinceController = self._controllers["province"]
+        ctrl.set_regen_mode(on)
+        if on:
+            self._status_info.setText('增量生成：点击省份选择区域，然后点「重新生成」')
+        else:
+            self._status_info.setText("回到查看模式")
+
+    def _on_regen_execute(self) -> None:
+        ctrl: ProvinceController = self._controllers["province"]
+        if not ctrl.regen_selected_pids:
+            QMessageBox.warning(self, "增量生成", "请先选择要重新生成的省份区域")
+            return
+        n = len(ctrl.regen_selected_pids)
+        reply = QMessageBox.question(
+            self, "增量生成",
+            f"将对 {n} 个省份所在区域重新生成省份。\n"
+            "该区域内的旧省份将被删除并重新划分。\n\n"
+            "继续吗？",
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        removed, created = ctrl.execute_regen()
+        self._update_province_count()
+        QMessageBox.information(
+            self, "增量生成完成",
+            f"删除 {removed} 个旧省份，新建 {created} 个省份。"
+        )
 
     # ═══════════════════════ State 管理 ═══════════════════════
 

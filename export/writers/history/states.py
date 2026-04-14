@@ -36,33 +36,42 @@ _COASTAL_DOCKYARDS = {
 }
 
 
-def _is_land(pid: int, province_map, tile_map) -> bool:
-    """判断省份是否主要是陆地."""
-    import numpy as np
-    from data.constants import TILE_LAND
-    mask = province_map == pid
-    if not np.any(mask):
-        return False
-    return int(np.sum(tile_map[mask] == TILE_LAND)) > 0
-
-
 def write_states_from_mgr(
-    state_mgr, country_mgr, province_map, output_dir, tile_map=None
+    state_mgr, country_mgr, province_map, output_dir, tile_map=None,
+    land_id_set=None, coastal_set=None,
 ) -> None:
-    """用 StateManager + CountryManager 的数据写 State 文件."""
+    """用 StateManager + CountryManager 的数据写 State 文件.
+    如果传入预计算的 land_id_set 和 coastal_set，直接使用，避免逐省份全图扫描。
+    """
     d = os.path.join(output_dir, "history", "states")
     os.makedirs(d, exist_ok=True)
 
-    coastal_set = set()
-    if tile_map is not None and province_map is not None:
-        coastal_set = set(int(p) for p in get_coastal_provinces(tile_map, province_map))
+    # 预计算 land_id_set（一次性）
+    if land_id_set is None and tile_map is not None:
+        import numpy as np
+        from data.constants import TILE_LAND
+        flat_pm = province_map.ravel()
+        flat_tm = tile_map.ravel()
+        n = int(province_map.max()) + 1
+        land_counts = np.bincount(flat_pm, weights=(flat_tm == TILE_LAND), minlength=n)
+        total_counts = np.bincount(flat_pm, minlength=n)
+        land_id_set = set()
+        for pid in range(1, n):
+            if total_counts[pid] > 0 and land_counts[pid] > total_counts[pid] / 2:
+                land_id_set.add(pid)
+
+    if coastal_set is None:
+        if tile_map is not None and province_map is not None:
+            coastal_set = set(int(p) for p in get_coastal_provinces(tile_map, province_map))
+        else:
+            coastal_set = set()
 
     for sid, state in state_mgr.states.items():
         if not state.provinces:
             continue
 
-        if tile_map is not None:
-            land_provs = [p for p in state.provinces if _is_land(p, province_map, tile_map)]
+        if land_id_set is not None:
+            land_provs = [p for p in state.provinces if p in land_id_set]
         else:
             land_provs = list(state.provinces)
         if not land_provs:
@@ -158,6 +167,8 @@ def write_states_from_mgr(
                 nb_level = 3 if state.category in (
                     "city", "large_city", "metropolis", "megalopolis"
                 ) else 2
+                # state 里只给一个沿海省份放 naval_base 建筑（和 vanilla 一致）
+                # 注意：buildings.txt 的 naval_base_spawn 是另一回事，那个每个 coastal 省份都要
                 nb_prov = state_coastal_provs[0]
                 prov_blocks.setdefault(nb_prov, {})["naval_base"] = nb_level
             for pid, bmap in prov_blocks.items():

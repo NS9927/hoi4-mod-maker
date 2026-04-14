@@ -1,0 +1,527 @@
+"""
+导出预检对话框 — 显示项目完成度，支持自动补全后导出。
+
+点"导出MOD"时弹出此对话框，列出所有必需项的状态：
+  ✓ 已完成  /  ✗ 缺失（可自动补全）  /  ⚠ 有问题
+用户可选择"自动补全并导出"或"取消"。
+"""
+from __future__ import annotations
+
+import os
+import traceback
+from dataclasses import dataclass
+
+import numpy as np
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtWidgets import (
+    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QProgressBar, QFileDialog, QGroupBox, QCheckBox,
+    QTextEdit, QMessageBox, QWidget,
+)
+
+from data.constants import DEFAULT_MOD_OUTPUT_PATH, DEFAULT_MOD_NAME
+
+
+# ── 检查项数据 ──────────────────────────────────────
+
+@dataclass
+class CheckItem:
+    """单个检查项"""
+    name: str           # 显示名
+    status: str         # "ok" / "missing" / "warning"
+    detail: str         # 详细说明
+    can_auto: bool      # 是否可自动补全
+    count: int = 0      # 数量（省份数/State数等）
+
+
+def check_project_readiness(project, canvas) -> list[CheckItem]:
+    """检查项目是否可以导出，返回检查项列表。"""
+    items: list[CheckItem] = []
+    pm = canvas.province_map
+    tm = canvas.tile_map
+    province_count = int(pm.max())
+
+    # 1. 陆地 / 省份
+    if province_count == 0:
+        items.append(CheckItem(
+            "省份", "missing", "没有省份数据，请先画地图并生成省份", False))
+        # 没有省份后续检查无意义
+        return items
+
+    from data.constants import TILE_LAND
+    flat_tm = tm.ravel()
+    flat_pm = pm.ravel()
+    land_pixels = int(np.sum(flat_tm == TILE_LAND))
+    if land_pixels == 0:
+        items.append(CheckItem(
+            "陆地", "missing", "没有陆地像素，请先在 Land 模式画地图", False))
+        return items
+
+    items.append(CheckItem(
+        "省份", "ok", f"共 {province_count} 个省份", False, province_count))
+
+    # 2. State
+    state_mgr = project.state_mgr
+    state_count = len(state_mgr.states) if state_mgr.states else 0
+    if state_count == 0:
+        items.append(CheckItem(
+            "State (州)", "missing",
+            "没有 State — 每个陆地省份必须属于一个 State，否则崩溃",
+            True))
+    else:
+        # 检查孤儿省份
+        n = province_count + 1
+        land_counts = np.bincount(flat_pm, weights=(flat_tm == TILE_LAND), minlength=n)
+        total_counts = np.bincount(flat_pm, minlength=n)
+        land_pids = set()
+        for pid in range(1, n):
+            if total_counts[pid] > 0 and land_counts[pid] > total_counts[pid] / 2:
+                land_pids.add(pid)
+        assigned = set()
+        for s in state_mgr.states.values():
+            assigned.update(s.provinces)
+        orphans = land_pids - assigned
+        if orphans:
+            items.append(CheckItem(
+                "State (州)", "warning",
+                f"有 {state_count} 个 State，但 {len(orphans)} 个陆地省份未分配（导出时自动领养）",
+                True, state_count))
+        else:
+            items.append(CheckItem(
+                "State (州)", "ok", f"共 {state_count} 个 State", False, state_count))
+
+    # 3. 国家
+    country_mgr = project.country_mgr
+    country_count = len(country_mgr.countries) if country_mgr.countries else 0
+    if country_count == 0:
+        items.append(CheckItem(
+            "国家", "missing",
+            "没有国家 — 至少需要一个国家，否则无法进入游戏",
+            True))
+    else:
+        # 检查无主 State
+        unowned = []
+        for sid in state_mgr.states:
+            if not country_mgr.get_owner_of_state(sid):
+                unowned.append(sid)
+        if unowned:
+            items.append(CheckItem(
+                "国家", "warning",
+                f"有 {country_count} 个国家，但 {len(unowned)} 个 State 未分配所有者",
+                True, country_count))
+        else:
+            items.append(CheckItem(
+                "国家", "ok", f"共 {country_count} 个国家", False, country_count))
+
+    # 4. 战略区域
+    sr_mgr = project.strategic_region_mgr
+    sr_count = sr_mgr.count() if sr_mgr else 0
+    if sr_count == 0:
+        items.append(CheckItem(
+            "战略区域", "missing",
+            "没有战略区域 — 每个省份必须属于一个战略区域，否则崩溃",
+            True))
+    else:
+        items.append(CheckItem(
+            "战略区域", "ok", f"共 {sr_count} 个战略区域", False, sr_count))
+
+    # 5. 大陆
+    cont_mgr = project.continent_mgr
+    cont_count = cont_mgr.count() if cont_mgr else 0
+    if cont_count == 0:
+        items.append(CheckItem(
+            "大陆", "missing",
+            "没有大陆定义 — 导出时使用默认大陆",
+            True))
+    else:
+        items.append(CheckItem(
+            "大陆", "ok", f"共 {cont_count} 个大陆", False, cont_count))
+
+    # 6. 地形
+    ter = canvas.terrain_map
+    if ter is None or int(ter.max()) == 0:
+        items.append(CheckItem(
+            "地形", "missing",
+            "没有地形数据 — 导出时自动从 tile_map 生成",
+            True))
+    else:
+        items.append(CheckItem(
+            "地形", "ok", "地形数据已设置", False))
+
+    # 7. 高度
+    hm = canvas.height_map
+    if hm is None or int(hm.max()) == int(hm.min()):
+        items.append(CheckItem(
+            "高度图", "missing",
+            "没有高度数据 — 导出时自动生成默认高度",
+            True))
+    else:
+        items.append(CheckItem(
+            "高度图", "ok", "高度数据已设置", False))
+
+    return items
+
+
+# ── 自动补全逻辑 ──────────────────────────────────────
+
+def auto_complete_project(project, canvas) -> list[str]:
+    """自动补全缺失数据，返回补全操作日志。"""
+    log: list[str] = []
+    pm = canvas.province_map
+    tm = canvas.tile_map
+    province_count = int(pm.max())
+    if province_count == 0:
+        return ["错误：没有省份数据，无法补全"]
+
+    # 1. 自动生成 State
+    state_mgr = project.state_mgr
+    if not state_mgr.states:
+        state_mgr.auto_split(pm, tm, per_state=15)
+        log.append(f"自动生成 {len(state_mgr.states)} 个 State（每组约15省份）")
+
+    # 2. 自动创建国家
+    country_mgr = project.country_mgr
+    if not country_mgr.countries:
+        country_mgr.create_country("AAA", name="Default Nation", color=(100, 100, 200))
+        log.append("自动创建默认国家 AAA")
+
+    # 3. 分配无主 State 给第一个国家
+    first_tag = next(iter(country_mgr.countries))
+    unowned = []
+    for sid in state_mgr.states:
+        if not country_mgr.get_owner_of_state(sid):
+            unowned.append(sid)
+    if unowned:
+        for sid in unowned:
+            country_mgr.assign_state(sid, first_tag)
+            state = state_mgr.get_state(sid)
+            if state:
+                state.owner_tag = first_tag
+        log.append(f"将 {len(unowned)} 个无主 State 分配给 {first_tag}")
+
+    # 4. 设首都
+    for tag, country in country_mgr.countries.items():
+        if country.capital <= 0:
+            owned_states = country_mgr.get_states_of_country(tag)
+            if owned_states:
+                first_state = state_mgr.get_state(owned_states[0])
+                if first_state and first_state.provinces:
+                    country.capital = first_state.provinces[0]
+                    log.append(f"国家 {tag} 自动设首都为省份 {country.capital}")
+
+    # 5. 自动生成战略区域
+    sr_mgr = project.strategic_region_mgr
+    if sr_mgr.count() == 0:
+        sr_mgr.auto_generate(pm, tm, state_mgr=state_mgr)
+        log.append(f"自动生成 {sr_mgr.count()} 个战略区域")
+
+    # 6. 大陆（至少有一个默认的）
+    cont_mgr = project.continent_mgr
+    if cont_mgr.count() == 0:
+        cont_mgr.add_continent("default_continent")
+        log.append("自动创建默认大陆 default_continent")
+
+    return log
+
+
+# ── 后台导出线程 ──────────────────────────────────────
+
+class ExportWorker(QThread):
+    """后台执行导出，避免界面冻结。"""
+    progress = pyqtSignal(str)       # 进度文本
+    finished = pyqtSignal(object)    # 成功时发 ExportReport
+    failed = pyqtSignal(str)         # 失败时发错误信息
+
+    def __init__(
+        self, output_dir: str, canvas, project,
+        scope: dict[str, bool] | None = None, parent=None,
+    ) -> None:
+        super().__init__(parent)
+        self.output_dir = output_dir
+        self.canvas = canvas
+        self.project = project
+        self.scope = scope or {}
+
+    def run(self) -> None:
+        try:
+            self.progress.emit("正在执行导出前检查和修复...")
+            from services.export_service import export_mod
+            report = export_mod(
+                self.output_dir,
+                self.canvas,
+                self.project.state_mgr,
+                self.project.country_mgr,
+                self.project.continent_mgr,
+                adjacency_mgr=self.project.adjacency_mgr,
+                railway_mgr=self.project.railway_mgr,
+                supply_mgr=self.project.supply_mgr,
+                colormap_settings=self.project.colormap_settings,
+                default_map_settings=self.project.default_map_settings,
+                adjacency_rule_mgr=self.project.adjacency_rule_mgr,
+                strategic_region_mgr=self.project.strategic_region_mgr,
+                scope=self.scope,
+            )
+            self.finished.emit(report)
+        except Exception as e:
+            self.failed.emit(f"{e}\n\n{traceback.format_exc()}")
+
+
+# ── 对话框 ──────────────────────────────────────────
+
+class ExportDialog(QDialog):
+    """导出预检对话框 — 检查 → 自动补全 → 选目录 → 导出。"""
+
+    def __init__(self, project, canvas, parent=None) -> None:
+        super().__init__(parent)
+        self.project = project
+        self.canvas = canvas
+        self._worker: ExportWorker | None = None
+
+        self.setWindowTitle("导出 MOD")
+        self.setMinimumWidth(560)
+        self.setMinimumHeight(420)
+        self._build_ui()
+        self._run_check()
+
+    # ── UI 构建 ──
+
+    def _build_ui(self) -> None:
+        layout = QVBoxLayout(self)
+        layout.setSpacing(10)
+
+        # 标题
+        title = QLabel("导出前检查")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # 检查结果区域
+        self._check_group = QGroupBox("项目完成度")
+        self._check_layout = QVBoxLayout(self._check_group)
+        layout.addWidget(self._check_group)
+
+        # 导出范围选择
+        scope_group = QGroupBox("导出范围")
+        scope_layout = QVBoxLayout(scope_group)
+        self._scope_checks = {}
+        scope_items = [
+            ("map", "地图文件 (BMP/CSV/positions/buildings)", True),
+            ("states", "States (history/states/)", True),
+            ("countries", "国家 (country_tags/countries/history)", True),
+            ("strategic_regions", "战略区域 (strategicregions/weatherpositions)", True),
+            ("localisation", "本地化 (localisation/)", True),
+            ("supply", "补给系统 (supply_nodes/railways/supply_areas)", True),
+            ("gfx", "图形资源 (国旗/肖像)", True),
+            ("replace_path", "replace_path + descriptor.mod", True),
+        ]
+        for key, label, default in scope_items:
+            cb = QCheckBox(label)
+            cb.setChecked(default)
+            scope_layout.addWidget(cb)
+            self._scope_checks[key] = cb
+        layout.addWidget(scope_group)
+
+        # 日志区域（初始隐藏）
+        self._log_box = QGroupBox("操作日志")
+        log_layout = QVBoxLayout(self._log_box)
+        self._log_text = QTextEdit()
+        self._log_text.setReadOnly(True)
+        self._log_text.setMaximumHeight(150)
+        log_layout.addWidget(self._log_text)
+        self._log_box.setVisible(False)
+        layout.addWidget(self._log_box)
+
+        # 进度条（初始隐藏）
+        self._progress_bar = QProgressBar()
+        self._progress_bar.setRange(0, 0)  # indeterminate
+        self._progress_bar.setVisible(False)
+        layout.addWidget(self._progress_bar)
+
+        self._progress_label = QLabel("")
+        self._progress_label.setVisible(False)
+        layout.addWidget(self._progress_label)
+
+        # 按钮行
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        self._btn_auto = QPushButton("自动补全并导出")
+        self._btn_auto.setStyleSheet(
+            "QPushButton { background: #6c6cf0; color: white; padding: 8px 20px;"
+            " border-radius: 4px; font-weight: bold; }"
+            "QPushButton:hover { background: #7c7cff; }"
+            "QPushButton:disabled { background: #444; color: #888; }"
+        )
+        self._btn_auto.clicked.connect(self._on_auto_export)
+        btn_layout.addWidget(self._btn_auto)
+
+        self._btn_export_direct = QPushButton("直接导出（不补全）")
+        self._btn_export_direct.setStyleSheet(
+            "QPushButton { background: #22c55e; color: white; padding: 8px 20px;"
+            " border-radius: 4px; font-weight: bold; }"
+            "QPushButton:hover { background: #2ad66a; }"
+            "QPushButton:disabled { background: #444; color: #888; }"
+        )
+        self._btn_export_direct.clicked.connect(self._on_direct_export)
+        btn_layout.addWidget(self._btn_export_direct)
+
+        self._btn_cancel = QPushButton("取消")
+        self._btn_cancel.setStyleSheet(
+            "QPushButton { padding: 8px 16px; border-radius: 4px; }"
+        )
+        self._btn_cancel.clicked.connect(self.reject)
+        btn_layout.addWidget(self._btn_cancel)
+
+        layout.addLayout(btn_layout)
+
+    # ── 检查 ──
+
+    def _run_check(self) -> None:
+        """执行检查并显示结果。"""
+        # 清空旧结果
+        while self._check_layout.count():
+            child = self._check_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
+
+        self._items = check_project_readiness(self.project, self.canvas)
+
+        has_missing = False
+        has_blocking = False
+
+        for item in self._items:
+            row = QHBoxLayout()
+
+            # 状态图标
+            if item.status == "ok":
+                icon = "✓"
+                color = "#22c55e"
+            elif item.status == "warning":
+                icon = "⚠"
+                color = "#f59e0b"
+            else:
+                icon = "✗"
+                color = "#ef4444"
+                has_missing = True
+                if not item.can_auto:
+                    has_blocking = True
+
+            icon_label = QLabel(icon)
+            icon_label.setStyleSheet(f"color: {color}; font-size: 16px; font-weight: bold;")
+            icon_label.setFixedWidth(24)
+            row.addWidget(icon_label)
+
+            # 名称 + 详情
+            text = f"<b>{item.name}</b> — {item.detail}"
+            if item.can_auto and item.status != "ok":
+                text += ' <span style="color: #6c6cf0;">[可自动补全]</span>'
+            info = QLabel(text)
+            info.setWordWrap(True)
+            info.setTextFormat(Qt.RichText)
+            row.addWidget(info, 1)
+
+            container = QWidget()
+            container.setLayout(row)
+            self._check_layout.addWidget(container)
+
+        # 有不可自动修复的阻断性错误 → 禁用导出
+        if has_blocking:
+            self._btn_auto.setEnabled(False)
+            self._btn_export_direct.setEnabled(False)
+
+        # 没有缺失项 → 隐藏"自动补全"按钮
+        if not has_missing:
+            self._btn_auto.setText("导出")
+            self._btn_export_direct.setVisible(False)
+
+    # ── 导出动作 ──
+
+    def _on_auto_export(self) -> None:
+        """自动补全后导出。"""
+        # 先执行自动补全
+        log = auto_complete_project(self.project, self.canvas)
+        if log:
+            self._log_box.setVisible(True)
+            self._log_text.setPlainText("\n".join(f"[补全] {l}" for l in log))
+
+        # 刷新检查
+        self._run_check()
+
+        # 选目录并导出
+        self._do_export()
+
+    def _on_direct_export(self) -> None:
+        """不补全直接导出。"""
+        # 警告
+        missing = [i for i in self._items if i.status == "missing"]
+        if missing:
+            names = "、".join(i.name for i in missing)
+            reply = QMessageBox.warning(
+                self, "确认",
+                f"以下数据缺失：{names}\n\n"
+                "缺失的数据会导致 HOI4 加载崩溃。确定要跳过补全直接导出吗？",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        self._do_export()
+
+    def _do_export(self) -> None:
+        """选择目录 → 启动后台导出。"""
+        output_dir = QFileDialog.getExistingDirectory(
+            self, "选择导出目录", DEFAULT_MOD_OUTPUT_PATH)
+        if not output_dir:
+            return
+
+        # 禁用按钮，显示进度
+        self._btn_auto.setEnabled(False)
+        self._btn_export_direct.setEnabled(False)
+        self._btn_cancel.setEnabled(False)
+        self._progress_bar.setVisible(True)
+        self._progress_label.setVisible(True)
+        self._progress_label.setText("正在导出...")
+
+        self._output_dir = output_dir
+        scope = {k: cb.isChecked() for k, cb in self._scope_checks.items()}
+        self._worker = ExportWorker(output_dir, self.canvas, self.project,
+                                    scope=scope, parent=self)
+        self._worker.progress.connect(self._on_progress)
+        self._worker.finished.connect(self._on_export_done)
+        self._worker.failed.connect(self._on_export_failed)
+        self._worker.start()
+
+    def _on_progress(self, text: str) -> None:
+        self._progress_label.setText(text)
+
+    def _on_export_done(self, report) -> None:
+        self._progress_bar.setVisible(False)
+        self._progress_label.setVisible(False)
+
+        # 显示结果
+        lines = [f"MOD 导出成功！\n路径: {self._output_dir}\n"]
+        if report.stats:
+            lines.append("── 统计 ──")
+            labels = {"provinces": "省份", "states": "State",
+                      "countries": "国家", "files": "文件"}
+            for k, v in report.stats.items():
+                lines.append(f"  {labels.get(k, k)}: {v}")
+        if report.fixed:
+            lines.append("\n── 自动修复 ──")
+            for f in report.fixed:
+                lines.append(f"  [已修复] {f}")
+        if report.warnings:
+            lines.append("\n── 警告 ──")
+            for w in report.warnings:
+                lines.append(f"  [警告] {w}")
+
+        QMessageBox.information(self, "导出完成", "\n".join(lines))
+        self.accept()
+
+    def _on_export_failed(self, error_msg: str) -> None:
+        self._progress_bar.setVisible(False)
+        self._progress_label.setVisible(False)
+        self._btn_auto.setEnabled(True)
+        self._btn_export_direct.setEnabled(True)
+        self._btn_cancel.setEnabled(True)
+
+        QMessageBox.critical(self, "导出失败", error_msg)

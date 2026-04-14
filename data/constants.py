@@ -28,7 +28,9 @@ MAX_PROVINCES = 15000
 DEFAULT_PROVINCES = 12000
 
 # 省份最小像素数
-MIN_PROVINCE_PIXELS = 8
+# HOI4 硬性最低 8 像素，但 <50 像素的省份会导致 buildings.txt 坐标问题
+# 生成时合并阈值设 50，确保每个省份足够大
+MIN_PROVINCE_PIXELS = 50
 
 # 省份数量上限（HOI4 引擎限制）
 ENGINE_MAX_PROVINCES = 19000

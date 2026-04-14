@@ -18,56 +18,31 @@ import numpy as np
 from data.constants import MAP_WIDTH, MAP_HEIGHT
 
 
-_CITIES_W = MAP_WIDTH // 4
-_CITIES_H = MAP_HEIGHT // 4
-
 # terrain.bmp 中 spawn_city=yes 的调色板索引
 _URBAN_PALETTE_INDEX = 13
 
 
 def write_cities_bmp(output_dir: str,
                      terrain_map: np.ndarray | None = None) -> None:
-    """生成 map/cities.bmp.
-    如果提供 terrain_map，从 urban terrain 区域生成城市标记;
-    否则生成全黑占位。"""
+    """生成 map/cities.bmp（全尺寸，和 provinces.bmp 一样大）。
+    vanilla cities.bmp 就是全尺寸 5632x2048，不是 1/4。"""
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "cities.bmp")
 
-    w, h = _CITIES_W, _CITIES_H
+    from data.constants import MAP_WIDTH, MAP_HEIGHT
+    w, h = MAP_WIDTH, MAP_HEIGHT
 
     if terrain_map is not None:
-        data = _generate_from_terrain(terrain_map, w, h)
+        # 直接在全尺寸上标记 urban 像素
+        data = np.zeros((h, w), dtype=np.uint8)
+        src_h, src_w = terrain_map.shape
+        rh, rw = min(h, src_h), min(w, src_w)
+        data[:rh, :rw] = (terrain_map[:rh, :rw] == _URBAN_PALETTE_INDEX).astype(np.uint8) * 15
     else:
         data = np.zeros((h, w), dtype=np.uint8)
 
     _write_8bit_bmp(path, data, w, h)
-
-
-def _generate_from_terrain(terrain_map: np.ndarray,
-                           out_w: int, out_h: int) -> np.ndarray:
-    """从 terrain_map 提取 urban 区域，缩放到 1/4 尺寸。
-    非零像素值 = 城市存在 (用 15 作为城市标记值)。"""
-    # 标记 urban 像素
-    urban_mask = (terrain_map == _URBAN_PALETTE_INDEX).astype(np.float32)
-
-    # 用 4x4 block 平均池化缩放到 1/4 尺寸
-    src_h, src_w = terrain_map.shape
-    # 裁剪到 4 的整数倍
-    crop_h = (src_h // 4) * 4
-    crop_w = (src_w // 4) * 4
-    cropped = urban_mask[:crop_h, :crop_w]
-    # reshape 成 4x4 block 然后取均值
-    blocks = cropped.reshape(crop_h // 4, 4, crop_w // 4, 4)
-    density = blocks.mean(axis=(1, 3))
-
-    # 任何 block 中有 urban 像素 → 标记为城市 (阈值 > 0)
-    result = np.zeros((out_h, out_w), dtype=np.uint8)
-    rh = min(out_h, density.shape[0])
-    rw = min(out_w, density.shape[1])
-    result[:rh, :rw] = (density[:rh, :rw] > 0).astype(np.uint8) * 15
-
-    return result
 
 
 def _write_8bit_bmp(path: str, data: np.ndarray,

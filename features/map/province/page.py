@@ -32,6 +32,8 @@ class ProvincePage(QWidget):
     split_province_requested = pyqtSignal()
     lasso_province_toggled = pyqtSignal(bool)
     merge_mode_toggled = pyqtSignal(bool)
+    regen_mode_toggled = pyqtSignal(bool)
+    regen_execute_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -99,10 +101,28 @@ class ProvincePage(QWidget):
 
         lay.addWidget(tools_box)
 
+        # ── 增量生成 ──
+        regen_box = _make_section("增量生成")
+
+        self._regen_btn = QPushButton("选择区域")
+        self._regen_btn.setCheckable(True)
+        self._regen_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._regen_btn.setToolTip('开启后点击省份选择区域（多选），再点「重新生成」')
+        regen_box.layout().addWidget(self._regen_btn)
+
+        self._regen_exec_btn = QPushButton("重新生成选区省份")
+        self._regen_exec_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        self._regen_exec_btn.setToolTip("对选中的省份区域重新生成，其他区域不受影响")
+        regen_box.layout().addWidget(self._regen_exec_btn)
+
+        lay.addWidget(regen_box)
+
         # ── 信号连接 ──
         self._merge_btn.toggled.connect(self._on_merge_toggled)
         self._expand_btn.toggled.connect(self._on_expand_toggled)
         self._split_btn.clicked.connect(self.split_province_requested.emit)
+        self._regen_btn.toggled.connect(self._on_regen_toggled)
+        self._regen_exec_btn.clicked.connect(self.regen_execute_requested.emit)
 
         lay.addStretch()
 
@@ -120,9 +140,22 @@ class ProvincePage(QWidget):
     def _on_expand_toggled(self, on: bool) -> None:
         if on and self._merge_btn.isChecked():
             self._merge_btn.setChecked(False)
+        if on and self._regen_btn.isChecked():
+            self._regen_btn.setChecked(False)
         self.lasso_province_toggled.emit(on)
         if on:
             self._province_hint.setText("扩张模式：点击省份后拖动扩张")
+        else:
+            self._province_hint.setText("点击省份查看信息")
+
+    def _on_regen_toggled(self, on: bool) -> None:
+        if on and self._merge_btn.isChecked():
+            self._merge_btn.setChecked(False)
+        if on and self._expand_btn.isChecked():
+            self._expand_btn.setChecked(False)
+        self.regen_mode_toggled.emit(on)
+        if on:
+            self._province_hint.setText('增量生成：点击省份选择区域（多选），然后点「重新生成」')
         else:
             self._province_hint.setText("点击省份查看信息")
 

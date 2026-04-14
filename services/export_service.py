@@ -344,6 +344,7 @@ def export_mod(
     default_map_settings=None,
     adjacency_rule_mgr=None,
     strategic_region_mgr=None,
+    scope: dict[str, bool] | None = None,
 ) -> ExportReport:
     """调用完整导出管线. 失败抛异常. 返回 ExportReport."""
     # ── 导出前自动检测和修复 ──
@@ -390,6 +391,7 @@ def export_mod(
         adjacency_rule_mgr=adjacency_rule_mgr,
         strategic_region_mgr=strategic_region_mgr,
         provincial_terrain=canvas.map_data.provincial_terrain,
+        scope=scope,
     )
 
     # ── 统计导出文件 ──

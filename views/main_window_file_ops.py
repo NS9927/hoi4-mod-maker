@@ -23,56 +23,9 @@ class MainWindowFileOpsMixin:
     # ═══════════════════════ 导出 ═══════════════════════════
 
     def _on_export_mod(self) -> None:
-        from services.export_service import validate_before_export, export_mod
-        warnings = validate_before_export(
-            self._canvas, self._project.state_mgr, self._project.country_mgr
-        )
-        if warnings:
-            msg = "发现以下问题:\n\n" + "\n".join(warnings) + "\n\n仍然导出吗？"
-            reply = QMessageBox.question(self, "导出验证", msg)
-            if reply != QMessageBox.StandardButton.Yes:
-                return
-
-        output_dir = QFileDialog.getExistingDirectory(self, tr("export_title"), "")
-        if not output_dir:
-            return
-
-        self._status_info.setText(tr("status_exporting"))
-        self.repaint()
-
-        try:
-            report = export_mod(
-                output_dir, self._canvas, self._project.state_mgr,
-                self._project.country_mgr, self._project.continent_mgr,
-                adjacency_mgr=self._project.adjacency_mgr,
-                railway_mgr=self._project.railway_mgr,
-                supply_mgr=self._project.supply_mgr,
-                colormap_settings=self._project.colormap_settings,
-                default_map_settings=self._project.default_map_settings,
-                adjacency_rule_mgr=self._project.adjacency_rule_mgr,
-                strategic_region_mgr=self._project.strategic_region_mgr,
-            )
-            lines = [f"MOD 导出成功！\n路径: {output_dir}\n"]
-            if report.stats:
-                lines.append("── 统计 ──")
-                stat_labels = {
-                    "provinces": "省份", "states": "State",
-                    "countries": "国家", "files": "文件",
-                }
-                for k, v in report.stats.items():
-                    label = stat_labels.get(k, k)
-                    lines.append(f"  {label}: {v}")
-            if report.fixed:
-                lines.append("\n── 自动修复 ──")
-                for f in report.fixed:
-                    lines.append(f"  [已修复] {f}")
-            if report.warnings:
-                lines.append("\n── 警告 ──")
-                for w in report.warnings:
-                    lines.append(f"  [警告] {w}")
-            QMessageBox.information(self, tr("export_title"), "\n".join(lines))
-        except Exception as e:
-            QMessageBox.critical(self, tr("dlg_error"), tr("export_failed", str(e)))
+        from views.export_dialog import ExportDialog
+        dlg = ExportDialog(self._project, self._canvas, parent=self)
+        dlg.exec_()
 
     # ═══════════════════════ 新建/打开/保存 ═══════════════
 
