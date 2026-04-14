@@ -1,0 +1,24 @@
+# 崩溃时间: 2026-04-14T19:27:18.220651
+# Python: 3.10.11 (tags/v3.10.11:7d4cc5a, Apr  5 2023, 00:38:17) [MSC v.1929 64 bit (AMD64)]
+# Platform: win32
+
+Traceback (most recent call last):
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\main.py", line 43, in <module>
+    main()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\main.py", line 36, in main
+    window = MainWindow()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\views\main_window.py", line 89, in __init__
+    self._init_ui()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\views\main_window.py", line 142, in _init_ui
+    self._tool_panel = ToolPanel()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\ui\tool_panel.py", line 228, in __init__
+    self._init_ui()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\ui\tool_panel.py", line 266, in _init_ui
+    self._create_pages()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\ui\tool_panel.py", line 295, in _create_pages
+    self._land_page = LandPage()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\features\map\land\page.py", line 37, in __init__
+    self._init_ui()
+  File "C:\Users\Administrator.SKY-20180310BMB\Desktop\MOD\hoi4_map_maker\features\map\land\page.py", line 51, in _init_ui
+    tools_box = _make_section("工具")
+NameError: name '_make_section' is not defined

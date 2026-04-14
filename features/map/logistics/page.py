@@ -13,6 +13,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.styles import (
+    make_section as _make_section,
     _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _SPINBOX_STYLE,
 )

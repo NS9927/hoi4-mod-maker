@@ -13,19 +13,13 @@ from data.constants import (
 )
 
 from ui.styles import (
+    make_section as _make_section,
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
     _TOOL_BTN_STYLE, _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
     _SPINBOX_STYLE, _color_icon,
 )
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class LandPage(QWidget):
@@ -45,8 +39,8 @@ class LandPage(QWidget):
 
     def _init_ui(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(10)
 
         # 提示
         hint = QLabel("画陆地/海洋/湖泊。画笔涂色，填充灌满区域，变换可框选移动/缩放/旋转")

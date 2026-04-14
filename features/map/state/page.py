@@ -10,19 +10,13 @@ from PyQt5.QtWidgets import (
 from domain.managers.state import StateManager
 
 from ui.styles import (
+    make_section as _make_section,
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
     _PRIMARY_BTN_STYLE, _SPINBOX_STYLE, _LINEEDIT_STYLE,
     _COMBOBOX_STYLE, _LIST_STYLE,
 )
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class StatePage(QWidget):
@@ -43,8 +37,8 @@ class StatePage(QWidget):
 
     def _init_ui(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(10)
 
         # 自动分组按钮
         auto_btn = QPushButton("自动分组")

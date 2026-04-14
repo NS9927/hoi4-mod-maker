@@ -18,6 +18,7 @@ from data.terrain_types import (
 )
 
 from ui.styles import (
+    make_section as _make_section,
     _DIM, _SECTION_STYLE, _PRIMARY_BTN_STYLE, _TOOL_BTN_STYLE,
 )
 
@@ -55,13 +56,6 @@ _TILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "..", "..", "..", "data", "atlas_tiles")
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class TerrainPage(QWidget):
@@ -78,7 +72,7 @@ class TerrainPage(QWidget):
 
     def _init_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(4)
 
         # 编辑模式切换: 按省份 vs 画笔
@@ -115,7 +109,7 @@ class TerrainPage(QWidget):
         scroll.setStyleSheet("QScrollArea { border: none; }")
         scroll_content = QWidget()
         lay = QVBoxLayout(scroll_content)
-        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(6)
 
         for group_type in _GROUP_ORDER:

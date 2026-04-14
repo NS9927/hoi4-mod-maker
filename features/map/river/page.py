@@ -11,18 +11,12 @@ from domain.managers.river import (
 )
 
 from ui.styles import (
+    make_section as _make_section,
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
     _TOOL_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class RiverPage(QWidget):
@@ -40,8 +34,8 @@ class RiverPage(QWidget):
 
     def _init_ui(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(10)
 
         # 提示
         hint = QLabel("河流规则: 必须1像素宽，只走上下左右(不能斜走)\n"

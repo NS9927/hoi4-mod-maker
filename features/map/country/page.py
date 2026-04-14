@@ -11,19 +11,13 @@ from PyQt5.QtGui import QColor, QBrush
 from domain.managers.country import RULING_PARTIES
 
 from ui.styles import (
+    make_section as _make_section,
     _BORDER, _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
     _COMBOBOX_STYLE, _LIST_STYLE,
 )
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class CountryPage(QWidget):
@@ -43,8 +37,8 @@ class CountryPage(QWidget):
 
     def _init_ui(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(10)
 
         # 创建国家按钮
         create_btn = QPushButton("创建国家")

@@ -187,6 +187,17 @@ _LIST_STYLE = f"""
 """
 
 
+def make_section(title: str):
+    """创建统一样式的 QGroupBox 分组容器。所有 page 共用。"""
+    from PyQt5.QtWidgets import QGroupBox, QVBoxLayout
+    box = QGroupBox(title)
+    box.setLayout(QVBoxLayout())
+    box.layout().setContentsMargins(10, 14, 10, 10)
+    box.layout().setSpacing(8)
+    box.setStyleSheet(_SECTION_STYLE)
+    return box
+
+
 def _color_icon(r: int, g: int, b: int, size: int = 12) -> QIcon:
     """生成一个纯色方块图标 (列表 / 按钮装饰用)."""
     px = QPixmap(size, size)

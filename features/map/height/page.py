@@ -7,18 +7,12 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.styles import (
+    make_section as _make_section,
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
 
 
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setLayout(QVBoxLayout())
-    box.layout().setContentsMargins(8, 8, 8, 8)
-    box.layout().setSpacing(4)
-    box.setStyleSheet(_SECTION_STYLE)
-    return box
 
 
 class HeightPage(QWidget):
@@ -35,8 +29,8 @@ class HeightPage(QWidget):
 
     def _init_ui(self) -> None:
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(8)
+        lay.setContentsMargins(8, 8, 8, 8)
+        lay.setSpacing(10)
 
         # 提示
         hint = QLabel("点击省份设高度。改地形会自动联动高度\n彩色显示: 蓝=海 绿=平原 棕=山 白=雪顶")
