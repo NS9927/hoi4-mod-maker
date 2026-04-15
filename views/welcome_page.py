@@ -87,7 +87,6 @@ class WelcomePage(QWidget):
     open_project_requested = pyqtSignal()
     open_recent_requested = pyqtSignal(str)         # path
     import_mod_requested = pyqtSignal()              # 导入MOD地图
-    tutorial_requested = pyqtSignal()                # 交互式教程
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -155,25 +154,6 @@ class WelcomePage(QWidget):
         btn_guide.setStyleSheet(btn_style)
         btn_guide.clicked.connect(self._on_guide)
         center.addWidget(btn_guide, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        btn_tutorial = QPushButton(tr("action_tutorial"))
-        btn_tutorial.setStyleSheet(f"""
-            QPushButton {{
-                background: {_ACCENT};
-                border: none;
-                color: white;
-                padding: 12px 32px;
-                font-size: 15px;
-                font-weight: bold;
-                border-radius: 6px;
-                min-width: 200px;
-            }}
-            QPushButton:hover {{
-                background: {_ACCENT_HOVER};
-            }}
-        """)
-        btn_tutorial.clicked.connect(lambda: self.tutorial_requested.emit())
-        center.addWidget(btn_tutorial, alignment=Qt.AlignmentFlag.AlignCenter)
 
         center.addSpacing(12)
 
