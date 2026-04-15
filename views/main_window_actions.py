@@ -142,6 +142,17 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         QMessageBox.critical(self, tr("dlg_error"), msg)
         self._status_info.setText(tr("status_ready"))
 
+    def _on_smooth_coast(self) -> None:
+        """平滑海岸线（在生成省份之前用）。"""
+        from domain.generators.coastline import smooth_coastline
+        map_data = self._project.map_data
+        new_tile = smooth_coastline(map_data.tile_map)
+        map_data.tile_map[:] = new_tile
+        self._canvas.tile_map = map_data.tile_map
+        self._canvas.schedule_full_render()
+        self._project.mark_dirty()
+        self._status_info.setText(tr("status_coast_smoothed"))
+
     def _on_quick_init(self) -> None:
         """一键初始化：自动生成州 + 战略区域 + 默认国家。"""
         pm = self._canvas.province_map

@@ -33,6 +33,7 @@ class LandPage(QWidget):
     generate_provinces_requested = pyqtSignal(int)
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
+    smooth_coast_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -113,6 +114,13 @@ class LandPage(QWidget):
             btn.clicked.connect(lambda _, t=tile_id: self._on_tile_click(t))
             tile_box.layout().addWidget(btn)
         lay.addWidget(tile_box)
+
+        # 平滑海岸线
+        coast_btn = QPushButton(tr("land_btn_smooth_coast"))
+        coast_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        coast_btn.setToolTip(tr("land_btn_smooth_coast_tip"))
+        coast_btn.clicked.connect(self.smooth_coast_requested.emit)
+        lay.addWidget(coast_btn)
 
         # 生成省份
         gen_box = _make_section(tr("land_section_province_gen"))

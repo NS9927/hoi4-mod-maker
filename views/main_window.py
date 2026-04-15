@@ -260,6 +260,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.generate_provinces_requested.connect(self._on_generate_provinces)
         tp.validate_requested.connect(self._on_validate)
         tp.quick_init_requested.connect(self._on_quick_init)
+        tp.smooth_coast_requested.connect(self._on_smooth_coast)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
         tp.terrain_brush_size_changed.connect(
             lambda s: setattr(self._controllers["terrain"], "brush_size", s)
