@@ -190,6 +190,13 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._brush_cursor.setVisible(False)
         self._scene.addItem(self._brush_cursor)
 
+        # 密度叠加层
+        self._density_overlay_item = QGraphicsPixmapItem()
+        self._density_overlay_item.setZValue(5)
+        self._density_overlay_item.setVisible(False)
+        self._density_overlay_visible = False
+        self._scene.addItem(self._density_overlay_item)
+
         # 套索路径反馈（黄色虚线）
         self._lasso_path_item = QGraphicsPathItem()
         pen = QPen(QColor(255, 230, 0, 230), 2)
@@ -822,6 +829,17 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         mode = self._display_mode
 
         if mode == "land":
+            # 密度画笔子模式
+            if getattr(self, '_density_overlay_visible', False):
+                dm = getattr(self._map_data, 'density_map', None) if self._map_data else None
+                if dm is not None:
+                    import numpy as np
+                    yy, xx = np.ogrid[y0:y1, x0:x1]
+                    circle = (yy - cy) ** 2 + (xx - cx) ** 2 <= r * r
+                    dv = getattr(self, '_density_paint_value', 1.0)
+                    dm[y0:y1, x0:x1][circle] = dv
+                return
+
             # 修改大陆时，如果已有省份数据则自动清除（只检查一次）
             if self._has_provinces:
                 self._has_provinces = False

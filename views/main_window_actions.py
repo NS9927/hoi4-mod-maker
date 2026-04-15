@@ -153,6 +153,29 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._project.mark_dirty()
         self._status_info.setText(tr("status_coast_smoothed"))
 
+    def _on_density_paint_toggle(self, enabled: bool) -> None:
+        """开关密度画笔模式。"""
+        land_ctrl = self._controllers["land"]
+        land_ctrl.density_mode = enabled
+        self._canvas.set_density_overlay_visible(enabled)
+        if enabled:
+            land_page = self._tool_panel._land_page
+            # 同步密度值到 canvas（_stamp_brush 读取）
+            dv = land_page._density_value_slider.value() / 100.0
+            self._canvas._density_paint_value = dv
+            land_page._density_value_slider.valueChanged.connect(
+                lambda v: setattr(self._canvas, '_density_paint_value', v / 100.0)
+            )
+            # 同步 density_map
+            if self._project.map_data.density_map is not None:
+                land_page._density_map = self._project.map_data.density_map
+            self._status_info.setText(tr("status_density_paint_on"))
+        else:
+            land_page = self._tool_panel._land_page
+            land_page._density_map = self._project.map_data.density_map
+            self._canvas._density_paint_value = 1.0
+            self._status_info.setText(tr("status_density_paint_off"))
+
     def _on_quick_init(self) -> None:
         """一键初始化：自动生成州 + 战略区域 + 默认国家。"""
         pm = self._canvas.province_map

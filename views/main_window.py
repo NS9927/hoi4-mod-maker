@@ -261,6 +261,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.validate_requested.connect(self._on_validate)
         tp.quick_init_requested.connect(self._on_quick_init)
         tp.smooth_coast_requested.connect(self._on_smooth_coast)
+        tp.density_paint_toggled.connect(self._on_density_paint_toggle)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
         tp.terrain_brush_size_changed.connect(
             lambda s: setattr(self._controllers["terrain"], "brush_size", s)

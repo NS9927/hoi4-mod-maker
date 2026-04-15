@@ -352,9 +352,11 @@ class InputMixin:
 
                 self._flush_dirty()
                 # 省份模式拖动结束后：只刷新边界，不做重清理
-                # （重清理移到导出时跑，避免每次松鼠标卡住）
                 if self._display_mode == "province":
                     self._render_province_overlay()
+                # 密度画笔结束后刷新叠加层
+                if getattr(self, '_density_overlay_visible', False):
+                    self._render_density_overlay()
                 self.stroke_ended.emit()
                 event.accept()
                 return

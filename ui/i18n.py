@@ -283,6 +283,8 @@ _translations: dict[str, dict[str, str]] = {
     "land_density_none": {"zh": "未设置密度图（均匀生成）", "en": "No density map (uniform generation)"},
     "land_density_loaded": {"zh": "✓ 密度图已加载", "en": "✓ Density map loaded"},
     "land_density_painting": {"zh": "✓ 密度画笔模式（在地图上涂抹）", "en": "✓ Density paint mode (draw on map)"},
+    "status_density_paint_on": {"zh": "密度画笔模式：在地图上涂抹省份密度", "en": "Density paint mode: draw province density on map"},
+    "status_density_paint_off": {"zh": "密度画笔模式已关闭", "en": "Density paint mode off"},
     "land_btn_hide": {"zh": "隐藏", "en": "Hide"},
     "land_btn_smooth_coast": {"zh": "平滑海岸线", "en": "Smooth Coastline"},
     "land_btn_smooth_coast_tip": {"zh": "用高斯模糊平滑陆海边界，让海岸线更自然（建议在生成省份之前使用）", "en": "Gaussian blur to smooth land/sea boundary for natural coastlines (use before generating provinces)"},

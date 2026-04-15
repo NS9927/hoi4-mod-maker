@@ -152,6 +152,7 @@ class ToolPanel(QWidget):
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
     smooth_coast_requested = pyqtSignal()
+    density_paint_toggled = pyqtSignal(bool)
     auto_terrain_requested = pyqtSignal()
     terrain_brush_size_changed = pyqtSignal(int)
     terrain_soft_edge_changed = pyqtSignal(bool)
@@ -364,6 +365,7 @@ class ToolPanel(QWidget):
         p.validate_requested.connect(self.validate_requested)
         p.quick_init_requested.connect(self.quick_init_requested)
         p.smooth_coast_requested.connect(self.smooth_coast_requested)
+        p.density_paint_toggled.connect(self.density_paint_toggled)
 
     def _connect_province_signals(self) -> None:
         p = self._province_page

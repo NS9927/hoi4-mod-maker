@@ -201,11 +201,55 @@ class OverlayMixin:
         self._lasso_overlay.setVisible(False)
 
     def _update_brush_cursor(self, sx: int, sy: int) -> None:
-        """更新画笔预览光标位置和大小。
-        省份模式不显示刷子框 — 它是边界编辑工具，不是绘画工具。"""
-        if self._current_tool in ("brush", "eraser") and self._display_mode in ("land", "river"):
+        """更新画笔预览光标位置和大小。"""
+        show_brush = (
+            self._current_tool in ("brush", "eraser")
+            and self._display_mode in ("land", "river")
+        ) or getattr(self, '_density_overlay_visible', False)
+
+        if show_brush:
             r = self._brush_size // 2
             self._brush_cursor.setRect(sx - r, sy - r, self._brush_size, self._brush_size)
             self._brush_cursor.setVisible(True)
         else:
             self._brush_cursor.setVisible(False)
+
+    # ── 密度叠加层 ──
+
+    def _render_density_overlay(self) -> None:
+        """渲染密度图为半透明热力图叠加在地图上。"""
+        density = getattr(self._map_data, 'density_map', None) if self._map_data else None
+        overlay_item = getattr(self, '_density_overlay_item', None)
+        if overlay_item is None:
+            return
+
+        if density is None or not getattr(self, '_density_overlay_visible', False):
+            overlay_item.setVisible(False)
+            return
+
+        h, w = density.shape
+        # 转 RGBA 热力图：低密度=蓝透明，高密度=红不透明
+        rgba = np.zeros((h, w, 4), dtype=np.uint8)
+        d = np.clip(density, 0, 1)
+        rgba[:, :, 0] = (d * 255).astype(np.uint8)          # R: 高密度→红
+        rgba[:, :, 2] = ((1 - d) * 200).astype(np.uint8)    # B: 低密度→蓝
+        rgba[:, :, 3] = 100                                   # 半透明
+
+        img = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_RGBA8888)
+        overlay_item.setPixmap(QPixmap.fromImage(img.copy()))
+        overlay_item.setVisible(True)
+
+    def set_density_overlay_visible(self, visible: bool) -> None:
+        """开关密度叠加层。"""
+        self._density_overlay_visible = visible
+        if visible:
+            # 确保 density_map 存在
+            if self._map_data and self._map_data.density_map is None:
+                self._map_data.density_map = np.full(
+                    (self.map_h, self.map_w), 0.5, dtype=np.float32
+                )
+            self._render_density_overlay()
+        else:
+            overlay_item = getattr(self, '_density_overlay_item', None)
+            if overlay_item:
+                overlay_item.setVisible(False)
