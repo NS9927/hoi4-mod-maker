@@ -24,6 +24,7 @@ def generate_provinces(
     sea_scale: float = 0.15,
     lake_scale: float = 0.3,
     lloyd_iterations: int = 2,
+    density_map: np.ndarray | None = None,
 ) -> tuple[np.ndarray, int]:
     """
     基于泊松盘 + Lloyd 松弛生成省份。
@@ -35,6 +36,7 @@ def generate_provinces(
         sea_scale: 海洋省份密度系数（0.15 = 海洋只生成 15% 的省份密度）
         lake_scale: 湖泊省份密度系数（0.3 = 湖泊是陆地的 30% 密度）
         lloyd_iterations: Lloyd 松弛迭代次数（0=不松弛，2=推荐）
+        density_map: (H, W) float32, 0.0~1.0 密度图（1=密集，0=稀疏），None=均匀
     """
     land_mask = tile_map == TILE_LAND
     sea_mask = tile_map == TILE_SEA
@@ -94,9 +96,10 @@ def generate_provinces(
             # 检查是否跨 wrap 边界
             crosses_wrap = (pixel_xs.min() == 0 and pixel_xs.max() >= MAP_WIDTH - 1)
 
-            # 泊松盘采样种子（均匀间距）
+            # 泊松盘采样种子（支持密度图）
             seed_ys, seed_xs = _poisson_disk_sample(
-                pixel_ys, pixel_xs, region_count, n_pixels
+                pixel_ys, pixel_xs, region_count, n_pixels,
+                density_map=density_map,
             )
             actual_count = len(seed_ys)
 
@@ -165,26 +168,34 @@ def _poisson_disk_sample(
     pixel_xs: np.ndarray,
     target_count: int,
     n_pixels: int,
+    density_map: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
-    泊松盘采样：在给定像素集合中均匀间距放置种子。
+    泊松盘采样：在给定像素集合中放置种子。
 
-    近似算法：把像素区域划分成网格，每个格子随机选一个像素作为种子。
-    比纯随机均匀得多，比精确泊松盘快得多。
+    近似算法：把像素区域划分成网格，每个格子根据密度决定是否放种子。
+    density_map 为 None 时退化为均匀采样。
+
+    density_map: (H, W) float32, 0.0=稀疏 ~ 1.0=密集
     """
     if target_count >= n_pixels:
         return pixel_ys.copy(), pixel_xs.copy()
 
     if target_count <= 10:
-        # 太少了直接随机
         indices = np.random.choice(n_pixels, size=target_count, replace=False)
         return pixel_ys[indices], pixel_xs[indices]
 
-    # 计算网格间距
+    # 计算基础网格间距（用最密的间距，密度图控制跳过）
     y_min, y_max = pixel_ys.min(), pixel_ys.max()
     x_min, x_max = pixel_xs.min(), pixel_xs.max()
     area = n_pixels
-    cell_size = max(1, int(np.sqrt(area / target_count)))
+
+    if density_map is not None:
+        # 用更细的网格（按最大密度），然后概率跳过低密度格子
+        # 基础 cell_size 按 target_count * 1.5 估算（多撒一些，后面裁）
+        cell_size = max(1, int(np.sqrt(area / (target_count * 1.5))))
+    else:
+        cell_size = max(1, int(np.sqrt(area / target_count)))
 
     # 划分网格
     grid_rows = max(1, (y_max - y_min + 1) // cell_size)
@@ -195,7 +206,7 @@ def _poisson_disk_sample(
     cell_x = np.clip((pixel_xs - x_min) // cell_size, 0, grid_cols - 1)
     cell_id = cell_y * grid_cols + cell_x
 
-    # 每个有像素的格子随机选一个种子
+    # 每个有像素的格子决定是否放种子
     unique_cells = np.unique(cell_id)
     seed_ys_list = []
     seed_xs_list = []
@@ -204,21 +215,39 @@ def _poisson_disk_sample(
         cell_mask = cell_id == cid
         cell_indices = np.where(cell_mask)[0]
         chosen = np.random.choice(cell_indices)
-        seed_ys_list.append(pixel_ys[chosen])
-        seed_xs_list.append(pixel_xs[chosen])
+        cy, cx = pixel_ys[chosen], pixel_xs[chosen]
+
+        if density_map is not None:
+            # 采样该位置的密度值，概率决定是否放种子
+            # density=1.0 → 100% 放，density=0.0 → 基础概率（不完全跳过）
+            d = float(density_map[cy, cx])
+            prob = 0.1 + 0.9 * d  # 最低 10% 概率，保证不会完全空白
+            if np.random.random() > prob:
+                continue
+
+        seed_ys_list.append(cy)
+        seed_xs_list.append(cx)
 
     result_ys = np.array(seed_ys_list, dtype=np.int32)
     result_xs = np.array(seed_xs_list, dtype=np.int32)
 
-    # 如果网格产生的种子太多，随机裁剪到目标数
+    # 如果种子太多，随机裁剪到目标数
     if len(result_ys) > target_count:
         indices = np.random.choice(len(result_ys), size=target_count, replace=False)
         result_ys = result_ys[indices]
         result_xs = result_xs[indices]
-    # 如果太少（区域形状不规则），补充随机种子
+    # 如果太少，补充随机种子（优先高密度区域）
     elif len(result_ys) < target_count:
         deficit = target_count - len(result_ys)
-        extra = np.random.choice(n_pixels, size=min(deficit, n_pixels), replace=False)
+        if density_map is not None:
+            # 按密度值做加权随机采样
+            densities = density_map[pixel_ys, pixel_xs].astype(np.float64)
+            densities = np.maximum(densities, 0.01)
+            probs = densities / densities.sum()
+            extra = np.random.choice(n_pixels, size=min(deficit, n_pixels),
+                                     replace=False, p=probs)
+        else:
+            extra = np.random.choice(n_pixels, size=min(deficit, n_pixels), replace=False)
         result_ys = np.concatenate([result_ys, pixel_ys[extra[:deficit]]])
         result_xs = np.concatenate([result_xs, pixel_xs[extra[:deficit]]])
 

@@ -173,6 +173,27 @@ class LandPage(QWidget):
         )
         gen_box.layout().addWidget(self._lake_density_slider)
 
+        # 省份密度图
+        density_row = QHBoxLayout()
+        self._density_btn = QPushButton(tr("land_btn_load_density"))
+        self._density_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._density_btn.setToolTip(tr("land_btn_load_density_tip"))
+        self._density_btn.clicked.connect(self._on_load_density)
+        density_row.addWidget(self._density_btn)
+
+        self._density_clear_btn = QPushButton(tr("land_btn_clear_density"))
+        self._density_clear_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._density_clear_btn.clicked.connect(self._on_clear_density)
+        self._density_clear_btn.setEnabled(False)
+        density_row.addWidget(self._density_clear_btn)
+        gen_box.layout().addLayout(density_row)
+
+        self._density_status = QLabel(tr("land_density_none"))
+        self._density_status.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
+        gen_box.layout().addWidget(self._density_status)
+
+        self._density_map = None  # (H, W) float32 or None
+
         validate_btn = QPushButton(tr("land_btn_validate"))
         validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_requested.emit)
@@ -296,10 +317,35 @@ class LandPage(QWidget):
         count = self._province_count_spin.value()
         self.generate_provinces_requested.emit(count)
 
+    def _on_load_density(self) -> None:
+        """加载密度图（灰度图片）。"""
+        from PyQt5.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("land_btn_load_density"),
+            "", "Images (*.png *.jpg *.bmp *.tif);;All (*)",
+        )
+        if not path:
+            return
+        import numpy as np
+        from PIL import Image
+        img = Image.open(path).convert("L")  # 转灰度
+        from data.constants import MAP_WIDTH, MAP_HEIGHT
+        img = img.resize((MAP_WIDTH, MAP_HEIGHT), Image.Resampling.BILINEAR)
+        self._density_map = np.array(img, dtype=np.float32) / 255.0
+        self._density_status.setText(tr("land_density_loaded"))
+        self._density_clear_btn.setEnabled(True)
+
+    def _on_clear_density(self) -> None:
+        """清除密度图。"""
+        self._density_map = None
+        self._density_status.setText(tr("land_density_none"))
+        self._density_clear_btn.setEnabled(False)
+
     def get_generation_params(self) -> dict:
         """返回省份生成的所有参数。"""
         return {
             "target_count": self._province_count_spin.value(),
             "sea_scale": self._sea_density_slider.value() / 100.0,
             "lake_scale": self._lake_density_slider.value() / 100.0,
+            "density_map": self._density_map,
         }

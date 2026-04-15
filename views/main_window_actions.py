@@ -32,7 +32,7 @@ class _GenerateThread(QThread):
     error = pyqtSignal(str)
 
     def __init__(self, tile_map, count, province_map=None, incremental=False,
-                 sea_scale=0.15, lake_scale=0.3):
+                 sea_scale=0.15, lake_scale=0.3, density_map=None):
         super().__init__()
         self._tile_map = tile_map.copy()
         self._count = count
@@ -40,6 +40,7 @@ class _GenerateThread(QThread):
         self._incremental = incremental
         self._sea_scale = sea_scale
         self._lake_scale = lake_scale
+        self._density_map = density_map.copy() if density_map is not None else None
 
     def run(self):
         try:
@@ -53,6 +54,7 @@ class _GenerateThread(QThread):
                 pm, cnt = generate_provinces(
                     self._tile_map, self._count,
                     sea_scale=self._sea_scale,
+                    density_map=self._density_map,
                 )
             self.finished.emit(pm, cnt)
         except Exception as e:
@@ -105,10 +107,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         # 从 Land 页面读取密度参数
         sea_scale = 0.15
         lake_scale = 0.3
+        density_map = None
         if hasattr(self._tool_panel, '_land_page') and self._tool_panel._land_page is not None:
             params = self._tool_panel._land_page.get_generation_params()
             sea_scale = params.get("sea_scale", 0.15)
             lake_scale = params.get("lake_scale", 0.3)
+            density_map = params.get("density_map")
 
         self._gen_thread = _GenerateThread(
             self._canvas.tile_map, count,
@@ -116,6 +120,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             incremental=incremental,
             sea_scale=sea_scale,
             lake_scale=lake_scale,
+            density_map=density_map,
         )
         self._gen_thread.finished.connect(self._on_generate_done)
         self._gen_thread.error.connect(self._on_generate_error)
