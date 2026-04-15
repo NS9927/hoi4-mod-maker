@@ -26,25 +26,29 @@ class TutorialOverlay(QWidget):
         # 底部指示面板
         self._panel = QWidget(self)
         self._panel.setStyleSheet(f"""
-            QWidget {{
-                background: {_BG};
-                border-top: 2px solid {_ACCENT};
+            QWidget#tutorialPanel {{
+                background: #2a2a3e;
+                border-top: 3px solid {_ACCENT};
+                border-left: none;
+                border-right: none;
+                border-bottom: none;
             }}
         """)
+        self._panel.setObjectName("tutorialPanel")
         panel_lay = QVBoxLayout(self._panel)
-        panel_lay.setContentsMargins(20, 12, 20, 12)
-        panel_lay.setSpacing(8)
+        panel_lay.setContentsMargins(24, 16, 24, 14)
+        panel_lay.setSpacing(10)
 
         # 步骤标签
         self._step_label = QLabel()
-        self._step_label.setStyleSheet(f"color: {_ACCENT}; font-size: 12px; font-weight: bold;")
+        self._step_label.setStyleSheet(f"color: {_ACCENT}; font-size: 13px; font-weight: bold; background: transparent;")
         panel_lay.addWidget(self._step_label)
 
         # 指示文字
         self._msg = QLabel()
-        self._msg.setStyleSheet("color: #e0e0f0; font-size: 14px;")
+        self._msg.setStyleSheet("color: white; font-size: 14px; line-height: 1.5; background: transparent;")
         self._msg.setWordWrap(True)
-        panel_lay.addWidget(self._msg)
+        panel_lay.addWidget(self._msg, 1)
 
         # 按钮行
         btn_row = QHBoxLayout()
@@ -85,7 +89,8 @@ class TutorialOverlay(QWidget):
 
         panel_lay.addLayout(btn_row)
 
-        self._panel.setFixedHeight(120)
+        self._panel.setMinimumHeight(140)
+        self._panel.setMaximumHeight(220)
         self.hide()
 
     def show_step(self, step_text: str, message: str,
@@ -105,6 +110,8 @@ class TutorialOverlay(QWidget):
 
         self.raise_()
         self.show()
+        # 刷新面板位置
+        self.resizeEvent(None)
         self.update()
 
     def set_next_text(self, text: str) -> None:
@@ -114,7 +121,10 @@ class TutorialOverlay(QWidget):
         super().resizeEvent(event)
         pw = self.width()
         ph = self.height()
-        panel_h = self._panel.height()
+        # 让面板自适应内容高度
+        panel_h = self._panel.sizeHint().height()
+        panel_h = max(panel_h, self._panel.minimumHeight())
+        panel_h = min(panel_h, self._panel.maximumHeight())
         self._panel.setGeometry(0, ph - panel_h, pw, panel_h)
 
     def paintEvent(self, event) -> None:
