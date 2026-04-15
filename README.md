@@ -11,6 +11,20 @@ HOI4 Map Maker is an open-source desktop map editor built with Python and PyQt5.
 ![License](https://img.shields.io/badge/license-GPLv3-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.10%2B-brightgreen.svg)
 
+### Getting Started Guide
+
+A built-in step-by-step guide walks you through the entire workflow on first launch:
+
+<p align="center">
+  <img src="docs/screenshots/guide_step1.png" width="480" alt="Getting Started Guide">
+</p>
+
+Each editing mode also shows a contextual hint bar on first use:
+
+<p align="center">
+  <img src="docs/screenshots/hint_bar.png" width="380" alt="Mode Hint Bar">
+</p>
+
 ---
 
 ## Features
