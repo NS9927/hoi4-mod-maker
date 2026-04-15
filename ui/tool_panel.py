@@ -228,19 +228,7 @@ class ToolPanel(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
-        # 整体滚动区域 (模式栏 + 页面内容一起滚动)
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
-        self._scroll.setFrameShape(QFrame.NoFrame)
-        self._scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
-
-        # 滚动内容容器
-        scroll_content = QWidget()
-        scroll_layout = QVBoxLayout(scroll_content)
-        scroll_layout.setContentsMargins(0, 0, 0, 0)
-        scroll_layout.setSpacing(0)
-
-        # 分组折叠模式栏 (V1 原版样式)
+        # 分组折叠模式栏
         self._mode_tabs = _GroupedModeBar([
             (tr("group_map_drawing"), [
                 ("land", tr("mode_land")),
@@ -262,20 +250,25 @@ class ToolPanel(QWidget):
             ]),
         ])
         self._mode_tabs.mode_changed.connect(self._on_mode_changed)
-        scroll_layout.addWidget(self._mode_tabs)
+        root.addWidget(self._mode_tabs)
 
-        # 堆叠容器 (页面内容)
+        # 页面内容滚动区域 (只包裹 stack，mode_tabs 固定在上方)
+        self._page_scroll = QScrollArea()
+        self._page_scroll.setWidgetResizable(True)
+        self._page_scroll.setFrameShape(QFrame.NoFrame)
+        self._page_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self._page_scroll.setStyleSheet("QScrollArea { background: transparent; border: none; }")
+
         self._stack = QStackedWidget()
         self._stack.setStyleSheet("background: transparent; border: none;")
-        scroll_layout.addWidget(self._stack, 1)
-
-        self._scroll.setWidget(scroll_content)
-        root.addWidget(self._scroll, 1)
+        self._stack.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+        self._page_scroll.setWidget(self._stack)
+        root.addWidget(self._page_scroll, 1)
 
         # 创建各页面实例并连接信号
         self._create_pages()
 
-        # 底部固定区域 (不参与滚动)
+        # 底部固定区域
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         sep.setStyleSheet(f"color: {_BORDER}; margin: 0;")
