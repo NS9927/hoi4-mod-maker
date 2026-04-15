@@ -196,11 +196,6 @@ class LandPage(QWidget):
         self._density_paint_btn.toggled.connect(self._on_density_paint_toggle)
         density_row.addWidget(self._density_paint_btn)
 
-        self._density_btn = QPushButton(tr("land_btn_load_density"))
-        self._density_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._density_btn.clicked.connect(self._on_load_density)
-        density_row.addWidget(self._density_btn)
-
         self._density_clear_btn = QPushButton(tr("land_btn_clear_density"))
         self._density_clear_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._density_clear_btn.clicked.connect(self._on_clear_density)
@@ -367,24 +362,6 @@ class LandPage(QWidget):
             self._density_map = np.full((MAP_HEIGHT, MAP_WIDTH), 0.5, dtype=np.float32)
             self._density_status.setText(tr("land_density_painting"))
             self._density_clear_btn.setEnabled(True)
-
-    def _on_load_density(self) -> None:
-        """从文件加载密度图。"""
-        from PyQt5.QtWidgets import QFileDialog
-        path, _ = QFileDialog.getOpenFileName(
-            self, tr("land_btn_load_density"),
-            "", "Images (*.png *.jpg *.bmp *.tif);;All (*)",
-        )
-        if not path:
-            return
-        import numpy as np
-        from PIL import Image
-        img = Image.open(path).convert("L")
-        from data.constants import MAP_WIDTH, MAP_HEIGHT
-        img = img.resize((MAP_WIDTH, MAP_HEIGHT), Image.Resampling.BILINEAR)
-        self._density_map = np.array(img, dtype=np.float32) / 255.0
-        self._density_status.setText(tr("land_density_loaded"))
-        self._density_clear_btn.setEnabled(True)
 
     def _on_clear_density(self) -> None:
         """清除密度图。"""
