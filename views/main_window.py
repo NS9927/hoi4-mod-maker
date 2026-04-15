@@ -145,9 +145,10 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._canvas = MapCanvas()
         self._splitter.addWidget(self._canvas)
 
-        self._splitter.setSizes([320, 1200])
+        self._splitter.setSizes([380, 1200])
         self._splitter.setStretchFactor(0, 0)
         self._splitter.setStretchFactor(1, 1)
+        self._splitter.setHandleWidth(1)  # 拖拽条几乎不可见
 
         self._stack.addWidget(self._splitter)
 
