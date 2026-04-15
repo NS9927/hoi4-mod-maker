@@ -9,8 +9,8 @@
 from __future__ import annotations
 
 from PyQt5.QtWidgets import (
-    QMainWindow, QAction, QFileDialog, QMessageBox,
-    QLabel, QApplication, QInputDialog, QSplitter, QStackedWidget,
+    QMainWindow, QAction, QFileDialog, QMessageBox, QWidget,
+    QLabel, QApplication, QInputDialog, QStackedWidget, QHBoxLayout,
 )
 from PyQt5.QtCore import Qt, QTimer, QPoint
 from PyQt5.QtGui import QKeySequence
@@ -133,24 +133,21 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._welcome_page.import_mod_requested.connect(self._on_welcome_import_mod)
         self._stack.addWidget(self._welcome_page)
 
-        # 编辑器 splitter
-        self._splitter = QSplitter(Qt.Orientation.Horizontal)
-        self._splitter.setStyleSheet(
-            "QSplitter::handle { background: #3a3a4a; width: 3px; }"
-        )
+        # 编辑器布局：左侧固定宽度工具面板 + 右侧画布
+        self._editor = QWidget()
+        editor = self._editor
+        editor_layout = QHBoxLayout(editor)
+        editor_layout.setContentsMargins(0, 0, 0, 0)
+        editor_layout.setSpacing(0)
 
         self._tool_panel = ToolPanel()
-        self._splitter.addWidget(self._tool_panel)
+        self._tool_panel.setFixedWidth(380)
+        editor_layout.addWidget(self._tool_panel)
 
         self._canvas = MapCanvas()
-        self._splitter.addWidget(self._canvas)
+        editor_layout.addWidget(self._canvas, 1)
 
-        self._splitter.setSizes([380, 1200])
-        self._splitter.setStretchFactor(0, 0)
-        self._splitter.setStretchFactor(1, 1)
-        self._splitter.setHandleWidth(1)  # 拖拽条几乎不可见
-
-        self._stack.addWidget(self._splitter)
+        self._stack.addWidget(editor)
 
     def _init_menu(self) -> None:
         menubar = self.menuBar()
@@ -675,7 +672,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._stack.setCurrentWidget(self._welcome_page)
 
     def _show_editor(self) -> None:
-        self._stack.setCurrentWidget(self._splitter)
+        self._stack.setCurrentWidget(self._editor)
         QTimer.singleShot(100, self._canvas.fit_in_view)
 
     def _on_welcome_new(self, width: int, height: int) -> None:
