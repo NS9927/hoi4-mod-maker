@@ -49,24 +49,29 @@ class LandPage(QWidget):
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
-        # 工具按钮
+        # 工具按钮 (Grid 2行3列，避免横排挤不下)
         tools_box = _make_section(tr("land_section_tools"))
-        tl = QHBoxLayout()
+        tl = QGridLayout()
+        tl.setSpacing(3)
+        tl.setColumnStretch(0, 1)
+        tl.setColumnStretch(1, 1)
+        tl.setColumnStretch(2, 1)
         self._land_tool_group = QButtonGroup(self)
         self._land_tool_group.setExclusive(True)
-        for tid, label in [("brush", tr("land_tool_brush")), ("eraser", tr("land_tool_eraser")),
-                           ("fill", tr("land_tool_fill")), ("transform", tr("land_tool_transform")), ("pan", tr("land_tool_pan"))]:
+        tools = [("brush", tr("land_tool_brush")), ("eraser", tr("land_tool_eraser")),
+                 ("fill", tr("land_tool_fill")), ("transform", tr("land_tool_transform")),
+                 ("pan", tr("land_tool_pan"))]
+        for i, (tid, label) in enumerate(tools):
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
             btn.setStyleSheet(_TOOL_BTN_STYLE)
-            btn.setMinimumWidth(48)
             if tid == "fill":
                 btn.setToolTip(tr("land_tool_fill_tip"))
             elif tid == "transform":
                 btn.setToolTip(tr("land_tool_transform_tip"))
             self._land_tool_group.addButton(btn)
-            tl.addWidget(btn)
+            tl.addWidget(btn, i // 3, i % 3)
             if tid == "brush":
                 btn.setChecked(True)
         self._land_tool_group.buttonClicked.connect(
