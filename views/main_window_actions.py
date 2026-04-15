@@ -381,6 +381,53 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._canvas.height_map = smooth_height(self._canvas.height_map)
         self._status_info.setText(tr("status_height_smoothed"))
 
+    # ── 山脉画线 ──
+
+    def _on_ridge_mode(self, enabled: bool) -> None:
+        """切换山脉画线模式。"""
+        self._ridge_mode = enabled
+        self._ridge_points = []
+        if enabled:
+            self._status_info.setText(tr("status_ridge_mode_on"))
+        else:
+            self._status_info.setText(tr("status_ridge_mode_off"))
+
+    def _on_ridge_click(self, y: int, x: int) -> None:
+        """山脉画线模式下的点击：收集点，松开鼠标时应用。"""
+        if not getattr(self, '_ridge_mode', False):
+            return
+        if not hasattr(self, '_ridge_points'):
+            self._ridge_points = []
+        self._ridge_points.append((y, x))
+
+    def _on_ridge_release(self) -> None:
+        """山脉画线模式下松开鼠标：用收集的点生成山脉。"""
+        points = getattr(self, '_ridge_points', [])
+        if len(points) < 2:
+            self._ridge_points = []
+            return
+
+        # 间隔采样（避免太多点）
+        if len(points) > 100:
+            step = len(points) // 100
+            points = points[::step] + [points[-1]]
+
+        from services.terrain_service import apply_mountain_ridge
+        map_data = self._project.map_data
+        peak = getattr(self, '_ridge_peak', 220)
+        falloff = getattr(self, '_ridge_falloff', 80)
+
+        new_height = apply_mountain_ridge(
+            map_data.height_map, map_data.tile_map,
+            points, peak_height=peak, falloff_distance=float(falloff),
+        )
+        map_data.height_map[:] = new_height
+        self._canvas.height_map = map_data.height_map
+        self._canvas.schedule_full_render()
+        self._project.mark_dirty()
+        self._ridge_points = []
+        self._status_info.setText(tr("status_ridge_applied"))
+
     # ═══════════════════════ Continent ═══════════════════════
 
     def _on_continent_pick_toggled(self, on: bool) -> None:

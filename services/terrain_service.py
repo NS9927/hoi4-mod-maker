@@ -296,6 +296,95 @@ def smart_auto_height(
     return np.clip(hm, 0, 255).astype(np.uint8)
 
 
+def apply_mountain_ridge(
+    height_map: np.ndarray,
+    tile_map: np.ndarray,
+    points: list[tuple[int, int]],
+    peak_height: int = 220,
+    falloff_distance: float = 80.0,
+    ridge_width: float = 5.0,
+) -> np.ndarray:
+    """在高度图上沿给定点序列画山脉。
+
+    算法参考 mapgen4 距离场方式：
+    1. 沿 points 连线生成山脊线像素
+    2. 计算每个陆地像素到山脊线的最短距离
+    3. 高度 = peak_height * exp(-distance / falloff_distance)
+    4. 与原高度取 max（叠加而非覆盖）
+
+    参数:
+        height_map: (H, W) uint8, 现有高度图
+        tile_map: (H, W) uint8, 地块类型
+        points: [(y, x), ...] 山脊线经过的点序列
+        peak_height: 山峰高度 (0-255)
+        falloff_distance: 衰减距离（像素）
+        ridge_width: 山脊宽度（像素）
+    """
+    from scipy.ndimage import distance_transform_edt
+
+    if len(points) < 2:
+        return height_map
+
+    h, w = height_map.shape
+    result = height_map.copy().astype(np.float32)
+    land = tile_map == TILE_LAND
+
+    # 1. 在二值图上画山脊线（1像素宽，沿 points 连线）
+    ridge_mask = np.zeros((h, w), dtype=bool)
+    for i in range(len(points) - 1):
+        y0, x0 = points[i]
+        y1, x1 = points[i + 1]
+        _draw_line(ridge_mask, y0, x0, y1, x1, int(ridge_width))
+
+    # 2. 计算到山脊线的距离
+    # distance_transform_edt 计算非零像素到最近零像素的距离
+    # 我们要非山脊像素到山脊的距离，所以取反
+    inv_mask = ~ridge_mask
+    dist = distance_transform_edt(inv_mask).astype(np.float32)
+
+    # 3. 高度衰减：指数衰减
+    ridge_height = peak_height * np.exp(-dist / max(falloff_distance, 1.0))
+
+    # 4. 只叠加到陆地，取 max
+    result[land] = np.maximum(result[land], ridge_height[land])
+
+    # 强制约束
+    result[~land] = height_map[~land]  # 非陆地不变
+    result[land] = np.maximum(result[land], SEA_LEVEL + 1)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+def _draw_line(mask: np.ndarray, y0: int, x0: int, y1: int, x1: int, width: int) -> None:
+    """Bresenham 直线 + 宽度扩展。"""
+    h, w = mask.shape
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+    r = width // 2
+
+    while True:
+        # 画圆形笔触
+        for dy2 in range(-r, r + 1):
+            for dx2 in range(-r, r + 1):
+                if dy2 * dy2 + dx2 * dx2 <= r * r:
+                    ny, nx = y0 + dy2, x0 + dx2
+                    if 0 <= ny < h and 0 <= nx < w:
+                        mask[ny, nx] = True
+
+        if y0 == y1 and x0 == x1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+
 def auto_height(tile_map: np.ndarray) -> np.ndarray:
     """从 tile_map 自动生成高度图 (调用智能版本)."""
     return smart_auto_height(tile_map)

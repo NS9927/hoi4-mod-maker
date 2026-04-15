@@ -24,6 +24,9 @@ class HeightPage(QWidget):
     height_value_changed = pyqtSignal(int)
     auto_height_requested = pyqtSignal()
     smooth_height_requested = pyqtSignal()
+    ridge_mode_toggled = pyqtSignal(bool)       # 山脉画线模式开关
+    ridge_peak_changed = pyqtSignal(int)         # 山峰高度
+    ridge_falloff_changed = pyqtSignal(int)      # 衰减距离
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -98,6 +101,63 @@ class HeightPage(QWidget):
         gl.addWidget(smooth_btn)
 
         lay.addWidget(gen_box)
+
+        # ── 山脉画线 ──
+        ridge_box = _make_section(tr("height_section_ridge"))
+        rl = ridge_box.layout()
+
+        ridge_hint = QLabel(tr("height_ridge_hint"))
+        ridge_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
+        ridge_hint.setWordWrap(True)
+        rl.addWidget(ridge_hint)
+
+        self._ridge_btn = QPushButton(tr("height_btn_ridge"))
+        self._ridge_btn.setCheckable(True)
+        self._ridge_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        self._ridge_btn.toggled.connect(self.ridge_mode_toggled.emit)
+        rl.addWidget(self._ridge_btn)
+
+        # 山峰高度
+        rpk_row = QHBoxLayout()
+        rpk_lbl = QLabel(tr("height_label_ridge_peak"))
+        rpk_lbl.setStyleSheet(_LABEL_STYLE)
+        rpk_row.addWidget(rpk_lbl)
+        self._ridge_peak_label = QLabel("220")
+        self._ridge_peak_label.setStyleSheet(_DIM_LABEL_STYLE)
+        rpk_row.addStretch()
+        rpk_row.addWidget(self._ridge_peak_label)
+        rl.addLayout(rpk_row)
+
+        self._ridge_peak_slider = QSlider(Qt.Orientation.Horizontal)
+        self._ridge_peak_slider.setRange(100, 255)
+        self._ridge_peak_slider.setValue(220)
+        self._ridge_peak_slider.setStyleSheet(_SLIDER_STYLE)
+        self._ridge_peak_slider.valueChanged.connect(
+            lambda v: (self._ridge_peak_label.setText(str(v)), self.ridge_peak_changed.emit(v))
+        )
+        rl.addWidget(self._ridge_peak_slider)
+
+        # 衰减距离
+        rfo_row = QHBoxLayout()
+        rfo_lbl = QLabel(tr("height_label_ridge_falloff"))
+        rfo_lbl.setStyleSheet(_LABEL_STYLE)
+        rfo_row.addWidget(rfo_lbl)
+        self._ridge_falloff_label = QLabel("80px")
+        self._ridge_falloff_label.setStyleSheet(_DIM_LABEL_STYLE)
+        rfo_row.addStretch()
+        rfo_row.addWidget(self._ridge_falloff_label)
+        rl.addLayout(rfo_row)
+
+        self._ridge_falloff_slider = QSlider(Qt.Orientation.Horizontal)
+        self._ridge_falloff_slider.setRange(20, 300)
+        self._ridge_falloff_slider.setValue(80)
+        self._ridge_falloff_slider.setStyleSheet(_SLIDER_STYLE)
+        self._ridge_falloff_slider.valueChanged.connect(
+            lambda v: (self._ridge_falloff_label.setText(f"{v}px"), self.ridge_falloff_changed.emit(v))
+        )
+        rl.addWidget(self._ridge_falloff_slider)
+
+        lay.addWidget(ridge_box)
 
         # ── 手动画笔 ──
         brush_box = _make_section(tr("height_section_brush"))

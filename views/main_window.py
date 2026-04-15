@@ -269,6 +269,11 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         )
         tp.auto_height_requested.connect(self._on_auto_height)
         tp.smooth_height_requested.connect(self._on_smooth_height)
+        tp.ridge_mode_toggled.connect(self._on_ridge_mode)
+        tp.ridge_peak_changed.connect(
+            lambda v: setattr(self, '_ridge_peak', v))
+        tp.ridge_falloff_changed.connect(
+            lambda v: setattr(self, '_ridge_falloff', v))
         tp.export_requested.connect(self._on_export_mod)
 
         # Province 信号 → controller

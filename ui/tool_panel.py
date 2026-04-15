@@ -156,6 +156,9 @@ class ToolPanel(QWidget):
     terrain_soft_edge_changed = pyqtSignal(bool)
     auto_height_requested = pyqtSignal()
     smooth_height_requested = pyqtSignal()
+    ridge_mode_toggled = pyqtSignal(bool)
+    ridge_peak_changed = pyqtSignal(int)
+    ridge_falloff_changed = pyqtSignal(int)
     export_requested = pyqtSignal()
     split_province_requested = pyqtSignal()
     lasso_province_toggled = pyqtSignal(bool)
@@ -381,6 +384,9 @@ class ToolPanel(QWidget):
         p.height_value_changed.connect(self.height_value_changed)
         p.auto_height_requested.connect(self.auto_height_requested)
         p.smooth_height_requested.connect(self.smooth_height_requested)
+        p.ridge_mode_toggled.connect(self.ridge_mode_toggled)
+        p.ridge_peak_changed.connect(self.ridge_peak_changed)
+        p.ridge_falloff_changed.connect(self.ridge_falloff_changed)
 
     def _connect_river_signals(self) -> None:
         p = self._river_page
