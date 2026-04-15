@@ -562,13 +562,31 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_toggle_language(self) -> None:
         new_lang = "en" if get_language() == "zh" else "zh"
         set_language(new_lang)
-        self.setWindowTitle(tr("app_title"))
-        self._status_info.setText(tr("status_ready"))
-        self._update_province_count()
-        QMessageBox.information(
-            self, tr("dlg_language_title"),
-            tr("dlg_language_switched"),
+        # 保存语言设置
+        import json, os
+        config_path = os.path.join(os.path.expanduser("~"), ".hoi4_map_maker.json")
+        config = {}
+        if os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+            except Exception:
+                pass
+        config["language"] = new_lang
+        with open(config_path, "w") as f:
+            json.dump(config, f)
+
+        reply = QMessageBox.question(
+            self,
+            "Language / 语言",
+            "Language changed. Restart to apply.\n语言已切换，重启软件生效。\n\nRestart now? / 现在重启？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
+        if reply == QMessageBox.StandardButton.Yes:
+            import sys
+            from PyQt5.QtWidgets import QApplication
+            QApplication.quit()
+            os.execl(sys.executable, sys.executable, *sys.argv)
 
     def _on_about(self) -> None:
         QMessageBox.about(
