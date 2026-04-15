@@ -28,6 +28,7 @@ class RiverPage(QWidget):
     brush_size_changed = pyqtSignal(int)
     river_type_changed = pyqtSignal(int)
     validate_river_requested = pyqtSignal()
+    auto_river_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -112,6 +113,14 @@ class RiverPage(QWidget):
 
         width_box.layout().addLayout(wgrid)
         lay.addWidget(width_box)
+
+        # 自动生成
+        from ui.styles import _PRIMARY_BTN_STYLE
+        auto_btn = QPushButton(tr("river_btn_auto"))
+        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        auto_btn.setToolTip(tr("river_btn_auto_tip"))
+        auto_btn.clicked.connect(self.auto_river_requested.emit)
+        lay.addWidget(auto_btn)
 
         # 验证按钮
         validate_btn = QPushButton(tr("river_btn_validate"))

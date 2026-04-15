@@ -179,6 +179,7 @@ class ToolPanel(QWidget):
     # 河流信号
     river_type_changed = pyqtSignal(int)
     validate_river_requested = pyqtSignal()
+    auto_river_requested = pyqtSignal()
 
     # 后勤信号
     open_adjacency_dialog_requested = pyqtSignal()
@@ -387,6 +388,7 @@ class ToolPanel(QWidget):
         p.brush_size_changed.connect(self.brush_size_changed)
         p.river_type_changed.connect(self.river_type_changed)
         p.validate_river_requested.connect(self.validate_river_requested)
+        p.auto_river_requested.connect(self.auto_river_requested)
 
     def _connect_state_signals(self) -> None:
         p = self._state_page
