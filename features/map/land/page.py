@@ -34,6 +34,7 @@ class LandPage(QWidget):
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
     smooth_coast_requested = pyqtSignal()
+    density_paint_toggled = pyqtSignal(bool)   # 密度画笔模式开关
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -182,10 +183,21 @@ class LandPage(QWidget):
         gen_box.layout().addWidget(self._lake_density_slider)
 
         # 省份密度图
+        density_hint = QLabel(tr("land_density_hint"))
+        density_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
+        density_hint.setWordWrap(True)
+        gen_box.layout().addWidget(density_hint)
+
         density_row = QHBoxLayout()
+        self._density_paint_btn = QPushButton(tr("land_btn_paint_density"))
+        self._density_paint_btn.setCheckable(True)
+        self._density_paint_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._density_paint_btn.setToolTip(tr("land_btn_paint_density_tip"))
+        self._density_paint_btn.toggled.connect(self._on_density_paint_toggle)
+        density_row.addWidget(self._density_paint_btn)
+
         self._density_btn = QPushButton(tr("land_btn_load_density"))
         self._density_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._density_btn.setToolTip(tr("land_btn_load_density_tip"))
         self._density_btn.clicked.connect(self._on_load_density)
         density_row.addWidget(self._density_btn)
 
@@ -195,6 +207,26 @@ class LandPage(QWidget):
         self._density_clear_btn.setEnabled(False)
         density_row.addWidget(self._density_clear_btn)
         gen_box.layout().addLayout(density_row)
+
+        # 密度画笔强度滑块（画笔模式时可见）
+        self._density_value_row = QHBoxLayout()
+        dv_lbl = QLabel(tr("land_label_density_value"))
+        dv_lbl.setStyleSheet(_LABEL_STYLE)
+        self._density_value_row.addWidget(dv_lbl)
+        self._density_value_label = QLabel("100%")
+        self._density_value_label.setStyleSheet(_DIM_LABEL_STYLE)
+        self._density_value_row.addStretch()
+        self._density_value_row.addWidget(self._density_value_label)
+        gen_box.layout().addLayout(self._density_value_row)
+
+        self._density_value_slider = QSlider(Qt.Orientation.Horizontal)
+        self._density_value_slider.setRange(0, 100)
+        self._density_value_slider.setValue(100)
+        self._density_value_slider.setStyleSheet(_SLIDER_STYLE)
+        self._density_value_slider.valueChanged.connect(
+            lambda v: self._density_value_label.setText(f"{v}%")
+        )
+        gen_box.layout().addWidget(self._density_value_slider)
 
         self._density_status = QLabel(tr("land_density_none"))
         self._density_status.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
@@ -325,8 +357,19 @@ class LandPage(QWidget):
         count = self._province_count_spin.value()
         self.generate_provinces_requested.emit(count)
 
+    def _on_density_paint_toggle(self, on: bool) -> None:
+        """切换密度画笔模式。"""
+        self.density_paint_toggled.emit(on)
+        if on and self._density_map is None:
+            # 首次开启，创建全白密度图（均匀）
+            import numpy as np
+            from data.constants import MAP_WIDTH, MAP_HEIGHT
+            self._density_map = np.full((MAP_HEIGHT, MAP_WIDTH), 0.5, dtype=np.float32)
+            self._density_status.setText(tr("land_density_painting"))
+            self._density_clear_btn.setEnabled(True)
+
     def _on_load_density(self) -> None:
-        """加载密度图（灰度图片）。"""
+        """从文件加载密度图。"""
         from PyQt5.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(
             self, tr("land_btn_load_density"),
@@ -336,7 +379,7 @@ class LandPage(QWidget):
             return
         import numpy as np
         from PIL import Image
-        img = Image.open(path).convert("L")  # 转灰度
+        img = Image.open(path).convert("L")
         from data.constants import MAP_WIDTH, MAP_HEIGHT
         img = img.resize((MAP_WIDTH, MAP_HEIGHT), Image.Resampling.BILINEAR)
         self._density_map = np.array(img, dtype=np.float32) / 255.0
@@ -348,6 +391,24 @@ class LandPage(QWidget):
         self._density_map = None
         self._density_status.setText(tr("land_density_none"))
         self._density_clear_btn.setEnabled(False)
+        self._density_paint_btn.setChecked(False)
+
+    def paint_density_at(self, y: int, x: int, radius: int) -> None:
+        """在密度图上画笔涂抹（供 controller 调用）。"""
+        import numpy as np
+        if self._density_map is None:
+            return
+        h, w = self._density_map.shape
+        value = self._density_value_slider.value() / 100.0
+        r = radius
+        y0, y1 = max(0, y - r), min(h, y + r + 1)
+        x0, x1 = max(0, x - r), min(w, x + r + 1)
+        yy, xx = np.ogrid[y0:y1, x0:x1]
+        mask = (yy - y) ** 2 + (xx - x) ** 2 <= r * r
+        self._density_map[y0:y1, x0:x1][mask] = value
+
+    def is_density_paint_mode(self) -> bool:
+        return self._density_paint_btn.isChecked()
 
     def get_generation_params(self) -> dict:
         """返回省份生成的所有参数。"""
