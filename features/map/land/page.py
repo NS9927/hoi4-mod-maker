@@ -18,6 +18,7 @@ from ui.styles import (
     _TOOL_BTN_STYLE, _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
     _SPINBOX_STYLE, _color_icon,
 )
+from ui.i18n import tr
 
 
 
@@ -43,27 +44,27 @@ class LandPage(QWidget):
         lay.setSpacing(10)
 
         # 提示
-        hint = QLabel("画陆地/海洋/湖泊。画笔涂色，填充灌满区域，变换可框选移动/缩放/旋转")
+        hint = QLabel(tr("land_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
         # 工具按钮
-        tools_box = _make_section("工具")
+        tools_box = _make_section(tr("land_section_tools"))
         tl = QHBoxLayout()
         self._land_tool_group = QButtonGroup(self)
         self._land_tool_group.setExclusive(True)
-        for tid, label in [("brush", "画笔"), ("eraser", "橡皮"),
-                           ("fill", "填充"), ("transform", "变换"), ("pan", "平移")]:
+        for tid, label in [("brush", tr("land_tool_brush")), ("eraser", tr("land_tool_eraser")),
+                           ("fill", tr("land_tool_fill")), ("transform", tr("land_tool_transform")), ("pan", tr("land_tool_pan"))]:
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
             btn.setStyleSheet(_TOOL_BTN_STYLE)
             btn.setMinimumWidth(48)
             if tid == "fill":
-                btn.setToolTip("点击一个区域，自动填满相同类型的连通区域")
+                btn.setToolTip(tr("land_tool_fill_tip"))
             elif tid == "transform":
-                btn.setToolTip("框选区域后可移动/缩放/旋转。Enter确认，ESC取消")
+                btn.setToolTip(tr("land_tool_transform_tip"))
             self._land_tool_group.addButton(btn)
             tl.addWidget(btn)
             if tid == "brush":
@@ -75,11 +76,11 @@ class LandPage(QWidget):
         lay.addWidget(tools_box)
 
         # 画笔大小
-        brush_box = _make_section("画笔大小")
+        brush_box = _make_section(tr("land_section_brush_size"))
         self._land_brush_label = QLabel(f"{BRUSH_DEFAULT}px")
         self._land_brush_label.setStyleSheet(_DIM_LABEL_STYLE)
         row = QHBoxLayout()
-        lbl = QLabel("大小:")
+        lbl = QLabel(tr("land_label_size"))
         lbl.setStyleSheet(_LABEL_STYLE)
         row.addWidget(lbl)
         row.addStretch()
@@ -95,11 +96,11 @@ class LandPage(QWidget):
         lay.addWidget(brush_box)
 
         # 地块类型
-        tile_box = _make_section("大陆绘制")
+        tile_box = _make_section(tr("land_section_tile_draw"))
         for tile_id, label, color in [
-            (TILE_LAND, "画陆地", (139, 172, 101)),
-            (TILE_SEA,  "画海洋", (68, 105, 156)),
-            (TILE_LAKE, "画湖泊", (100, 160, 210)),
+            (TILE_LAND, tr("land_draw_land"), (139, 172, 101)),
+            (TILE_SEA,  tr("land_draw_sea"), (68, 105, 156)),
+            (TILE_LAKE, tr("land_draw_lake"), (100, 160, 210)),
         ]:
             btn = QPushButton(f"  {label}")
             btn.setIcon(_color_icon(*color))
@@ -109,14 +110,14 @@ class LandPage(QWidget):
         lay.addWidget(tile_box)
 
         # 生成省份
-        gen_box = _make_section("省份生成")
-        gen_btn = QPushButton("生成省份")
+        gen_box = _make_section(tr("land_section_province_gen"))
+        gen_btn = QPushButton(tr("land_btn_generate"))
         gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         gen_btn.clicked.connect(self._on_generate_provinces)
         gen_box.layout().addWidget(gen_btn)
 
         spin_row = QHBoxLayout()
-        spin_lbl = QLabel("省份数量:")
+        spin_lbl = QLabel(tr("land_label_province_count"))
         spin_lbl.setStyleSheet(_LABEL_STYLE)
         spin_row.addWidget(spin_lbl)
         self._province_count_spin = QSpinBox()
@@ -129,7 +130,7 @@ class LandPage(QWidget):
 
         # 海洋省份密度
         sea_row = QHBoxLayout()
-        sea_lbl = QLabel("海洋密度:")
+        sea_lbl = QLabel(tr("land_label_sea_density"))
         sea_lbl.setStyleSheet(_LABEL_STYLE)
         sea_row.addWidget(sea_lbl)
         self._sea_density_label = QLabel("15%")
@@ -149,7 +150,7 @@ class LandPage(QWidget):
 
         # 湖泊省份密度
         lake_row = QHBoxLayout()
-        lake_lbl = QLabel("湖泊密度:")
+        lake_lbl = QLabel(tr("land_label_lake_density"))
         lake_lbl.setStyleSheet(_LABEL_STYLE)
         lake_row.addWidget(lake_lbl)
         self._lake_density_label = QLabel("30%")
@@ -167,27 +168,27 @@ class LandPage(QWidget):
         )
         gen_box.layout().addWidget(self._lake_density_slider)
 
-        validate_btn = QPushButton("验证省份")
+        validate_btn = QPushButton(tr("land_btn_validate"))
         validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_requested.emit)
         gen_box.layout().addWidget(validate_btn)
 
-        quick_init_btn = QPushButton("一键初始化（州+战略区+国家）")
+        quick_init_btn = QPushButton(tr("land_btn_quick_init"))
         quick_init_btn.setStyleSheet(
             "QPushButton { background: #22c55e; color: white; padding: 8px;"
             " border-radius: 4px; font-weight: bold; }"
             "QPushButton:hover { background: #2ad66a; }"
         )
-        quick_init_btn.setToolTip("自动生成州、战略区域、默认国家，一步到位可导出")
+        quick_init_btn.setToolTip(tr("land_btn_quick_init_tip"))
         quick_init_btn.clicked.connect(self.quick_init_requested.emit)
         gen_box.layout().addWidget(quick_init_btn)
 
         lay.addWidget(gen_box)
 
         # ── 原版地图参考 ──
-        vanilla_box = _make_section("原版地图参考")
+        vanilla_box = _make_section(tr("land_section_vanilla_ref"))
         v_opacity_row = QHBoxLayout()
-        v_olbl = QLabel("透明度:")
+        v_olbl = QLabel(tr("land_label_opacity"))
         v_olbl.setStyleSheet(_LABEL_STYLE)
         v_opacity_row.addWidget(v_olbl)
         self._vanilla_ref_opacity_label = QLabel("30%")
@@ -204,19 +205,19 @@ class LandPage(QWidget):
             lambda v: self._vanilla_ref_opacity_label.setText(f"{v}%")
         )
         vanilla_box.layout().addWidget(self._vanilla_ref_opacity_slider)
-        self._vanilla_ref_toggle = QPushButton("隐藏")
+        self._vanilla_ref_toggle = QPushButton(tr("land_btn_hide"))
         self._vanilla_ref_toggle.setCheckable(True)
         self._vanilla_ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._vanilla_ref_toggle.toggled.connect(
-            lambda on: (self._vanilla_ref_toggle.setText("显示" if on else "隐藏"))
+            lambda on: (self._vanilla_ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide")))
         )
         vanilla_box.layout().addWidget(self._vanilla_ref_toggle)
         lay.addWidget(vanilla_box)
 
         # ── 自定义参考图 ──
-        ref_box = _make_section("自定义参考图")
+        ref_box = _make_section(tr("land_section_custom_ref"))
         opacity_row = QHBoxLayout()
-        olbl = QLabel("透明度:")
+        olbl = QLabel(tr("land_label_opacity"))
         olbl.setStyleSheet(_LABEL_STYLE)
         opacity_row.addWidget(olbl)
         self._ref_opacity_label = QLabel("40%")
@@ -236,7 +237,7 @@ class LandPage(QWidget):
 
         # 缩放控制
         scale_row = QHBoxLayout()
-        slbl = QLabel("缩放:")
+        slbl = QLabel(tr("land_label_scale"))
         slbl.setStyleSheet(_LABEL_STYLE)
         scale_row.addWidget(slbl)
         self._ref_scale_label = QLabel("100%")
@@ -255,16 +256,16 @@ class LandPage(QWidget):
         ref_box.layout().addWidget(self._ref_scale_slider)
 
         # 铺满地图按钮
-        self._ref_fit_btn = QPushButton("铺满地图")
+        self._ref_fit_btn = QPushButton(tr("land_btn_fit_map"))
         self._ref_fit_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         ref_box.layout().addWidget(self._ref_fit_btn)
 
         # 显示/隐藏
-        self._ref_toggle = QPushButton("隐藏")
+        self._ref_toggle = QPushButton(tr("land_btn_hide"))
         self._ref_toggle.setCheckable(True)
         self._ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._ref_toggle.toggled.connect(
-            lambda on: self._ref_toggle.setText("显示" if on else "隐藏")
+            lambda on: self._ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
         )
         ref_box.layout().addWidget(self._ref_toggle)
 

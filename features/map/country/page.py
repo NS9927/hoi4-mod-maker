@@ -10,6 +10,7 @@ from PyQt5.QtGui import QColor, QBrush
 
 from domain.managers.country import RULING_PARTIES
 
+from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
     _BORDER, _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
@@ -41,20 +42,20 @@ class CountryPage(QWidget):
         lay.setSpacing(10)
 
         # 创建国家按钮
-        create_btn = QPushButton("创建国家")
+        create_btn = QPushButton(tr("country_create_btn"))
         create_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         create_btn.clicked.connect(self.create_country_requested.emit)
         lay.addWidget(create_btn)
 
         # 快速创建国家按钮
-        quick_btn = QPushButton("快速创建国家")
+        quick_btn = QPushButton(tr("country_quick_create_btn"))
         quick_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        quick_btn.setToolTip("输入 TAG/名称/执政党，一键创建并进入领土分配模式")
+        quick_btn.setToolTip(tr("country_quick_create_tip"))
         quick_btn.clicked.connect(self._show_quick_create_dialog)
         lay.addWidget(quick_btn)
 
         # 国家列表
-        list_box = _make_section("国家列表")
+        list_box = _make_section(tr("country_list_section"))
         self._country_list = QListWidget()
         self._country_list.setStyleSheet(_LIST_STYLE)
         self._country_list.setMaximumHeight(200)
@@ -63,7 +64,7 @@ class CountryPage(QWidget):
         lay.addWidget(list_box)
 
         # 国家属性面板
-        info_box = _make_section("国家属性")
+        info_box = _make_section(tr("country_props_section"))
         il = info_box.layout()
 
         # TAG
@@ -79,7 +80,7 @@ class CountryPage(QWidget):
 
         # 名称
         cname_row = QHBoxLayout()
-        cname_lbl = QLabel("名称:")
+        cname_lbl = QLabel(tr("country_name_label"))
         cname_lbl.setStyleSheet(_LABEL_STYLE)
         cname_row.addWidget(cname_lbl)
         self._country_name_edit = QLineEdit()
@@ -90,7 +91,7 @@ class CountryPage(QWidget):
 
         # 执政党
         party_row = QHBoxLayout()
-        party_lbl = QLabel("执政党:")
+        party_lbl = QLabel(tr("country_party_label"))
         party_lbl.setStyleSheet(_LABEL_STYLE)
         party_row.addWidget(party_lbl)
         self._country_party_combo = QComboBox()
@@ -102,7 +103,7 @@ class CountryPage(QWidget):
 
         # 颜色显示（可点击修改）
         color_row = QHBoxLayout()
-        color_lbl = QLabel("颜色:")
+        color_lbl = QLabel(tr("country_color_label"))
         color_lbl.setStyleSheet(_LABEL_STYLE)
         color_row.addWidget(color_lbl)
         self._country_color_btn = QPushButton()
@@ -110,7 +111,7 @@ class CountryPage(QWidget):
         self._country_color_btn.setStyleSheet(
             f"background: rgb(100,100,200); border: 1px solid {_BORDER}; border-radius: 3px;"
         )
-        self._country_color_btn.setToolTip("点击修改颜色")
+        self._country_color_btn.setToolTip(tr("country_color_tip"))
         self._country_color_btn.clicked.connect(self._on_country_color_clicked)
         color_row.addStretch()
         color_row.addWidget(self._country_color_btn)
@@ -118,10 +119,10 @@ class CountryPage(QWidget):
 
         # 首都
         cap_row = QHBoxLayout()
-        cap_lbl = QLabel("首都:")
+        cap_lbl = QLabel(tr("country_capital_label"))
         cap_lbl.setStyleSheet(_LABEL_STYLE)
         cap_row.addWidget(cap_lbl)
-        self._country_capital_label = QLabel("未设置")
+        self._country_capital_label = QLabel(tr("country_capital_unset"))
         self._country_capital_label.setStyleSheet(_DIM_LABEL_STYLE)
         cap_row.addStretch()
         cap_row.addWidget(self._country_capital_label)
@@ -130,7 +131,7 @@ class CountryPage(QWidget):
         lay.addWidget(info_box)
 
         # 提示
-        hint = QLabel("选中国家后，点击State可分配领土\n快速创建: 创建后自动进入领土分配模式")
+        hint = QLabel(tr("country_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
@@ -167,27 +168,27 @@ class CountryPage(QWidget):
         from PyQt5.QtWidgets import QDialog, QFormLayout, QDialogButtonBox, QColorDialog
 
         dlg = QDialog(self)
-        dlg.setWindowTitle("快速创建国家")
+        dlg.setWindowTitle(tr("country_quick_dlg_title"))
         dlg.setMinimumWidth(300)
 
         form = QFormLayout(dlg)
 
         tag_edit = QLineEdit()
-        tag_edit.setPlaceholderText("如 KAR (3个大写字母)")
+        tag_edit.setPlaceholderText(tr("country_tag_placeholder"))
         tag_edit.setMaxLength(3)
         tag_edit.setStyleSheet(_LINEEDIT_STYLE)
-        form.addRow("TAG:", tag_edit)
+        form.addRow(tr("country_tag_row"), tag_edit)
 
         name_edit = QLineEdit()
-        name_edit.setPlaceholderText("国家名称")
+        name_edit.setPlaceholderText(tr("country_name_placeholder"))
         name_edit.setStyleSheet(_LINEEDIT_STYLE)
-        form.addRow("名称:", name_edit)
+        form.addRow(tr("country_name_label"), name_edit)
 
         party_combo = QComboBox()
         party_combo.setStyleSheet(_COMBOBOX_STYLE)
         party_combo.addItems(RULING_PARTIES)
         party_combo.setCurrentText("neutrality")
-        form.addRow("执政党:", party_combo)
+        form.addRow(tr("country_party_label"), party_combo)
 
         color_btn = QPushButton()
         color_btn.setFixedSize(60, 24)
@@ -199,7 +200,7 @@ class CountryPage(QWidget):
         color_btn._color = (_r, _g, _b)
 
         def _pick_color():
-            c = QColorDialog.getColor(QColor(*color_btn._color), dlg, "选择国家颜色")
+            c = QColorDialog.getColor(QColor(*color_btn._color), dlg, tr("country_pick_color_title"))
             if c.isValid():
                 color_btn._color = (c.red(), c.green(), c.blue())
                 color_btn.setStyleSheet(
@@ -208,7 +209,7 @@ class CountryPage(QWidget):
                 )
 
         color_btn.clicked.connect(_pick_color)
-        form.addRow("颜色:", color_btn)
+        form.addRow(tr("country_color_label"), color_btn)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -226,7 +227,7 @@ class CountryPage(QWidget):
                 self.quick_create_country_requested.emit(tag, name, party)
             else:
                 from PyQt5.QtWidgets import QMessageBox
-                QMessageBox.warning(dlg, "错误", "TAG 必须是 3 个字母")
+                QMessageBox.warning(dlg, tr("dlg_error"), tr("country_tag_invalid"))
 
     # ── 公共更新方法 ──
     def update_country_list(self, countries: list[tuple[str, str, tuple]]) -> None:
@@ -260,4 +261,4 @@ class CountryPage(QWidget):
             f"background: rgb({r},{g},{b}); border: 1px solid {_BORDER}; border-radius: 3px;"
         )
 
-        self._country_capital_label.setText(capital_name if capital_name else "未设置")
+        self._country_capital_label.setText(capital_name if capital_name else tr("country_capital_unset"))

@@ -11,6 +11,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import pyqtSignal, Qt, QSettings
 from PyQt5.QtGui import QFont
 
+from ui.i18n import tr
+
 
 # ── 色板 (与 ui/styles.py 保持一致) ──
 _BG = "#1e1e2e"
@@ -49,7 +51,7 @@ class _SizePickerDialog(QDialog):
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("选择地图尺寸")
+        self.setWindowTitle(tr("welcome_size_picker_title"))
         self.setFixedSize(300, 160)
 
         layout = QFormLayout(self)
@@ -58,13 +60,13 @@ class _SizePickerDialog(QDialog):
         self._width_spin.setRange(256, 16384)
         self._width_spin.setValue(5632)
         self._width_spin.setSingleStep(256)
-        layout.addRow("宽度:", self._width_spin)
+        layout.addRow(tr("welcome_width"), self._width_spin)
 
         self._height_spin = QSpinBox()
         self._height_spin.setRange(256, 16384)
         self._height_spin.setValue(2048)
         self._height_spin.setSingleStep(256)
-        layout.addRow("高度:", self._height_spin)
+        layout.addRow(tr("welcome_height"), self._height_spin)
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -100,7 +102,7 @@ class WelcomePage(QWidget):
         center.setSpacing(16)
 
         # 标题
-        title = QLabel("HOI4 地图制作工具")
+        title = QLabel(tr("welcome_title"))
         title_font = QFont("Microsoft YaHei", 28, QFont.Weight.Bold)
         title.setFont(title_font)
         title.setStyleSheet(f"color: {_TEXT}; background: transparent;")
@@ -133,17 +135,17 @@ class WelcomePage(QWidget):
             }}
         """
 
-        btn_new = QPushButton("新建项目")
+        btn_new = QPushButton(tr("action_new"))
         btn_new.setStyleSheet(btn_style)
         btn_new.clicked.connect(self._on_new)
         center.addWidget(btn_new, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        btn_open = QPushButton("打开项目")
+        btn_open = QPushButton(tr("action_open"))
         btn_open.setStyleSheet(btn_style)
         btn_open.clicked.connect(lambda: self.open_project_requested.emit())
         center.addWidget(btn_open, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        btn_import = QPushButton("导入MOD地图")
+        btn_import = QPushButton(tr("welcome_import_mod"))
         btn_import.setStyleSheet(btn_style)
         btn_import.clicked.connect(lambda: self.import_mod_requested.emit())
         center.addWidget(btn_import, alignment=Qt.AlignmentFlag.AlignCenter)
@@ -151,7 +153,7 @@ class WelcomePage(QWidget):
         center.addSpacing(12)
 
         # 最近项目
-        recent_label = QLabel("最近项目")
+        recent_label = QLabel(tr("welcome_recent"))
         recent_label.setStyleSheet(f"color: {_DIM}; font-size: 12px; background: transparent;")
         recent_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         center.addWidget(recent_label)
@@ -190,7 +192,7 @@ class WelcomePage(QWidget):
             item.setData(Qt.ItemDataRole.UserRole, path)
             self._recent_list.addItem(item)
         if self._recent_list.count() == 0:
-            empty = QListWidgetItem("(无最近项目)")
+            empty = QListWidgetItem(tr("welcome_no_recent"))
             empty.setFlags(Qt.ItemFlag.NoItemFlags)
             self._recent_list.addItem(empty)
 

@@ -14,6 +14,7 @@ from ui.styles import (
     _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _SPINBOX_STYLE,
 )
+from ui.i18n import tr
 
 
 class HeightPage(QWidget):
@@ -34,33 +35,28 @@ class HeightPage(QWidget):
         lay.setSpacing(10)
 
         # ── 使用说明 ──
-        hint = QLabel(
-            "① 先画好陆地/海洋\n"
-            "② 点「智能生成高度」自动算出山谷起伏\n"
-            "③ 不满意可换种子重来，或用画笔微调\n"
-            "④ 高度图做好后，切「地形」模式生成地形"
-        )
+        hint = QLabel(tr("height_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
         # ── 智能生成 ──
-        gen_box = _make_section("智能生成")
+        gen_box = _make_section(tr("height_section_auto_gen"))
         gl = gen_box.layout()
 
-        auto_btn = QPushButton("智能生成高度")
+        auto_btn = QPushButton(tr("height_btn_auto_gen"))
         auto_btn.setStyleSheet(
             "QPushButton { background: #6c6cf0; color: white; padding: 10px;"
             " font-size: 14px; font-weight: bold; border-radius: 5px; border: none; }"
             "QPushButton:hover { background: #7c7cff; }"
         )
-        auto_btn.setToolTip("根据陆地形状自动算出海岸低、内陆高、有山脉有谷地的高度图")
+        auto_btn.setToolTip(tr("height_btn_auto_gen_tip"))
         auto_btn.clicked.connect(self.auto_height_requested.emit)
         gl.addWidget(auto_btn)
 
         # 种子
         seed_row = QHBoxLayout()
-        seed_lbl = QLabel("种子:")
+        seed_lbl = QLabel(tr("height_label_seed"))
         seed_lbl.setStyleSheet(_LABEL_STYLE)
         seed_row.addWidget(seed_lbl)
         self._height_seed_spin = QSpinBox()
@@ -68,7 +64,7 @@ class HeightPage(QWidget):
         self._height_seed_spin.setValue(42)
         self._height_seed_spin.setStyleSheet(_SPINBOX_STYLE)
         seed_row.addWidget(self._height_seed_spin)
-        rand_btn = QPushButton("随机")
+        rand_btn = QPushButton(tr("height_btn_random"))
         rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         rand_btn.setMaximumWidth(60)
         rand_btn.clicked.connect(self._randomize_seed)
@@ -77,7 +73,7 @@ class HeightPage(QWidget):
 
         # 山脉强度
         mt_row = QHBoxLayout()
-        mt_lbl = QLabel("山脉强度:")
+        mt_lbl = QLabel(tr("height_label_mountain"))
         mt_lbl.setStyleSheet(_LABEL_STYLE)
         mt_row.addWidget(mt_lbl)
         self._mountain_label = QLabel("200")
@@ -95,25 +91,25 @@ class HeightPage(QWidget):
         )
         gl.addWidget(self._mountain_slider)
 
-        smooth_btn = QPushButton("平滑高度")
+        smooth_btn = QPushButton(tr("height_btn_smooth"))
         smooth_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        smooth_btn.setToolTip("高斯模糊让高度过渡更柔和")
+        smooth_btn.setToolTip(tr("height_btn_smooth_tip"))
         smooth_btn.clicked.connect(self.smooth_height_requested.emit)
         gl.addWidget(smooth_btn)
 
         lay.addWidget(gen_box)
 
         # ── 手动画笔 ──
-        brush_box = _make_section("手动画笔")
+        brush_box = _make_section(tr("height_section_brush"))
         bl = brush_box.layout()
 
-        brush_hint = QLabel("选一个高度值，然后在地图上画。用于局部调高/调低")
+        brush_hint = QLabel(tr("height_brush_hint"))
         brush_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
         brush_hint.setWordWrap(True)
         bl.addWidget(brush_hint)
 
         val_row = QHBoxLayout()
-        vlbl = QLabel("高度值:")
+        vlbl = QLabel(tr("height_label_value"))
         vlbl.setStyleSheet(_LABEL_STYLE)
         val_row.addWidget(vlbl)
         self._height_value_label = QLabel("120")
@@ -132,11 +128,11 @@ class HeightPage(QWidget):
         # 快捷预设
         preset_row = QHBoxLayout()
         preset_row.setSpacing(4)
-        for name, val in [("海底", 40), ("海面", 95), ("平地", 110),
-                          ("丘陵", 150), ("山", 200)]:
+        for name, val in [(tr("height_preset_seabed"), 40), (tr("height_preset_sealevel"), 95), (tr("height_preset_flat"), 110),
+                          (tr("height_preset_hills"), 150), (tr("height_preset_mountain"), 200)]:
             btn = QPushButton(name)
             btn.setStyleSheet(_SECONDARY_BTN_STYLE + "QPushButton { padding: 4px 6px; font-size: 11px; }")
-            btn.setToolTip(f"高度值 = {val}")
+            btn.setToolTip(tr("height_preset_tip", val))
             btn.clicked.connect(lambda _, v=val: self._height_slider.setValue(v))
             preset_row.addWidget(btn)
         bl.addLayout(preset_row)
@@ -144,16 +140,8 @@ class HeightPage(QWidget):
         lay.addWidget(brush_box)
 
         # ── 高度参考 ──
-        ref_box = _make_section("高度含义")
-        ref_lbl = QLabel(
-            "0-94: 海底 (深色)\n"
-            "95: 海平面\n"
-            "96-114: 沿海低地 → 平原\n"
-            "115-129: 中等 → 森林\n"
-            "130-164: 较高 → 丘陵\n"
-            "165-209: 高 → 山地\n"
-            "210+: 极高 → 雪山"
-        )
+        ref_box = _make_section(tr("height_section_ref"))
+        ref_lbl = QLabel(tr("height_ref_text"))
         ref_lbl.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
         ref_box.layout().addWidget(ref_lbl)
         lay.addWidget(ref_box)

@@ -15,6 +15,7 @@ from ui.styles import (
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
+from ui.i18n import tr
 
 
 
@@ -39,22 +40,22 @@ class ProvincePage(QWidget):
         lay.setSpacing(10)
 
         # 提示 (动态更新)
-        self._province_hint = QLabel("点击查看省份信息。合并/扩张/切割需先点对应按钮开启")
+        self._province_hint = QLabel(tr("province_hint_default"))
         self._province_hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         self._province_hint.setWordWrap(True)
         lay.addWidget(self._province_hint)
 
         # ── 省份信息 ──
-        info_box = _make_section("省份信息")
+        info_box = _make_section(tr("province_section_info"))
         il = info_box.layout()
 
         self._prov_labels: dict[str, QLabel] = {}
         for key, display in [
-            ("id", "省份 ID"),
-            ("type", "类型"),
-            ("terrain", "地形"),
-            ("pixels", "像素数"),
-            ("coastal", "沿海"),
+            ("id", tr("province_info_id")),
+            ("type", tr("province_info_type")),
+            ("terrain", tr("province_info_terrain")),
+            ("pixels", tr("province_info_pixels")),
+            ("coastal", tr("province_info_coastal")),
         ]:
             row = QHBoxLayout()
             name_lbl = QLabel(f"{display}:")
@@ -71,42 +72,42 @@ class ProvincePage(QWidget):
         lay.addWidget(info_box)
 
         # ── 工具按钮 ──
-        tools_box = _make_section("省份操作")
+        tools_box = _make_section(tr("province_section_tools"))
 
         # 合并按钮 (toggle)
-        self._merge_btn = QPushButton("合并省份")
+        self._merge_btn = QPushButton(tr("province_btn_merge"))
         self._merge_btn.setCheckable(True)
         self._merge_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._merge_btn.setToolTip("开启后：点第一个省份，再点第二个省份，自动合并并关闭")
+        self._merge_btn.setToolTip(tr("province_btn_merge_tip"))
         tools_box.layout().addWidget(self._merge_btn)
 
         # 扩张按钮 (toggle)
-        self._expand_btn = QPushButton("扩张省份")
+        self._expand_btn = QPushButton(tr("province_btn_expand"))
         self._expand_btn.setCheckable(True)
         self._expand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._expand_btn.setToolTip("开启后：点击省份后拖动扩张边界，松手自动关闭")
+        self._expand_btn.setToolTip(tr("province_btn_expand_tip"))
         tools_box.layout().addWidget(self._expand_btn)
 
         # 切割按钮 (普通)
-        self._split_btn = QPushButton("切割选中省份")
+        self._split_btn = QPushButton(tr("province_btn_split"))
         self._split_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._split_btn.setToolTip("先点击选中一个省份，再点此按钮切割")
+        self._split_btn.setToolTip(tr("province_btn_split_tip"))
         tools_box.layout().addWidget(self._split_btn)
 
         lay.addWidget(tools_box)
 
         # ── 增量生成 ──
-        regen_box = _make_section("增量生成")
+        regen_box = _make_section(tr("province_section_regen"))
 
-        self._regen_btn = QPushButton("选择区域")
+        self._regen_btn = QPushButton(tr("province_btn_select_area"))
         self._regen_btn.setCheckable(True)
         self._regen_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._regen_btn.setToolTip('开启后点击省份选择区域（多选），再点「重新生成」')
+        self._regen_btn.setToolTip(tr("province_btn_select_area_tip"))
         regen_box.layout().addWidget(self._regen_btn)
 
-        self._regen_exec_btn = QPushButton("重新生成选区省份")
+        self._regen_exec_btn = QPushButton(tr("province_btn_regen_exec"))
         self._regen_exec_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._regen_exec_btn.setToolTip("对选中的省份区域重新生成，其他区域不受影响")
+        self._regen_exec_btn.setToolTip(tr("province_btn_regen_exec_tip"))
         regen_box.layout().addWidget(self._regen_exec_btn)
 
         lay.addWidget(regen_box)
@@ -127,9 +128,9 @@ class ProvincePage(QWidget):
             self._expand_btn.setChecked(False)
         self.merge_mode_toggled.emit(on)
         if on:
-            self._province_hint.setText("合并模式：点第一个省份，再点第二个")
+            self._province_hint.setText(tr("province_hint_merge"))
         else:
-            self._province_hint.setText("点击省份查看信息")
+            self._province_hint.setText(tr("province_hint_click_info"))
 
     def _on_expand_toggled(self, on: bool) -> None:
         if on and self._merge_btn.isChecked():
@@ -138,9 +139,9 @@ class ProvincePage(QWidget):
             self._regen_btn.setChecked(False)
         self.lasso_province_toggled.emit(on)
         if on:
-            self._province_hint.setText("扩张模式：点击省份后拖动扩张")
+            self._province_hint.setText(tr("province_hint_expand"))
         else:
-            self._province_hint.setText("点击省份查看信息")
+            self._province_hint.setText(tr("province_hint_click_info"))
 
     def _on_regen_toggled(self, on: bool) -> None:
         if on and self._merge_btn.isChecked():
@@ -149,9 +150,9 @@ class ProvincePage(QWidget):
             self._expand_btn.setChecked(False)
         self.regen_mode_toggled.emit(on)
         if on:
-            self._province_hint.setText('增量生成：点击省份选择区域（多选），然后点「重新生成」')
+            self._province_hint.setText(tr("province_hint_regen"))
         else:
-            self._province_hint.setText("点击省份查看信息")
+            self._province_hint.setText(tr("province_hint_click_info"))
 
     # ── 公共更新方法 ──
     def update_province_info(
@@ -162,4 +163,4 @@ class ProvincePage(QWidget):
         self._prov_labels["type"].setText(ptype)
         self._prov_labels["terrain"].setText(terrain)
         self._prov_labels["pixels"].setText(str(pixels))
-        self._prov_labels["coastal"].setText("是" if coastal else "否")
+        self._prov_labels["coastal"].setText(tr("province_coastal_yes") if coastal else tr("province_coastal_no"))

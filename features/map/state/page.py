@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
 
 from domain.managers.state import StateManager
 
+from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
@@ -41,14 +42,14 @@ class StatePage(QWidget):
         lay.setSpacing(10)
 
         # 自动分组按钮
-        auto_btn = QPushButton("自动分组")
+        auto_btn = QPushButton(tr("state_auto_btn"))
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(self._on_auto_states)
         lay.addWidget(auto_btn)
 
         # 每State省份数
         spin_row = QHBoxLayout()
-        spin_lbl = QLabel("每State省份数:")
+        spin_lbl = QLabel(tr("state_per_spin_label"))
         spin_lbl.setStyleSheet(_LABEL_STYLE)
         spin_row.addWidget(spin_lbl)
         self._state_per_spin = QSpinBox()
@@ -59,15 +60,15 @@ class StatePage(QWidget):
         lay.addLayout(spin_row)
 
         # 批量建州
-        batch_box = _make_section("批量建州")
-        self._batch_btn = QPushButton("选择省份建州")
+        batch_box = _make_section(tr("state_batch_section"))
+        self._batch_btn = QPushButton(tr("state_batch_select_btn"))
         self._batch_btn.setCheckable(True)
         self._batch_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._batch_btn.setToolTip("开启后点击省份多选，然后点确认创建新州")
+        self._batch_btn.setToolTip(tr("state_batch_select_tip"))
         self._batch_btn.toggled.connect(self.batch_create_state_toggled.emit)
         batch_box.layout().addWidget(self._batch_btn)
 
-        self._batch_confirm_btn = QPushButton("确认创建新州")
+        self._batch_confirm_btn = QPushButton(tr("state_batch_confirm_btn"))
         self._batch_confirm_btn.setStyleSheet(
             "QPushButton { background: #22c55e; color: white; padding: 6px;"
             " border-radius: 4px; font-weight: bold; }"
@@ -78,7 +79,7 @@ class StatePage(QWidget):
         lay.addWidget(batch_box)
 
         # State 列表
-        list_box = _make_section("State 列表")
+        list_box = _make_section(tr("state_list_section"))
         self._state_list = QListWidget()
         self._state_list.setStyleSheet(_LIST_STYLE)
         self._state_list.setMaximumHeight(200)
@@ -87,12 +88,12 @@ class StatePage(QWidget):
         lay.addWidget(list_box)
 
         # State 属性面板
-        info_box = _make_section("State 属性")
+        info_box = _make_section(tr("state_props_section"))
         il = info_box.layout()
 
         # 名称
         name_row = QHBoxLayout()
-        name_lbl = QLabel("名称:")
+        name_lbl = QLabel(tr("state_name_label"))
         name_lbl.setStyleSheet(_LABEL_STYLE)
         name_row.addWidget(name_lbl)
         self._state_name_edit = QLineEdit()
@@ -103,7 +104,7 @@ class StatePage(QWidget):
 
         # 人口
         mp_row = QHBoxLayout()
-        mp_lbl = QLabel("人口:")
+        mp_lbl = QLabel(tr("state_manpower_label"))
         mp_lbl.setStyleSheet(_LABEL_STYLE)
         mp_row.addWidget(mp_lbl)
         self._state_manpower_spin = QSpinBox()
@@ -116,7 +117,7 @@ class StatePage(QWidget):
 
         # 类别
         cat_row = QHBoxLayout()
-        cat_lbl = QLabel("类别:")
+        cat_lbl = QLabel(tr("state_category_label"))
         cat_lbl.setStyleSheet(_LABEL_STYLE)
         cat_row.addWidget(cat_lbl)
         self._state_category_combo = QComboBox()
@@ -129,12 +130,12 @@ class StatePage(QWidget):
         lay.addWidget(info_box)
 
         # 详情按钮
-        detail_btn = QPushButton("详情... (资源/建筑/核心/宣称)")
+        detail_btn = QPushButton(tr("state_detail_btn"))
         detail_btn.clicked.connect(self._on_state_detail_clicked)
         lay.addWidget(detail_btn)
 
         # 提示
-        hint = QLabel("选中State后点击省份可移入。双击State打开详情编辑资源/建筑/VP")
+        hint = QLabel(tr("state_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)

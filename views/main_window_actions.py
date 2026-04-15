@@ -89,10 +89,8 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
 
         if has_provinces:
             reply = QMessageBox.question(
-                self, "省份生成模式",
-                "当前地图已有省份。\n\n"
-                "点击 Yes = 只生成新区域的省份（保留已有）\n"
-                "点击 No = 重新生成全部省份",
+                self, tr("dlg_gen_mode_title"),
+                tr("dlg_gen_mode_body"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
                 | QMessageBox.StandardButton.Cancel,
                 QMessageBox.StandardButton.Yes,
@@ -101,7 +99,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
                 return
             incremental = (reply == QMessageBox.StandardButton.Yes)
 
-        self._status_info.setText("正在生成省份...（后台运行中，请稍候）")
+        self._status_info.setText(tr("status_generating_bg"))
         QApplication.processEvents()
 
         # 从 Land 页面读取密度参数
@@ -133,7 +131,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             "province_map_regenerated", incremental=was_incremental,
         )
 
-        self._status_info.setText(f"省份生成完成: {count} 个")
+        self._status_info.setText(tr("status_gen_done").format(count=count))
 
     def _on_generate_error(self, msg: str) -> None:
         QMessageBox.critical(self, tr("dlg_error"), msg)
@@ -143,21 +141,17 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         """一键初始化：自动生成州 + 战略区域 + 默认国家。"""
         pm = self._canvas.province_map
         if int(pm.max()) == 0:
-            QMessageBox.warning(self, "一键初始化", "请先生成省份")
+            QMessageBox.warning(self, tr("dlg_quick_init_title"), tr("dlg_quick_init_no_provinces"))
             return
 
         reply = QMessageBox.question(
-            self, "一键初始化",
-            "将自动生成：\n"
-            "- 州（按地理分组，每州约15个省份）\n"
-            "- 战略区域（按州分组）\n"
-            "- 默认国家 AAA（拥有所有领土）\n\n"
-            "已有的州/战略区域/国家数据将被覆盖。继续吗？",
+            self, tr("dlg_quick_init_title"),
+            tr("dlg_quick_init_body"),
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        self._status_info.setText("正在初始化...")
+        self._status_info.setText(tr("status_initializing"))
         QApplication.processEvents()
 
         try:
@@ -176,12 +170,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             log = auto_complete_project(self._project, fc)
 
             self._canvas.refresh_display()
-            msg = "一键初始化完成：\n" + "\n".join(f"- {l}" for l in log)
-            self._status_info.setText("初始化完成")
-            QMessageBox.information(self, "一键初始化", msg)
+            msg = tr("dlg_quick_init_done") + "\n".join(f"- {l}" for l in log)
+            self._status_info.setText(tr("status_init_done"))
+            QMessageBox.information(self, tr("dlg_quick_init_title"), msg)
         except Exception as e:
             import traceback
-            QMessageBox.critical(self, "初始化失败", f"{e}\n\n{traceback.format_exc()}")
+            QMessageBox.critical(self, tr("dlg_init_failed"), f"{e}\n\n{traceback.format_exc()}")
 
     def _on_validate(self) -> None:
         self._status_info.setText(tr("status_validating"))
@@ -218,12 +212,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         province_count = int(self._canvas.province_map.max())
         coastal_count = results.get("coastal_mismatch", 0)
         warn = results.get("count_warning", "")
-        info_text = f"省份总数：{province_count}    沿海：{coastal_count}"
+        info_text = tr("validate_info").format(total=province_count, coastal=coastal_count)
         if warn:
             info_text += f"\n⚠ {warn}"
         v.addWidget(QLabel(info_text))
 
-        v.addWidget(QLabel("双击问题项跳转到地图对应位置："))
+        v.addWidget(QLabel(tr("validate_double_click_hint")))
         list_w = QListWidget()
         v.addWidget(list_w)
 
@@ -236,19 +230,19 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         for i, (y, x) in enumerate(x_positions[:50]):
             add_item(f"X-crossing #{i+1} at ({x}, {y})", "xy", (x, y))
         if len(x_positions) > 50:
-            add_item(f"... 还有 {len(x_positions)-50} 个 X-crossing 未列出", "none", None)
+            add_item(tr("validate_more_xcrossing").format(n=len(x_positions)-50), "none", None)
 
         for pid in results.get("too_small_ids", [])[:50]:
-            add_item(f"过小省份 ID={pid}（< 8 像素）", "pid", pid)
+            add_item(tr("validate_too_small_item").format(pid=pid), "pid", pid)
         for pid in results.get("not_contiguous_ids", [])[:50]:
-            add_item(f"不连通省份 ID={pid}（多个碎片）", "pid", pid)
+            add_item(tr("validate_not_contiguous_item").format(pid=pid), "pid", pid)
         for pid in results.get("too_large_ids", [])[:50]:
-            add_item(f"过大省份 ID={pid}", "pid", pid)
+            add_item(tr("validate_too_large_item").format(pid=pid), "pid", pid)
         gaps = results.get("id_gaps", [])
         if gaps:
-            add_item(f"省份 ID 不连续：缺失 {len(gaps)} 个（导出时自动修复）", "none", None)
+            add_item(tr("validate_id_gaps").format(n=len(gaps)), "none", None)
         if list_w.count() == 0:
-            list_w.addItem("✓ 没有发现任何问题")
+            list_w.addItem(tr("validate_no_issues"))
 
         def on_double(item: QListWidgetItem) -> None:
             payload = item.data(_Qt.ItemDataRole.UserRole)
@@ -270,15 +264,15 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     # ═══════════════════════ Country 对话框 ═══════════════════
 
     def _on_create_country(self) -> None:
-        tag, ok = QInputDialog.getText(self, "创建国家", "输入国家 TAG (3个字母):")
+        tag, ok = QInputDialog.getText(self, tr("country_create_btn"), tr("dlg_country_tag_prompt"))
         if not ok or not tag:
             return
         tag = tag.upper().strip()[:3]
         if len(tag) != 3 or not tag.isalpha():
-            QMessageBox.warning(self, "错误", "TAG 必须是 3 个英文字母")
+            QMessageBox.warning(self, tr("dlg_error"), tr("country_tag_invalid"))
             return
 
-        name, ok = QInputDialog.getText(self, "创建国家", f"输入国家名称 (TAG: {tag}):")
+        name, ok = QInputDialog.getText(self, tr("country_create_btn"), tr("dlg_country_name_prompt").format(tag=tag))
         if not ok:
             return
 
@@ -286,14 +280,14 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         default_color = QColor(
             random.randint(60, 220), random.randint(60, 220), random.randint(60, 220)
         )
-        chosen = QColorDialog.getColor(default_color, self, f"选择 {tag} 的颜色")
+        chosen = QColorDialog.getColor(default_color, self, tr("dlg_country_pick_color").format(tag=tag))
         if not chosen.isValid():
             return
         color = (chosen.red(), chosen.green(), chosen.blue())
 
         ctrl: CountryController = self._controllers["country"]
         if not ctrl.create_country(tag, name or tag, color):
-            QMessageBox.warning(self, "错误", "创建国家失败")
+            QMessageBox.warning(self, tr("dlg_error"), tr("dlg_country_create_failed"))
 
     def _on_quick_create_country(self, tag: str, name: str, party: str) -> None:
         color = getattr(self._tool_panel, '_quick_create_color', (100, 100, 200))
@@ -305,7 +299,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         if not country:
             return
         r, g, b = country.color
-        chosen = QColorDialog.getColor(QColor(r, g, b), self, f"修改 {tag} 的颜色")
+        chosen = QColorDialog.getColor(QColor(r, g, b), self, tr("dlg_country_change_color").format(tag=tag))
         if not chosen.isValid():
             return
         ctrl: CountryController = self._controllers["country"]
@@ -316,12 +310,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_validate_river(self) -> None:
         from domain.managers.river import validate_rivers
         warnings = validate_rivers(self._canvas.river_map)
-        QMessageBox.information(self, "河流验证", "\n".join(warnings))
+        QMessageBox.information(self, tr("dlg_river_validate_title"), "\n".join(warnings))
 
     def _on_auto_terrain(self) -> None:
         from services.terrain_service import smart_auto_terrain, TerrainGenConfig
         from commands.map.generate_terrain import GenerateTerrainCommand
-        self._status_info.setText("正在智能生成地形...")
+        self._status_info.setText(tr("status_auto_terrain"))
         self.repaint()
         map_data = self._project.map_data
         # 从 terrain page 获取配置 (如果有)
@@ -337,11 +331,11 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._project.mark_dirty()
         # 通知 canvas 地形数据已变 (触发重新渲染)
         self._canvas.terrain_map = map_data.terrain_map
-        self._status_info.setText("智能地形生成完成 (支持 Ctrl+Z 撤销)")
+        self._status_info.setText(tr("status_auto_terrain_done"))
 
     def _on_auto_height(self) -> None:
         from services.terrain_service import smart_auto_height
-        self._status_info.setText("正在智能生成高度图...")
+        self._status_info.setText(tr("status_auto_height"))
         self.repaint()
         config = None
         height_page = self._tool_panel._height_page
@@ -353,12 +347,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         map_data.height_map[:] = new_height
         self._canvas.height_map = map_data.height_map
         self._project.mark_dirty()
-        self._status_info.setText("高度图生成完成 — 切到「地形」生成地形")
+        self._status_info.setText(tr("status_auto_height_done"))
 
     def _on_smooth_height(self) -> None:
         from services.terrain_service import smooth_height
         self._canvas.height_map = smooth_height(self._canvas.height_map)
-        self._status_info.setText("高度图已平滑")
+        self._status_info.setText(tr("status_height_smoothed"))
 
     # ═══════════════════════ Continent ═══════════════════════
 
@@ -381,7 +375,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         if ctrl.add_continent(name):
             self._refresh_continent_list()
         else:
-            QMessageBox.warning(self, "错误", "添加大陆失败")
+            QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_add_failed"))
 
     def _on_continent_rename(self, index: int, name: str) -> None:
         from controllers.continent import ContinentController
@@ -389,7 +383,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         if ctrl.rename_continent(index, name):
             self._refresh_continent_list()
         else:
-            QMessageBox.warning(self, "错误", "重命名失败")
+            QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_rename_failed"))
 
     def _on_continent_remove(self, index: int) -> None:
         from controllers.continent import ContinentController
@@ -397,7 +391,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         if ctrl.remove_continent(index):
             self._refresh_continent_list()
         else:
-            QMessageBox.warning(self, "错误", "删除失败")
+            QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_delete_failed"))
 
     def _refresh_continent_list(self) -> None:
         from PyQt5.QtWidgets import QListWidgetItem
@@ -406,7 +400,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         cm = self._project.continent_mgr
         for i, name in enumerate(cm.names):
             count = sum(1 for ci in cm._province_continent.values() if ci == i)
-            lst.addItem(QListWidgetItem(f"{i+1}. {name}  ({count} 省)"))
+            lst.addItem(QListWidgetItem(f"{i+1}. {name}  ({count} {tr('unit_provinces')})"))
 
     # ═══════════════════════ Strategic Region ═══════════════
 
@@ -459,7 +453,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             self._tool_panel._sr_naval_combo.blockSignals(True)
             self._tool_panel._sr_naval_combo.setCurrentIndex(nidx)
             self._tool_panel._sr_naval_combo.blockSignals(False)
-        self._tool_panel._sr_prov_count.setText(f"省份: {len(r.province_ids)}")
+        self._tool_panel._sr_prov_count.setText(tr("sr_prov_count").format(len(r.province_ids)))
 
     def _on_sr_name_changed(self, name: str) -> None:
         rid = self._get_sr_current_rid()
@@ -484,7 +478,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         lst.clear()
         for r in sorted(self._project.strategic_region_mgr.regions.values(), key=lambda x: x.id):
             label = (
-                f"#{r.id} {r.name}  ({len(r.province_ids)}省, "
+                f"#{r.id} {r.name}  ({len(r.province_ids)}{tr('unit_provinces')}, "
                 f"{PRESET_LABELS.get(r.weather_preset, r.weather_preset)})"
             )
             item = QListWidgetItem(label)
@@ -537,7 +531,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
 
     def _on_dm_tree_add(self) -> None:
         v, ok = QInputDialog.getInt(
-            self, "添加", "Palette 索引 (1-13):", value=4, min=1, max=13
+            self, tr("defmap_add_btn"), tr("dlg_defmap_palette_prompt"), value=4, min=1, max=13
         )
         if ok:
             ctrl: DefaultMapController = self._controllers["default_map"]
@@ -572,16 +566,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText(tr("status_ready"))
         self._update_province_count()
         QMessageBox.information(
-            self, "Language / 语言",
-            "语言已切换，部分界面需要重启生效。\n"
-            "Language switched. Some UI elements require restart."
+            self, tr("dlg_language_title"),
+            tr("dlg_language_switched"),
         )
 
     def _on_about(self) -> None:
         QMessageBox.about(
             self, tr("action_about"),
-            "HOI4 Fantasy World MOD Maker\n"
-            "HOI4 幻想世界 MOD 制作工具\n\n"
-            "Version 0.15\n"
-            "Map size: 5632 × 2048"
+            tr("dlg_about_body"),
         )

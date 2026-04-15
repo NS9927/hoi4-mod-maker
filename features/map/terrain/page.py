@@ -24,6 +24,7 @@ from ui.styles import (
     _SLIDER_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SPINBOX_STYLE,
     _SECONDARY_BTN_STYLE,
 )
+from ui.i18n import tr
 
 # 从 vanilla atlas0.dds 提取的每个 texture tile 的真实平均色 (RGB)
 _ATLAS_COLORS: dict[int, tuple[int, int, int]] = {
@@ -49,10 +50,20 @@ _ATLAS_COLORS: dict[int, tuple[int, int, int]] = {
 _GROUP_ORDER = ["plains", "forest", "hills", "mountain", "desert", "marsh", "jungle", "urban"]
 
 # 分组中文名
-_GROUP_CN = {
-    "plains": "平原", "forest": "森林", "hills": "丘陵", "mountain": "山地",
-    "desert": "沙漠", "marsh": "沼泽", "jungle": "丛林", "urban": "城市",
-}
+def _group_cn(key: str) -> str:
+    """获取地形分组的翻译名称."""
+    _TR_MAP = {
+        "plains": "terrain_group_plains",
+        "forest": "terrain_group_forest",
+        "hills": "terrain_group_hills",
+        "mountain": "terrain_group_mountain",
+        "desert": "terrain_group_desert",
+        "marsh": "terrain_group_marsh",
+        "jungle": "terrain_group_jungle",
+        "urban": "terrain_group_urban",
+    }
+    tr_key = _TR_MAP.get(key)
+    return tr(tr_key) if tr_key else key
 
 # atlas 贴图缩略图目录
 _TILES_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -84,14 +95,14 @@ class TerrainPage(QWidget):
         mode_row = QHBoxLayout()
         self._terrain_mode_group = QButtonGroup(self)
         self._terrain_mode_group.setExclusive(True)
-        province_btn = QPushButton("按省份")
+        province_btn = QPushButton(tr("terrain_mode_province"))
         province_btn.setCheckable(True)
         province_btn.setChecked(True)
         province_btn.setStyleSheet(_TOOL_BTN_STYLE)
         province_btn.setMinimumWidth(60)
         self._terrain_mode_group.addButton(province_btn, 0)
         mode_row.addWidget(province_btn)
-        brush_btn = QPushButton("画笔")
+        brush_btn = QPushButton(tr("terrain_mode_brush"))
         brush_btn.setCheckable(True)
         brush_btn.setStyleSheet(_TOOL_BTN_STYLE)
         brush_btn.setMinimumWidth(60)
@@ -101,11 +112,11 @@ class TerrainPage(QWidget):
         outer.addLayout(mode_row)
 
         # 画笔控件 (画笔模式下可见)
-        self._brush_box = _make_section("画笔设置")
+        self._brush_box = _make_section(tr("terrain_section_brush"))
         bl = self._brush_box.layout()
 
         size_row = QHBoxLayout()
-        size_lbl = QLabel("大小:")
+        size_lbl = QLabel(tr("terrain_label_size"))
         size_lbl.setStyleSheet(_LABEL_STYLE)
         size_row.addWidget(size_lbl)
         self._brush_size_label = QLabel("20px")
@@ -121,7 +132,7 @@ class TerrainPage(QWidget):
         self._brush_size_slider.valueChanged.connect(self._on_brush_size)
         bl.addWidget(self._brush_size_slider)
 
-        self._soft_edge_cb = QCheckBox("柔边 (自然过渡)")
+        self._soft_edge_cb = QCheckBox(tr("terrain_cb_soft_edge"))
         self._soft_edge_cb.setStyleSheet(f"color: {_DIM}; font-size: 12px;")
         self._soft_edge_cb.toggled.connect(self.terrain_soft_edge_changed.emit)
         bl.addWidget(self._soft_edge_cb)
@@ -130,7 +141,7 @@ class TerrainPage(QWidget):
         outer.addWidget(self._brush_box)
 
         # 提示
-        hint = QLabel("按省份: 点选地形后点击省份分配（同时设外观+属性）\n画笔: 逐像素画地形贴图（只影响外观）")
+        hint = QLabel(tr("terrain_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         hint.setWordWrap(True)
         outer.addWidget(hint)
@@ -149,7 +160,7 @@ class TerrainPage(QWidget):
             if not variants:
                 continue
 
-            group_name = _GROUP_CN.get(group_type, group_type)
+            group_name = _group_cn(group_type)
             box = _make_section(f"{group_name} ({len(variants)})")
             # 加粗分组边框
             box.setStyleSheet(box.styleSheet() + """
@@ -163,8 +174,8 @@ class TerrainPage(QWidget):
             for i, gt in enumerate(variants):
                 btn = QPushButton(gt.name_cn)
                 btn.setToolTip(
-                    f"索引: {gt.palette_index}  贴图: {gt.texture}\n"
-                    f"类型: {gt.type}  ID: {gt.id}"
+                    f"{tr('terrain_tip_index')}: {gt.palette_index}  {tr('terrain_tip_texture')}: {gt.texture}\n"
+                    f"{tr('terrain_tip_type')}: {gt.type}  ID: {gt.id}"
                 )
 
                 # 加载 atlas 贴图缩略图作为图标 (带黑框)
@@ -217,12 +228,12 @@ class TerrainPage(QWidget):
         outer.addWidget(scroll)
 
         # ── 智能生成设置 ──
-        gen_box = _make_section("智能地形生成")
+        gen_box = _make_section(tr("terrain_section_auto_gen"))
         gl = gen_box.layout()
 
         # 种子
         seed_row = QHBoxLayout()
-        seed_lbl = QLabel("种子:")
+        seed_lbl = QLabel(tr("terrain_label_seed"))
         seed_lbl.setStyleSheet(_LABEL_STYLE)
         seed_row.addWidget(seed_lbl)
         self._seed_spin = QSpinBox()
@@ -230,7 +241,7 @@ class TerrainPage(QWidget):
         self._seed_spin.setValue(42)
         self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
         seed_row.addWidget(self._seed_spin)
-        rand_btn = QPushButton("随机")
+        rand_btn = QPushButton(tr("terrain_btn_random"))
         rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         rand_btn.setMaximumWidth(60)
         rand_btn.clicked.connect(self._randomize_seed)
@@ -239,7 +250,7 @@ class TerrainPage(QWidget):
 
         # 噪声强度
         noise_row = QHBoxLayout()
-        noise_lbl = QLabel("噪声强度:")
+        noise_lbl = QLabel(tr("terrain_label_noise"))
         noise_lbl.setStyleSheet(_LABEL_STYLE)
         noise_row.addWidget(noise_lbl)
         self._noise_label = QLabel("20")
@@ -259,7 +270,7 @@ class TerrainPage(QWidget):
 
         # 散点密度
         scatter_row = QHBoxLayout()
-        scatter_lbl = QLabel("散点密度:")
+        scatter_lbl = QLabel(tr("terrain_label_scatter"))
         scatter_lbl.setStyleSheet(_LABEL_STYLE)
         scatter_row.addWidget(scatter_lbl)
         self._scatter_label = QLabel("65%")
@@ -277,7 +288,7 @@ class TerrainPage(QWidget):
         )
         gl.addWidget(self._scatter_slider)
 
-        auto_btn = QPushButton("智能地形生成")
+        auto_btn = QPushButton(tr("terrain_btn_auto_gen"))
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(self.auto_terrain_requested.emit)
         gl.addWidget(auto_btn)

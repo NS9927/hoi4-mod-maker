@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, pyqtSignal
 
 from data.constants import BRUSH_DEFAULT
+from ui.i18n import tr
 
 # 色板 / 样式常量从统一位置 import
 from ui.styles import (
@@ -241,23 +242,23 @@ class ToolPanel(QWidget):
 
         # 分组折叠模式栏 (V1 原版样式)
         self._mode_tabs = _GroupedModeBar([
-            ("地图绘制", [
-                ("land", "陆地与海洋"),
-                ("province", "省份"),
-                ("height", "高度"),
-                ("terrain", "地形"),
-                ("river", "河流"),
+            (tr("group_map_drawing"), [
+                ("land", tr("mode_land")),
+                ("province", tr("mode_province")),
+                ("height", tr("mode_height")),
+                ("terrain", tr("mode_terrain")),
+                ("river", tr("mode_river_nav")),
             ]),
-            ("区域管理", [
-                ("state", "州"),
-                ("country", "国家"),
-                ("continent", "大洲"),
-                ("strategic_region", "战略区"),
+            (tr("group_region_mgmt"), [
+                ("state", tr("mode_state")),
+                ("country", tr("mode_country")),
+                ("continent", tr("mode_continent")),
+                ("strategic_region", tr("mode_strategic_region")),
             ]),
-            ("后勤与配置", [
-                ("logistics", "后勤系统"),
-                ("colormap", "总览贴图"),
-                ("default_map", "地图配置"),
+            (tr("group_logistics_config"), [
+                ("logistics", tr("mode_logistics")),
+                ("colormap", tr("mode_colormap")),
+                ("default_map", tr("mode_default_map")),
             ]),
         ])
         self._mode_tabs.mode_changed.connect(self._on_mode_changed)
@@ -280,7 +281,7 @@ class ToolPanel(QWidget):
         sep.setStyleSheet(f"color: {_BORDER}; margin: 0;")
         root.addWidget(sep)
 
-        export_btn = QPushButton("导出 MOD")
+        export_btn = QPushButton(tr("panel_export_btn"))
         export_btn.setStyleSheet(_SUCCESS_BTN_STYLE)
         export_btn.clicked.connect(self.export_requested.emit)
         root.addWidget(export_btn)

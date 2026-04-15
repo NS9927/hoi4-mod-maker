@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QListWidget, QInputDialog, QScrollArea,
 )
 
+from ui.i18n import tr
 from ui.styles import (
     _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE, _LIST_STYLE,
 )
@@ -37,11 +38,7 @@ class ContinentPage(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
 
-        tip = QLabel("定义大陆 + 把省份指派到大陆.\n"
-                     "HOI4 要求所有陆地省份必须属于某个大洲，\n"
-                     "影响 continent.txt 和 definition.csv.\n"
-                     "先创建大陆(如 europe, asia)，再用拾取模式\n"
-                     "点击省份分配到选中的大陆.")
+        tip = QLabel(tr("continent_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
@@ -53,11 +50,11 @@ class ContinentPage(QWidget):
         lay.addWidget(self._continent_list)
 
         btn_row = QHBoxLayout()
-        add_btn = QPushButton("添加")
+        add_btn = QPushButton(tr("continent_add_btn"))
         add_btn.clicked.connect(self._on_add_continent)
-        rename_btn = QPushButton("重命名")
+        rename_btn = QPushButton(tr("continent_rename_btn"))
         rename_btn.clicked.connect(self._on_rename_continent)
-        remove_btn = QPushButton("删除")
+        remove_btn = QPushButton(tr("continent_delete_btn"))
         remove_btn.clicked.connect(self._on_remove_continent)
         btn_row.addWidget(add_btn)
         btn_row.addWidget(rename_btn)
@@ -65,7 +62,7 @@ class ContinentPage(QWidget):
         lay.addLayout(btn_row)
 
         # 拾取按钮
-        self._continent_pick_btn = QPushButton("开始指派省份")
+        self._continent_pick_btn = QPushButton(tr("continent_pick_btn"))
         self._continent_pick_btn.setCheckable(True)
         self._continent_pick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._continent_pick_btn.toggled.connect(
@@ -86,7 +83,7 @@ class ContinentPage(QWidget):
 
     # ── 槽函数 ──
     def _on_add_continent(self) -> None:
-        name, ok = QInputDialog.getText(self, "添加大陆", "大陆名 (英文):")
+        name, ok = QInputDialog.getText(self, tr("continent_add_dlg_title"), tr("continent_add_dlg_label"))
         if ok and name.strip():
             self.continent_add_requested.emit(name.strip())
 
@@ -95,7 +92,7 @@ class ContinentPage(QWidget):
         if item is None:
             return
         old = item.text().split(".")[1].strip().split("(")[0].strip() if "." in item.text() else ""
-        name, ok = QInputDialog.getText(self, "重命名", "新名字:", text=old)
+        name, ok = QInputDialog.getText(self, tr("continent_rename_dlg_title"), tr("continent_rename_dlg_label"), text=old)
         if ok and name.strip():
             row = self._continent_list.currentRow()
             self.continent_rename_requested.emit(row, name.strip())

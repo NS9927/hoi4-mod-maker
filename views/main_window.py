@@ -157,15 +157,15 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 文件
         file_menu = menubar.addMenu(tr("menu_file"))
         self._add_action(file_menu, tr("action_new"), self._on_new_project, QKeySequence.StandardKey.New)
-        self._add_action(file_menu, "打开项目", self._on_open_project, "Ctrl+O")
-        self._add_action(file_menu, "保存项目", self._on_save_project, "Ctrl+S")
+        self._add_action(file_menu, tr("action_open"), self._on_open_project, "Ctrl+O")
+        self._add_action(file_menu, tr("action_save"), self._on_save_project, "Ctrl+S")
         file_menu.addSeparator()
         self._add_action(file_menu, tr("action_import_image"), self._on_import_image, "Ctrl+I")
-        self._add_action(file_menu, "加载原版地图参考", self._on_load_vanilla_ref)
-        self._add_action(file_menu, "从图片提取陆海...", self._on_import_landmask, "Ctrl+Shift+I")
-        self._add_action(file_menu, "导入MOD地图...", self._on_import_mod_map, "Ctrl+Shift+M")
+        self._add_action(file_menu, tr("action_load_vanilla_ref"), self._on_load_vanilla_ref)
+        self._add_action(file_menu, tr("action_import_landmask"), self._on_import_landmask, "Ctrl+Shift+I")
+        self._add_action(file_menu, tr("action_import_mod_map"), self._on_import_mod_map, "Ctrl+Shift+M")
         self._add_action(file_menu, tr("action_export_mod"), self._on_export_mod, "Ctrl+E")
-        self._add_action(file_menu, "测试导出（最小MOD）", self._on_test_export, "Ctrl+T")
+        self._add_action(file_menu, tr("action_test_export"), self._on_test_export, "Ctrl+T")
         file_menu.addSeparator()
         self._add_action(file_menu, tr("action_exit"), self.close, QKeySequence.StandardKey.Quit)
 
@@ -192,7 +192,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 设置
         settings_menu = menubar.addMenu(tr("menu_settings"))
         self._add_action(settings_menu, tr("action_language"), self._on_toggle_language)
-        self._add_action(settings_menu, "快捷键设置...", self._on_shortcut_settings)
+        self._add_action(settings_menu, tr("action_shortcut_settings"), self._on_shortcut_settings)
 
         # 帮助
         help_menu = menubar.addMenu(tr("menu_help"))
@@ -210,7 +210,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._status_pos = QLabel(tr("status_pos", 0, 0))
         self._status_zoom = QLabel(tr("status_zoom", 1.0))
         self._status_provinces = QLabel(tr("status_provinces", 0))
-        self._status_mode = QLabel("模式: 大陆")
+        self._status_mode = QLabel(tr("status_mode").format(mode=tr("mode_continent")))
         self._status_info = QLabel(tr("status_ready"))
 
         sb = self.statusBar()
@@ -405,8 +405,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         if pid <= 0:
             return
         value, ok = QInputDialog.getInt(
-            self, "设置胜利点",
-            f"省份 {pid} 的 VP 分值\n(1=小镇, 5=中等, 10=城市, 20=首都):",
+            self, tr("dlg_set_vp_title"),
+            tr("dlg_set_vp_label").format(pid=pid),
             1, 0, 50, 1,
         )
         if ok:
@@ -427,7 +427,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
     def _on_mode_changed(self, mode: str) -> None:
         mode_name = self._app.on_mode_changed(mode)
-        self._status_mode.setText(f"模式: {mode_name}")
+        self._status_mode.setText(tr("status_mode").format(mode=mode_name))
 
     # ═══════════════════════ 省份点击路由 ═══════════════════
 
@@ -439,7 +439,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         ctrl_prov: ProvinceController = self._controllers["province"]
         if ctrl_prov.regen_mode:
             ctrl_prov.toggle_regen_province(pid)
-            self._status_info.setText(f'已选中 {len(ctrl_prov.regen_selected_pids)} 个省份')
+            self._status_info.setText(tr("status_selected_provinces").format(n=len(ctrl_prov.regen_selected_pids)))
             return
 
         # 批量建州模式
@@ -448,7 +448,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
                 self._batch_state_pids.remove(pid)
             else:
                 self._batch_state_pids.append(pid)
-            self._status_info.setText(f'已选中 {len(self._batch_state_pids)} 个省份建州')
+            self._status_info.setText(tr("status_selected_provinces_state").format(n=len(self._batch_state_pids)))
             return
 
         # 选州创建战略区域模式
@@ -459,9 +459,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
                     self._sr_selected_states.remove(sid)
                 else:
                     self._sr_selected_states.append(sid)
-                self._status_info.setText(f'已选中 {len(self._sr_selected_states)} 个州')
+                self._status_info.setText(tr("status_selected_states").format(n=len(self._sr_selected_states)))
             else:
-                self._status_info.setText(f'省份 {pid} 不属于任何州')
+                self._status_info.setText(tr("status_province_no_state").format(pid=pid))
             return
 
         try:
@@ -472,7 +472,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
                     info["pixels"], info["coastal"],
                 )
         except Exception as e:
-            self._status_info.setText(f"操作异常: {e}")
+            self._status_info.setText(tr("status_operation_error").format(err=e))
             import traceback
             traceback.print_exc()
 
@@ -489,7 +489,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
     def _on_provinces_cleared(self) -> None:
         self._update_province_count()
-        self._status_info.setText("修改大陆数据，省份已清除（需要重新生成）")
+        self._status_info.setText(tr("status_provinces_cleared"))
 
     # ═══════════════════════ 撤销/重做 ═══════════════════════
 
@@ -516,17 +516,16 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_merge_toggled(self, on: bool) -> None:
         if on:
             QMessageBox.information(
-                self, "合并省份",
-                "先点击要保留的省份，再点击要被合并的省份。\n"
-                "被合并省份的像素将并入保留省份。",
+                self, tr("province_btn_merge"),
+                tr("dlg_merge_hint"),
             )
         self._controllers["province"].set_merge_mode(on)
 
     def _on_lasso_toggled(self, on: bool) -> None:
         if on:
             QMessageBox.information(
-                self, "扩张省份",
-                "点击要扩张的省份，然后拖动画笔将周围像素并入该省份。",
+                self, tr("province_btn_expand"),
+                tr("dlg_expand_hint"),
             )
             self._controllers["province"].set_merge_mode(False)
             from domain.tools import lasso_province  # noqa: F401
@@ -536,38 +535,36 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
                 state_mgr=self._project.state_mgr,
                 country_mgr=self._project.country_mgr,
             )
-            self._status_info.setText("扩张模式：点击省份后拖动扩张")
+            self._status_info.setText(tr("status_expand_mode"))
         else:
             self._canvas.set_framework_tool(None)
-            self._status_info.setText("回到查看模式")
+            self._status_info.setText(tr("status_view_mode"))
 
     def _on_regen_mode_toggled(self, on: bool) -> None:
         ctrl: ProvinceController = self._controllers["province"]
         ctrl.set_regen_mode(on)
         if on:
-            self._status_info.setText('增量生成：点击省份选择区域，然后点「重新生成」')
+            self._status_info.setText(tr("status_regen_mode"))
         else:
-            self._status_info.setText("回到查看模式")
+            self._status_info.setText(tr("status_view_mode"))
 
     def _on_regen_execute(self) -> None:
         ctrl: ProvinceController = self._controllers["province"]
         if not ctrl.regen_selected_pids:
-            QMessageBox.warning(self, "增量生成", "请先选择要重新生成的省份区域")
+            QMessageBox.warning(self, tr("dlg_regen_title"), tr("dlg_regen_select_first"))
             return
         n = len(ctrl.regen_selected_pids)
         reply = QMessageBox.question(
-            self, "增量生成",
-            f"将对 {n} 个省份所在区域重新生成省份。\n"
-            "该区域内的旧省份将被删除并重新划分。\n\n"
-            "继续吗？",
+            self, tr("dlg_regen_title"),
+            tr("dlg_regen_confirm").format(n=n),
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
         removed, created = ctrl.execute_regen()
         self._update_province_count()
         QMessageBox.information(
-            self, "增量生成完成",
-            f"删除 {removed} 个旧省份，新建 {created} 个省份。"
+            self, tr("dlg_regen_done_title"),
+            tr("dlg_regen_done").format(removed=removed, created=created),
         )
 
     # ═══════════════════════ 批量建州 ═══════════════════════
@@ -577,15 +574,15 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._batch_state_mode = on
         self._batch_state_pids = []
         if on:
-            self._status_info.setText("批量建州：点击省份多选，然后点确认")
+            self._status_info.setText(tr("status_batch_state_mode"))
         else:
-            self._status_info.setText("回到查看模式")
+            self._status_info.setText(tr("status_view_mode"))
 
     def _on_batch_state_confirmed(self) -> None:
         """确认用选中的省份创建新州。"""
         pids = self._batch_state_pids
         if not pids:
-            QMessageBox.warning(self, "批量建州", "请先点击省份选择区域")
+            QMessageBox.warning(self, tr("dlg_batch_state_title"), tr("dlg_batch_state_select_first"))
             return
         ctrl = self._controllers["state"]
         n = len(pids)
@@ -595,7 +592,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._batch_state_pids = []
         if new_sid > 0:
             self._canvas.refresh_display()
-            QMessageBox.information(self, "批量建州", f"已创建州 {new_sid}（{n} 个省份）")
+            QMessageBox.information(self, tr("dlg_batch_state_title"), tr("dlg_batch_state_done").format(sid=new_sid, n=n))
 
     # ═══════════════════════ 战略区域从州创建 ═══════════════════
 
@@ -604,15 +601,15 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._sr_from_states_mode = on
         self._sr_selected_states = []
         if on:
-            self._status_info.setText("选择州 → 创建战略区域：点击地图选择多个州，然后点确认")
+            self._status_info.setText(tr("status_sr_from_states_mode"))
         else:
-            self._status_info.setText("回到查看模式")
+            self._status_info.setText(tr("status_view_mode"))
 
     def _on_sr_from_states_confirmed(self) -> None:
         """确认用选中的州创建战略区域。"""
         sids = self._sr_selected_states
         if not sids:
-            QMessageBox.warning(self, "创建战略区域", "请先点击地图选择州")
+            QMessageBox.warning(self, tr("dlg_sr_from_states_title"), tr("dlg_sr_from_states_select_first"))
             return
         ctrl = self._controllers["strategic_region"]
         n = len(sids)
@@ -622,7 +619,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._sr_selected_states = []
         if new_rid > 0:
             self._canvas.refresh_display()
-            QMessageBox.information(self, "创建战略区域", f"已创建战略区域 #{new_rid}（包含 {n} 个州）")
+            QMessageBox.information(self, tr("dlg_sr_from_states_title"), tr("dlg_sr_from_states_done").format(rid=new_rid, n=n))
 
     # ═══════════════════════ State 管理 ═══════════════════════
 
@@ -635,7 +632,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         dlg = StateDetailDialog(state, tags, parent=self)
         if dlg.exec_() == dlg.Accepted:
             self._app._refresh_state_list()
-            self._status_info.setText(f"State {state_id} 已更新")
+            self._status_info.setText(tr("status_state_updated").format(sid=state_id))
 
     # ═══════════════════════ 省份计数 ═══════════════════════
 
@@ -663,11 +660,11 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         import webbrowser
         from version import VERSION
         reply = QMessageBox.information(
-            self, "发现新版本",
-            f"当前版本：{VERSION}\n"
-            f"最新版本：{info['version']}\n\n"
-            f"更新内容：\n{info['body'][:500]}\n\n"
-            f"是否前往下载？",
+            self, tr("dlg_update_title"),
+            tr("dlg_update_body").format(
+                current=VERSION, latest=info['version'],
+                body=info['body'][:500],
+            ),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
@@ -687,7 +684,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _on_welcome_open_recent(self, path: str) -> None:
         import os
         if not os.path.exists(path):
-            QMessageBox.warning(self, "错误", f"文件不存在:\n{path}")
+            QMessageBox.warning(self, tr("dlg_error"), tr("dlg_file_not_found").format(path=path))
             return
         self._load_project_file(path)
         save_recent_project(path)
@@ -699,7 +696,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         from services.import_service import validate_mod_directory, import_mod_map
 
         mod_dir = QFileDialog.getExistingDirectory(
-            self, "选择 HOI4 MOD 或原版目录",
+            self, tr("dlg_select_mod_dir"),
             "", QFileDialog.Option.ShowDirsOnly,
         )
         if not mod_dir:
@@ -708,14 +705,14 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         missing = validate_mod_directory(mod_dir)
         if missing:
             QMessageBox.warning(
-                self, "导入失败",
-                f"目录缺少必需文件:\n" + "\n".join(missing),
+                self, tr("dlg_import_failed"),
+                tr("dlg_import_missing_files") + "\n".join(missing),
             )
             return
 
         # 显示进度提示
-        progress = QProgressDialog("正在读取MOD地图文件...", None, 0, 0, self)
-        progress.setWindowTitle("导入MOD")
+        progress = QProgressDialog(tr("import_reading_files"), None, 0, 0, self)
+        progress.setWindowTitle(tr("import_title"))
         progress.setMinimumDuration(0)
         progress.show()
         QApplication.processEvents()
@@ -726,12 +723,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             progress.close()
             import traceback
             QMessageBox.critical(
-                self, "导入失败",
-                f"读取MOD文件时出错:\n{e}\n\n{traceback.format_exc()}"
+                self, tr("dlg_import_failed"),
+                tr("dlg_import_read_error").format(err=e, tb=traceback.format_exc()),
             )
             return
 
-        progress.setLabelText("正在初始化地图...")
+        progress.setLabelText(tr("import_initializing"))
         QApplication.processEvents()
 
         new_w, new_h = result["width"], result["height"]
@@ -763,7 +760,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._canvas.set_map_data(md)
         self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
 
-        progress.setLabelText("正在渲染...")
+        progress.setLabelText(tr("import_rendering"))
         QApplication.processEvents()
 
         self._show_editor()
@@ -773,13 +770,13 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
         progress.close()
 
-        info_text = f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份)"
+        info_text = tr("import_done").format(w=new_w, h=new_h, n=result['province_count'])
         self._status_info.setText(info_text)
 
         warnings_text = ""
         if result["warnings"]:
-            warnings_text = "\n\n注意:\n" + "\n".join(f"- {w}" for w in result["warnings"])
-        QMessageBox.information(self, "导入完成", info_text + warnings_text)
+            warnings_text = "\n\n" + tr("import_warnings") + "\n".join(f"- {w}" for w in result["warnings"])
+        QMessageBox.information(self, tr("import_done_title"), info_text + warnings_text)
 
     # ═══════════════════════ 快捷键 ═══════════════════════════
 

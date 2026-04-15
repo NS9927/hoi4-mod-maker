@@ -10,6 +10,7 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtGui import QColor
 
+from ui.i18n import tr
 from ui.styles import _DIM_LABEL_STYLE, _LABEL_STYLE
 
 
@@ -34,17 +35,14 @@ class ColormapPage(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(8)
 
-        tip = QLabel("战略视角缩放时的全图底色(colormap).\n"
-                     "这是 HOI4 缩到最远时看到的颜色贴图，\n"
-                     "分别设置陆地/海洋/湖泊的底色.\n"
-                     "改颜色后下次导出生效.")
+        tip = QLabel(tr("colormap_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
 
         # 三个色块
         self._swatches: dict[str, QPushButton] = {}
-        for label_text, attr_name in [("陆地:", "land"), ("海洋:", "sea"), ("湖泊:", "lake")]:
+        for label_text, attr_name in [(tr("colormap_land_label"), "land"), (tr("colormap_sea_label"), "sea"), (tr("colormap_lake_label"), "lake")]:
             row = QHBoxLayout()
             lbl = QLabel(label_text)
             lbl.setFixedWidth(50)
@@ -59,7 +57,7 @@ class ColormapPage(QWidget):
             lay.addLayout(row)
             self._swatches[attr_name] = swatch
 
-        reset_btn = QPushButton("恢复默认")
+        reset_btn = QPushButton(tr("colormap_reset_btn"))
         reset_btn.clicked.connect(lambda: self.colormap_reset_requested.emit())
         lay.addWidget(reset_btn)
 
@@ -72,7 +70,7 @@ class ColormapPage(QWidget):
 
     def _pick_color(self, swatch: QPushButton, attr_name: str) -> None:
         """弹颜色选择器, 选完发信号."""
-        qc = QColorDialog.getColor(QColor(128, 128, 128), self, f"选择{attr_name}颜色")
+        qc = QColorDialog.getColor(QColor(128, 128, 128), self, tr("colormap_pick_color_title", attr_name))
         if qc.isValid():
             self.colormap_color_changed.emit(attr_name, qc.red(), qc.green(), qc.blue())
             swatch.setStyleSheet(

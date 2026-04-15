@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
 
 from domain.managers.strategic_region import PRESET_LABELS
 
+from ui.i18n import tr
 from ui.styles import (
     _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE,
     _LIST_STYLE, _COMBOBOX_STYLE, _LINEEDIT_STYLE,
@@ -46,28 +47,25 @@ class StrategicRegionPage(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        tip = QLabel("战略区域: 省份分组 + 天气 + 海军地形.\n"
-                     "建议先点'自动生成'按 State 创建初始分组，\n"
-                     "再手动调整。每个区域可设天气和海军地形类型.\n"
-                     "用拾取模式点省份可移入选中的区域.")
+        tip = QLabel(tr("sr_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
 
-        auto_btn = QPushButton("自动生成 (按 State 分组)")
+        auto_btn = QPushButton(tr("sr_auto_btn"))
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(lambda: self.strategic_region_auto_requested.emit())
         lay.addWidget(auto_btn)
 
         # 从州创建
-        self._from_states_btn = QPushButton("选择州 → 创建战略区域")
+        self._from_states_btn = QPushButton(tr("sr_from_states_btn"))
         self._from_states_btn.setCheckable(True)
         self._from_states_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._from_states_btn.setToolTip("开启后点击地图选择多个州，然后点确认合并为一个战略区域")
+        self._from_states_btn.setToolTip(tr("sr_from_states_tip"))
         self._from_states_btn.toggled.connect(self.create_from_states_toggled.emit)
         lay.addWidget(self._from_states_btn)
 
-        self._from_states_confirm_btn = QPushButton("确认创建战略区域")
+        self._from_states_confirm_btn = QPushButton(tr("sr_from_states_confirm_btn"))
         self._from_states_confirm_btn.setStyleSheet(
             "QPushButton { background: #22c55e; color: white; padding: 6px;"
             " border-radius: 4px; font-weight: bold; }"
@@ -86,9 +84,9 @@ class StrategicRegionPage(QWidget):
         lay.addWidget(self._sr_list)
 
         btn_row = QHBoxLayout()
-        new_btn = QPushButton("新建")
+        new_btn = QPushButton(tr("sr_new_btn"))
         new_btn.clicked.connect(lambda: self.strategic_region_new_requested.emit())
-        del_btn = QPushButton("删除")
+        del_btn = QPushButton(tr("sr_delete_btn"))
         del_btn.clicked.connect(lambda: self.strategic_region_delete_requested.emit())
         btn_row.addWidget(new_btn)
         btn_row.addWidget(del_btn)
@@ -96,7 +94,7 @@ class StrategicRegionPage(QWidget):
 
         # 编辑字段
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("名字:"))
+        name_row.addWidget(QLabel(tr("sr_name_label")))
         self._sr_name_edit = QLineEdit()
         self._sr_name_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._sr_name_edit.editingFinished.connect(
@@ -106,7 +104,7 @@ class StrategicRegionPage(QWidget):
         lay.addLayout(name_row)
 
         weather_row = QHBoxLayout()
-        weather_row.addWidget(QLabel("天气:"))
+        weather_row.addWidget(QLabel(tr("sr_weather_label")))
         self._sr_weather_combo = QComboBox()
         self._sr_weather_combo.setStyleSheet(_COMBOBOX_STYLE)
         for key, label in PRESET_LABELS.items():
@@ -120,10 +118,10 @@ class StrategicRegionPage(QWidget):
         lay.addLayout(weather_row)
 
         naval_row = QHBoxLayout()
-        naval_row.addWidget(QLabel("Naval:"))
+        naval_row.addWidget(QLabel(tr("sr_naval_label")))
         self._sr_naval_combo = QComboBox()
         self._sr_naval_combo.setStyleSheet(_COMBOBOX_STYLE)
-        self._sr_naval_combo.addItem("(无)", "")
+        self._sr_naval_combo.addItem(tr("sr_naval_none"), "")
         for nt in ("ocean", "deep_ocean", "shallow_sea"):
             self._sr_naval_combo.addItem(nt, nt)
         self._sr_naval_combo.currentIndexChanged.connect(
@@ -134,11 +132,11 @@ class StrategicRegionPage(QWidget):
         naval_row.addWidget(self._sr_naval_combo)
         lay.addLayout(naval_row)
 
-        self._sr_prov_count = QLabel("省份: 0")
+        self._sr_prov_count = QLabel(tr("sr_prov_count", 0))
         self._sr_prov_count.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(self._sr_prov_count)
 
-        self._sr_pick_btn = QPushButton("开始拾取省份")
+        self._sr_pick_btn = QPushButton(tr("sr_pick_btn"))
         self._sr_pick_btn.setCheckable(True)
         self._sr_pick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._sr_pick_btn.toggled.connect(

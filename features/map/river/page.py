@@ -15,6 +15,7 @@ from ui.styles import (
     _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
     _TOOL_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
+from ui.i18n import tr
 
 
 
@@ -38,19 +39,17 @@ class RiverPage(QWidget):
         lay.setSpacing(10)
 
         # 提示
-        hint = QLabel("河流规则: 必须1像素宽，只走上下左右(不能斜走)\n"
-                      "每条河需要1个源头(绿)。红=支流汇入 黄=分叉\n"
-                      "画笔大小仅影响橡皮擦范围，河流本身必须1像素宽")
+        hint = QLabel(tr("river_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
         # 工具按钮
-        tools_box = _make_section("工具")
+        tools_box = _make_section(tr("river_section_tools"))
         tl = QHBoxLayout()
         self._river_tool_group = QButtonGroup(self)
         self._river_tool_group.setExclusive(True)
-        for tid, label in [("brush", "画笔"), ("eraser", "橡皮"), ("pan", "平移")]:
+        for tid, label in [("brush", tr("river_tool_brush")), ("eraser", tr("river_tool_eraser")), ("pan", tr("river_tool_pan"))]:
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
@@ -67,11 +66,11 @@ class RiverPage(QWidget):
         lay.addWidget(tools_box)
 
         # 画笔大小
-        brush_box = _make_section("画笔大小")
+        brush_box = _make_section(tr("river_section_brush_size"))
         self._river_brush_label = QLabel("3px")
         self._river_brush_label.setStyleSheet(_DIM_LABEL_STYLE)
         row = QHBoxLayout()
-        lbl = QLabel("大小:")
+        lbl = QLabel(tr("river_label_size"))
         lbl.setStyleSheet(_LABEL_STYLE)
         row.addWidget(lbl)
         row.addStretch()
@@ -87,7 +86,7 @@ class RiverPage(QWidget):
         lay.addWidget(brush_box)
 
         # 标记类型 (单像素)
-        marker_box = _make_section("标记 (单像素)")
+        marker_box = _make_section(tr("river_section_markers"))
         mgrid = QGridLayout()
         mgrid.setSpacing(4)
 
@@ -101,7 +100,7 @@ class RiverPage(QWidget):
         lay.addWidget(marker_box)
 
         # 河流宽度画笔
-        width_box = _make_section("宽度画笔")
+        width_box = _make_section(tr("river_section_width"))
         wgrid = QGridLayout()
         wgrid.setSpacing(4)
 
@@ -115,7 +114,7 @@ class RiverPage(QWidget):
         lay.addWidget(width_box)
 
         # 验证按钮
-        validate_btn = QPushButton("验证河流")
+        validate_btn = QPushButton(tr("river_btn_validate"))
         validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_river_requested.emit)
         lay.addWidget(validate_btn)
