@@ -110,12 +110,23 @@ class TutorialOverlay(QWidget):
 
         self.raise_()
         self.show()
-        # 刷新面板位置
+        # 刷新面板位置 + 挖洞 mask
         self.resizeEvent(None)
+        self._update_mask()
         self.update()
 
     def set_next_text(self, text: str) -> None:
         self._next_btn.setText(text)
+
+    def _update_mask(self) -> None:
+        """用 setMask 在目标区域真正挖洞，让鼠标事件穿透到下层控件。"""
+        full = QRegion(self.rect())
+        if self._target_rect:
+            expanded = self._target_rect.adjusted(-4, -4, 4, 4)
+            hole = QRegion(expanded)
+            self.setMask(full - hole)
+        else:
+            self.clearMask()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -126,39 +137,24 @@ class TutorialOverlay(QWidget):
         panel_h = max(panel_h, self._panel.minimumHeight())
         panel_h = min(panel_h, self._panel.maximumHeight())
         self._panel.setGeometry(0, ph - panel_h, pw, panel_h)
+        self._update_mask()
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # 半透明暗色覆盖
-        overlay_color = QColor(0, 0, 0, 140)
+        # 半透明暗色覆盖（mask 已挖洞，这里直接画全区域）
+        painter.fillRect(self.rect(), QColor(0, 0, 0, 140))
 
+        # 目标边框高亮（画在遮罩边缘）
         if self._target_rect:
-            # 用 region 挖洞：全区域 - 目标区域
-            full = QRegion(self.rect())
-            # 目标区域外扩 4px 留呼吸空间
             expanded = self._target_rect.adjusted(-4, -4, 4, 4)
-            hole = QRegion(expanded)
-            painter.setClipRegion(full - hole)
-            painter.fillRect(self.rect(), overlay_color)
-            painter.setClipping(False)
-
-            # 目标边框高亮
             painter.setPen(QColor(_ACCENT))
             painter.drawRoundedRect(expanded, 4, 4)
-        else:
-            painter.fillRect(self.rect(), overlay_color)
 
-        # 底部面板区域不画遮罩（面板自己有背景）
-        panel_rect = self._panel.geometry()
-        painter.fillRect(panel_rect, QColor(_BG))
+        # 底部面板区域用实色背景
+        painter.fillRect(self._panel.geometry(), QColor("#2a2a3e"))
 
     def mousePressEvent(self, event) -> None:
-        """只允许点击目标区域内的控件，其余拦截。"""
-        if self._target_rect and self._target_rect.contains(event.pos()):
-            event.ignore()  # 让事件穿透到目标
-        elif self._panel.geometry().contains(event.pos()):
-            event.ignore()  # 让面板按钮可点
-        else:
-            event.accept()  # 拦截其余点击
+        """遮罩区域拦截点击，目标区域已通过 setMask 挖洞穿透。"""
+        event.accept()
