@@ -654,6 +654,72 @@ _translations: dict[str, dict[str, str]] = {
         "zh": "配置河流数量上限和树木调色板。",
         "en": "Configure max river count and tree color palette.",
     },
+
+    # === 交互式教程 ===
+    "action_tutorial": {"zh": "交互式教程", "en": "Interactive Tutorial"},
+    "tut_step_n": {"zh": "第 {} 步 / 共 {} 步", "en": "Step {} of {}"},
+    "tut_next": {"zh": "下一步 →", "en": "Next →"},
+    "tut_finish": {"zh": "完成教程", "en": "Finish Tutorial"},
+    "tut_skip": {"zh": "跳过教程", "en": "Skip Tutorial"},
+    "tut_step1_msg": {
+        "zh": "欢迎！已为你创建了一个小画布。\n\n"
+              "现在用画笔在画布上画出你的大陆形状（随便画几笔就行）。\n"
+              "画完后点击「下一步」。",
+        "en": "Welcome! A small canvas has been created for you.\n\n"
+              "Use the brush to draw some land shapes on the canvas (just a few strokes is fine).\n"
+              "Click 'Next' when done.",
+    },
+    "tut_step2_msg": {
+        "zh": "很好！现在点击上方的「生成省份」按钮。\n\n"
+              "已自动设置省份数量为 500（小画布够用了）。\n"
+              "点击按钮后会自动切分你画的陆地。",
+        "en": "Great! Now click the 'Generate Provinces' button above.\n\n"
+              "Province count has been set to 500 (enough for this small canvas).\n"
+              "It will automatically split your land into provinces.",
+    },
+    "tut_step3_msg": {
+        "zh": "已切换到「高度」模式。\n\n"
+              "点击页面中的「自动生成」按钮，系统会根据地形自动创建高度图。\n"
+              "高度图决定了山脉和平原的位置。",
+        "en": "Switched to 'Height' mode.\n\n"
+              "Click the 'Auto Generate' button to create a heightmap automatically.\n"
+              "The heightmap determines where mountains and plains are.",
+    },
+    "tut_step4_msg": {
+        "zh": "已切换到「地形」模式。\n\n"
+              "点击「自动生成」按钮，系统会根据高度自动分配地形类型\n"
+              "（平原、森林、山地等）。",
+        "en": "Switched to 'Terrain' mode.\n\n"
+              "Click 'Auto Generate' to assign terrain types (plains, forest, mountains, etc.)\n"
+              "automatically based on the heightmap.",
+    },
+    "tut_step5_msg": {
+        "zh": "已切回「陆地与海洋」模式。\n\n"
+              "点击页面底部绿色的「一键初始化」按钮。\n"
+              "系统会自动创建州、战略区域和默认国家。",
+        "en": "Switched back to 'Land & Sea' mode.\n\n"
+              "Click the green 'Quick Init' button at the bottom of the page.\n"
+              "It will auto-create states, strategic regions, and a default country.",
+    },
+    "tut_step6_msg": {
+        "zh": "所有准备工作已完成！\n\n"
+              "现在你可以点击底部的「导出 MOD」按钮导出完整的 HOI4 MOD。\n"
+              "点击「完成教程」关闭本引导，然后自己试试导出吧！",
+        "en": "Everything is ready!\n\n"
+              "You can now click 'Export MOD' at the bottom to generate a complete HOI4 MOD.\n"
+              "Click 'Finish Tutorial' to close this guide, then try exporting!",
+    },
+    "tut_done_title": {"zh": "教程完成！", "en": "Tutorial Complete!"},
+    "tut_done_msg": {
+        "zh": "恭喜你完成了新手教程！\n\n"
+              "你已经学会了制作 HOI4 MOD 的基本流程：\n"
+              "画地图 → 生省份 → 设地形 → 建国家 → 导出\n\n"
+              "现在可以新建一个正式项目，开始创造你的幻想世界了！",
+        "en": "Congratulations! You've completed the tutorial!\n\n"
+              "You've learned the basic MOD creation workflow:\n"
+              "Draw map → Generate provinces → Set terrain → Create countries → Export\n\n"
+              "Now create a new project and start building your fantasy world!",
+    },
 }
 
 

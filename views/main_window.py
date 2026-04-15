@@ -131,6 +131,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._welcome_page.open_project_requested.connect(self._on_open_project)
         self._welcome_page.open_recent_requested.connect(self._on_welcome_open_recent)
         self._welcome_page.import_mod_requested.connect(self._on_welcome_import_mod)
+        self._welcome_page.tutorial_requested.connect(self._on_start_tutorial)
         self._stack.addWidget(self._welcome_page)
 
         # 编辑器布局：左侧固定宽度工具面板 + 右侧画布
@@ -195,6 +196,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 帮助
         help_menu = menubar.addMenu(tr("menu_help"))
         self._add_action(help_menu, tr("action_guide"), self._show_guide_force)
+        self._add_action(help_menu, tr("action_tutorial"), self._on_start_tutorial)
         self._add_action(help_menu, tr("action_reset_hints"), self._reset_mode_hints)
         help_menu.addSeparator()
         self._add_action(help_menu, tr("action_about"), self._on_about)
@@ -695,6 +697,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         from views.guide_dialog import GuideDialog
         dlg = GuideDialog(self)
         dlg.exec_()
+
+    def _on_start_tutorial(self) -> None:
+        """启动交互式教程。"""
+        from views.tutorial import TutorialController
+        self._tutorial = TutorialController(self)
+        self._tutorial.start()
 
     def _reset_mode_hints(self) -> None:
         """重置所有模式操作提示。"""
