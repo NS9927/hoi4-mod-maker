@@ -38,16 +38,15 @@ def _populate_imported_data(project, result: dict) -> None:
     if project.state_mgr.states:
         project.state_mgr._next_id = max(project.state_mgr.states.keys()) + 1
 
-    # 填充 strategic regions
+    # 填充 strategic regions — 直接构造对象，不走 create_region（auto_id 会冲突）
+    from domain.managers.strategic_region import StrategicRegion
     sr_mgr = project.strategic_region_mgr
     for rd in result.get("strategic_regions", []):
-        r = sr_mgr.create_region(name=rd.get("name", ""))
-        # create_region 自动分配 ID，但我们要用原始 ID
-        # 先删掉自动分配的，再用原始 ID 放回
-        auto_id = r.id
-        sr_mgr._regions.pop(auto_id, None)
-        r.id = rd["id"]
-        r.province_ids = rd.get("provinces", [])
+        r = StrategicRegion(
+            id=rd["id"],
+            name=rd.get("name", f"STRATEGICREGION_{rd['id']}"),
+            province_ids=rd.get("provinces", []),
+        )
         sr_mgr._regions[r.id] = r
     if sr_mgr._regions:
         sr_mgr._next_id = max(sr_mgr._regions.keys()) + 1
