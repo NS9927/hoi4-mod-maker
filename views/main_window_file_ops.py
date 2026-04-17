@@ -374,6 +374,11 @@ class MainWindowFileOpsMixin:
         self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
         self._canvas.refresh_display()
         self._update_province_count()
+        # 刷新 State/Country 着色（导入后切模式才能看到颜色）
+        self._app._refresh_state_colors()
+        self._app._refresh_country_colors()
+        self._app._refresh_country_list()
+        self._app._refresh_state_list()
         self._project.mark_dirty()
 
         state_count = len(self._project.state_mgr.states)
