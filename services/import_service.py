@@ -30,20 +30,21 @@ _TYPE_MAP = {
 
 
 def validate_mod_directory(mod_dir: str) -> list[str]:
-    """检查目录结构，返回缺失文件列表。"""
-    required = ["map/provinces.bmp"]
-    optional = [
-        "map/definition.csv",
-        "map/terrain.bmp",
-        "map/heightmap.bmp",
-        "map/rivers.bmp",
-    ]
-    missing = []
-    for f in required:
-        path = os.path.join(mod_dir, f.replace("/", os.sep))
-        if not os.path.isfile(path):
-            missing.append(f)
-    return missing
+    """检查目录结构，返回缺失文件列表。
+
+    如果 MOD 没有 map/provinces.bmp，尝试从 vanilla 目录补。
+    很多 MOD 不含地图文件（只改 history/common），这种情况用 vanilla 的地图。
+    """
+    from data.constants import DEFAULT_HOI4_PATH
+    provinces_path = os.path.join(mod_dir, "map", "provinces.bmp")
+    if not os.path.isfile(provinces_path):
+        # 尝试 vanilla fallback
+        vanilla_provinces = os.path.join(DEFAULT_HOI4_PATH, "map", "provinces.bmp")
+        if os.path.isfile(vanilla_provinces):
+            return [f"map/provinces.bmp 不在此 MOD 中（该 MOD 使用 vanilla 地图）。\n"
+                    f"如需导入地图，请直接导入 vanilla 目录:\n{DEFAULT_HOI4_PATH}"]
+        return ["map/provinces.bmp（该 MOD 和 vanilla 都找不到地图文件）"]
+    return []
 
 
 def _parse_definition_csv(csv_path: str) -> dict[tuple[int, int, int], dict[str, Any]]:
