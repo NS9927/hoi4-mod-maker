@@ -80,9 +80,10 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._display_buffer = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
         self._province_border_buffer = None  # 延迟创建
 
-        # State / Country 颜色缓冲区
+        # State / Country / Strategic Region 颜色缓冲区
         self._state_color_rgb = None   # np.ndarray (H, W, 3) or None
         self._country_color_rgb = None  # np.ndarray (H, W, 3) or None
+        self._sr_color_rgb = None      # np.ndarray (H, W, 3) or None
         # 省份属性地形（gameplay terrain）颜色缓冲区
         self._provincial_terrain_color_rgb = None  # np.ndarray (H, W, 3) or None
 
@@ -291,6 +292,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             self._border_base_pixmap = None
         self._state_color_rgb = None
         self._country_color_rgb = None
+        self._sr_color_rgb = None
         h, w = map_data.tile_map.shape[0], map_data.tile_map.shape[1]
         self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
         self._scene.setSceneRect(0, 0, w, h)
@@ -481,6 +483,12 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         """存储 Country 颜色 RGB 数组并触发渲染"""
         self._country_color_rgb = rgb
         if self._display_mode == "country":
+            self._full_render()
+
+    def set_sr_colors(self, rgb: np.ndarray) -> None:
+        """存储 Strategic Region 颜色 RGB 数组并触发渲染"""
+        self._sr_color_rgb = rgb
+        if self._display_mode == "strategic_region":
             self._full_render()
 
     def set_provincial_terrain_colors(self, rgb: np.ndarray) -> None:
@@ -712,7 +720,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "logistics": self._render_logistics_mode,
             "density": self._render_land_mode,
             "continent": self._render_land_mode,
-            "strategic_region": self._render_land_mode,
+            "strategic_region": self._render_sr_mode,
             "colormap": self._render_land_mode,
             "default_map": self._render_land_mode,
             "province_terrain": self._render_province_terrain_mode,
@@ -737,7 +745,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "logistics": self._partial_render_logistics,
             "density": self._partial_render_land,
             "continent": self._partial_render_land,
-            "strategic_region": self._partial_render_land,
+            "strategic_region": self._partial_render_sr,
             "colormap": self._partial_render_land,
             "default_map": self._partial_render_land,
             "province_terrain": self._partial_render_province_terrain,
@@ -821,6 +829,16 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
     def _partial_render_country(self, x0: int, y0: int, x1: int, y1: int) -> None:
         from features.map.country.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
+    # ---------- strategic_region 模式渲染 ----------
+
+    def _render_sr_mode(self) -> None:
+        from features.map.strategic_region.renderer import render
+        render(self)
+
+    def _partial_render_sr(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        from features.map.strategic_region.renderer import partial_render
         partial_render(self, x0, y0, x1, y1)
 
     # ---------- river 模式渲染 ----------

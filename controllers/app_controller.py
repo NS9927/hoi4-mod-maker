@@ -111,6 +111,8 @@ class ApplicationController:
             self._refresh_state_colors()
         elif mode == "country":
             self._refresh_country_colors()
+        elif mode == "strategic_region":
+            self._refresh_sr_colors()
         elif mode == "province_terrain":
             self._refresh_provincial_terrain_colors()
 
@@ -263,6 +265,14 @@ class ApplicationController:
             self._canvas.province_map, self._project.state_mgr
         )
         self._canvas.set_country_colors(rgb)
+
+    def _refresh_sr_colors(self) -> None:
+        if int(self._canvas.province_map.max()) == 0:
+            return
+        rgb = self._project.strategic_region_mgr.build_sr_color_map(
+            self._canvas.province_map
+        )
+        self._canvas.set_sr_colors(rgb)
 
     def update_province_count(self) -> int:
         """返回当前省份数量。"""

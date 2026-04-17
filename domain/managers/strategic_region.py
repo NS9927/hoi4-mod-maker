@@ -315,6 +315,22 @@ class StrategicRegionManager:
             changed += 1
         return changed
 
+    def build_sr_color_map(self, province_map: np.ndarray) -> np.ndarray:
+        """生成战略区域着色图 (H, W, 3) — 每个 region 一种颜色（确定性哈希）。"""
+        max_pid = int(province_map.max())
+        lut = np.full((max_pid + 1, 3), 50, dtype=np.uint8)  # 未分配=深灰
+
+        for rid, region in self._regions.items():
+            # 确定性颜色：从 region id 哈希
+            rng = np.random.RandomState(rid * 7 + 13)
+            color = rng.randint(60, 220, size=3).astype(np.uint8)
+            for pid in region.province_ids:
+                if 0 < pid <= max_pid:
+                    lut[pid] = color
+
+        flat = np.clip(province_map.ravel(), 0, max_pid)
+        return lut[flat].reshape(province_map.shape[0], province_map.shape[1], 3)
+
     def clear(self) -> None:
         self._regions = {}
         self._next_id = 1
