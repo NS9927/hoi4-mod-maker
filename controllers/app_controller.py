@@ -95,6 +95,13 @@ class ApplicationController:
         # 密度模式特殊：借用 LandController 但开启 density_mode
         # （画的是 density_map 不是 tile_map，鼠标事件逻辑不同）
         if mode == "density":
+            # 确保 density_map 存在（首次进入时创建）
+            md = self._project.map_data
+            if md.density_map is None:
+                md.density_map = np.full(
+                    (md.tile_map.shape[0], md.tile_map.shape[1]),
+                    0.5, dtype=np.float32,
+                )
             self._current_controller = self._controllers.get("land")
             if self._current_controller is not None:
                 self._current_controller.density_mode = True
