@@ -1060,12 +1060,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
                         dm[dy0:dy1, dx0:dx1][d_circle] = dv
                 return
 
-            # 修改大陆时，如果已有省份数据则自动清除（只检查一次）
-            if self._has_provinces:
-                self._has_provinces = False
-                self._province_map[:] = 0
-                self._province_pixmap_item.setVisible(False)
-                self.provinces_cleared.emit()
+            # 已有省份时不再自动清除 — 用户可能只是想扩张陆地
+            # 新画的陆地区域 province_map 保持 0（未分配），
+            # 后续用"增量生成省份"给新区域补省份
 
             if self._current_tool == "eraser":
                 if circle is not None:

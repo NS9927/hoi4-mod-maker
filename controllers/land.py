@@ -33,11 +33,17 @@ class LandController(BaseController):
         self.density_value: float = 1.0  # 0.0~1.0
 
     def activate(self) -> None:
-        """进入大陆模式，默认画笔工具。"""
+        """进入大陆模式，默认画笔工具。有省份时提醒。"""
         self.current_tool = "brush"
         self._stroke_changes.clear()
         self._is_painting = False
-        self._emit_status("大陆编辑模式")
+        has_provinces = int(self.project.map_data.province_map.max()) > 0
+        if has_provinces:
+            self._emit_status(
+                "⚠ 已有省份数据 — 画地图不会清除省份，新区域用「增量生成」补省份"
+            )
+        else:
+            self._emit_status("大陆编辑模式")
 
     def deactivate(self) -> None:
         """离开大陆模式，结束未完成笔触。"""
