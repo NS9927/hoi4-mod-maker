@@ -371,6 +371,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.strategic_region_auto_requested.connect(
             lambda: self._controllers["strategic_region"].auto_generate()
         )
+        tp.auto_weather_requested.connect(
+            lambda: (self._controllers["strategic_region"].auto_assign_weather(), self._refresh_sr_list())
+        )
         tp.strategic_region_pick_toggled.connect(self._on_sr_pick_toggled)
         tp.strategic_region_new_requested.connect(
             lambda: (self._controllers["strategic_region"].create_region(), self._refresh_sr_list())
@@ -839,6 +842,10 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._project.country_mgr.clear()
         self._project.continent_mgr.clear()
         self._project.strategic_region_mgr.clear()
+
+        # 保留导入的美术资产
+        self._project.assets = dict(result.get("assets", {}))
+        self._project.dirty_assets = set()
 
         # 填充导入的 states/strategic_regions/countries
         from views.main_window_file_ops import _populate_imported_data

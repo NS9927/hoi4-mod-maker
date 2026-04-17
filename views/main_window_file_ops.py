@@ -327,6 +327,11 @@ class MainWindowFileOpsMixin:
         self._project.strategic_region_mgr.clear()
         self._cmd_history.clear()
 
+        # 保留导入的美术资产（colormap/world_normal 等），导出时不会覆盖
+        imported_assets = result.get("assets", {})
+        self._project.assets = dict(imported_assets)
+        self._project.dirty_assets = set()
+
         # 填充 states 数据
         _populate_imported_data(self._project, result)
 
@@ -339,8 +344,9 @@ class MainWindowFileOpsMixin:
 
         state_count = len(self._project.state_mgr.states)
         sr_count = self._project.strategic_region_mgr.count()
+        asset_count = len(self._project.assets)
         info_text = (f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份, "
-                     f"{state_count} 州, {sr_count} 战略区域)")
+                     f"{state_count} 州, {sr_count} 战略区域, {asset_count} 美术资产)")
         self._status_info.setText(info_text)
 
         warnings_text = ""

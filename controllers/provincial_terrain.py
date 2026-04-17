@@ -10,6 +10,7 @@ import numpy as np
 
 from controllers.base import BaseController
 from commands.map.paint_terrain import PaintTerrainCommand
+from ui.i18n import tr
 
 if TYPE_CHECKING:
     from model.project import Project
@@ -29,7 +30,7 @@ class ProvincialTerrainController(BaseController):
         self.assign_mode: bool = False  # 默认查看模式
 
     def activate(self) -> None:
-        self._emit_status("属性地形：查看模式（勾选「分配模式」才能改）")
+        self._emit_status(tr("status_pterrain_view"))
 
     def deactivate(self) -> None:
         pass
@@ -37,16 +38,16 @@ class ProvincialTerrainController(BaseController):
     def set_type(self, type_name: str) -> None:
         self.current_type = type_name
         if self.assign_mode:
-            self._emit_status(f"已选 {type_name}，点击省份生效")
+            self._emit_status(tr("status_pterrain_selected", type_name))
         else:
-            self._emit_status(f"已选 {type_name}（请勾选「分配模式」才能改）")
+            self._emit_status(tr("status_pterrain_selected_view", type_name))
 
     def set_assign_mode(self, enabled: bool) -> None:
         self.assign_mode = enabled
         if enabled:
-            self._emit_status(f"✏️ 分配模式开启：点击省份将其改为 {self.current_type}")
+            self._emit_status(tr("status_pterrain_assign_on", self.current_type))
         else:
-            self._emit_status("👁 查看模式：点 province 只看信息")
+            self._emit_status(tr("status_pterrain_view_on"))
 
     def on_province_clicked(self, pid: int) -> None:
         if pid <= 0:
@@ -66,7 +67,7 @@ class ProvincialTerrainController(BaseController):
             return
         tile_val = int(tile_map[ys[0], xs[0]])
         if tile_val in (TILE_SEA, TILE_LAKE):
-            self._emit_status(f"省份 {pid} 是海洋/湖泊，不能改地形")
+            self._emit_status(tr("status_pterrain_sea_skip", pid))
             return
 
         # 复用 PaintTerrainCommand，只传 provincial_terrain_changes
@@ -79,4 +80,4 @@ class ProvincialTerrainController(BaseController):
         self.history.execute(cmd)
         self.project.mark_dirty()
         self._emit_render(full=True)
-        self._emit_status(f"省份 {pid} 属性地形 → {self.current_type}")
+        self._emit_status(tr("status_pterrain_applied", pid, self.current_type))

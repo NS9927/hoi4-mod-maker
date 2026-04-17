@@ -184,6 +184,24 @@ class InputMixin:
                     self._is_drawing = True
                     self.stroke_started.emit()
                     sx, sy = self._scene_pos(event)
+                    # 河流自动源头：brush 模式下，若起笔点不是在已有河道上，
+                    # 自动在起点放一个源头标记（0=绿色），保证画出来的河合法。
+                    # HOI4 规则：没有源头的河引擎不渲染（Paradox wiki Map modding §721）
+                    if (self._current_tool == "brush"
+                        and self._current_river_type not in (0, 1, 2)
+                        and 0 <= sx < self.map_w and 0 <= sy < self.map_h):
+                        from domain.managers.river import VALID_RIVER_VALUES
+                        val = int(self._river_map[sy, sx])
+                        if val not in VALID_RIVER_VALUES:
+                            # 临时切 source 画一下，再切回原宽度
+                            orig_type = self._current_river_type
+                            self._current_river_type = 0
+                            self._stamp_brush(sx, sy)
+                            self._current_river_type = orig_type
+                            # 避免下一步与源头之间出对角，_last_draw_pos 设为源头位置
+                            self._last_draw_pos = (sx, sy)
+                            event.accept()
+                            return
                     self._paint_at(sx, sy)
                     event.accept()
                     return

@@ -229,7 +229,7 @@ class HeightGenConfig:
     """高度图生成参数。"""
     # 基础高度（参考原版: 海岸~97, 内陆平原~120, 山脉200+）
     coast_height: int = 97      # 海岸线基础高度 (刚过海平面95)
-    inland_max: int = 180       # 内陆最高基础值 (距离场上限，原版山区到200+)
+    inland_max: int = 220       # 内陆最高基础值（加上噪声 ±40 可达 260，让高山区能到 snow_min=210 成雪山）
     # 距离场
     distance_power: float = 0.35 # 距海岸距离的幂次
     distance_scale: float = 250.0 # 距离归一化尺度 (像素)
@@ -290,11 +290,22 @@ def smart_auto_height(
                                octaves=4, seed=config.seed, downsample=ds)
     detail_noise = perlin_2d((h, w), scale=config.detail_scale,
                              octaves=3, seed=config.seed + 500, downsample=ds)
+    # 第三层：高山集群（密集尖锐，只有阈值以上部分起作用，模拟真实山脉链）
+    peaks_noise = perlin_2d((h, w), scale=80.0,
+                            octaves=5, seed=config.seed + 777, downsample=ds)
 
     # 噪声权重：海岸 0% → 内陆 5 像素后 100%（保护海岸渐变）
     noise_weight = np.clip((dist_to_sea - 5) / 10.0, 0, 1).astype(np.float32)
     hm[land] += (mountain_noise[land] * config.noise_amplitude
                  + detail_noise[land] * config.detail_amplitude) * noise_weight[land]
+
+    # 山峰集群：只有 peaks_noise > 0.3 的地方才加高山（大概 30% 的内陆区域形成山脉链）
+    peak_threshold = 0.3
+    peak_strength = 120.0  # 阈值以上每 +0.1 → +12 高度，最多加 84（0.7→84）
+    peak_bonus = np.maximum(peaks_noise - peak_threshold, 0) * peak_strength
+    # 只在远离海岸（≥20像素）的地方生效，让山脉远离海
+    peak_mask = land & (dist_to_sea >= 20)
+    hm[peak_mask] += peak_bonus[peak_mask]
 
     # 5. 轻微平滑（不削山峰）
     hm = gaussian_filter(hm, sigma=2.0)

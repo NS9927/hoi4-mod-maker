@@ -42,10 +42,10 @@ class HeightPage(QWidget):
 
         # ═══════ 🏔 顶部：一键智能生成高度（推荐）═══════
         from ui.styles import _ACCENT
-        auto_top_box = _make_section("🏔 一键生成高度图（推荐）")
+        auto_top_box = _make_section(tr("height_auto_top_section"))
         auto_top_layout = auto_top_box.layout()
 
-        auto_top_btn = QPushButton("🏔 智能生成高度图")
+        auto_top_btn = QPushButton(tr("height_auto_top_btn"))
         auto_top_btn.setMinimumHeight(44)
         auto_top_btn.setStyleSheet(
             f"QPushButton {{"
@@ -59,11 +59,11 @@ class HeightPage(QWidget):
             f"}}"
             f"QPushButton:hover {{ background: #9090ff; }}"
         )
-        auto_top_btn.setToolTip("根据陆海划分自动生成有起伏的高度图。详细参数在下方")
+        auto_top_btn.setToolTip(tr("height_auto_top_tooltip"))
         auto_top_btn.clicked.connect(self.auto_height_requested.emit)
         auto_top_layout.addWidget(auto_top_btn)
 
-        auto_top_tip = QLabel("画完陆海就点这个，自动生成合理高度。下方参数可调细节。")
+        auto_top_tip = QLabel(tr("height_auto_top_tip"))
         auto_top_tip.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 2px;")
         auto_top_tip.setWordWrap(True)
         auto_top_layout.addWidget(auto_top_tip)

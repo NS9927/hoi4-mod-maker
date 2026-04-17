@@ -91,6 +91,11 @@ class TerrainController(BaseController):
         )
         self.history.execute(cmd)
         self.project.mark_dirty()
+        # 视觉地形变了 → colormap 需要重生；改了 height 也触发 normal
+        self._invalidate_art_assets(
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+            "map/world_normal.bmp",
+        )
         self._emit_render(full=True)
         self._emit_status(f"省份 {pid} 地形已设为 {ptype or '未知'}")
 
@@ -225,4 +230,7 @@ class TerrainController(BaseController):
         self.history.execute(cmd)
         self._stroke_changes = {}
         self.project.mark_dirty()
+        self._invalidate_art_assets(
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+        )
         self._emit_render(full=True)

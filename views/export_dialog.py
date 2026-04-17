@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 )
 
 from data.constants import DEFAULT_MOD_OUTPUT_PATH, DEFAULT_MOD_NAME
+from ui.i18n import tr
 
 
 # ── 检查项数据 ──────────────────────────────────────
@@ -170,6 +171,23 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
         items.append(CheckItem(
             "高度图", "ok", "高度数据已设置", False))
 
+    # 8. 美术资产（仅当有导入资产时显示）
+    asset_total = len(getattr(project, "assets", {}) or {})
+    if asset_total > 0:
+        clean_count = project.clean_asset_count()
+        dirty_count = project.dirty_asset_count()
+        if dirty_count == 0:
+            items.append(CheckItem(
+                "美术资产", "ok",
+                f"共 {asset_total} 个导入的原始资产全部保留（导出不会覆盖）",
+                False, asset_total))
+        else:
+            items.append(CheckItem(
+                "美术资产", "warning",
+                f"共 {asset_total} 个导入资产：{clean_count} 个保留、{dirty_count} 个将重新生成\n"
+                f"（因为相关地图数据被编辑过）",
+                False, asset_total))
+
     return items
 
 
@@ -271,6 +289,8 @@ class ExportWorker(QThread):
                 adjacency_rule_mgr=self.project.adjacency_rule_mgr,
                 strategic_region_mgr=self.project.strategic_region_mgr,
                 scope=self.scope,
+                assets=self.project.assets,
+                dirty_assets=self.project.dirty_assets,
             )
             self.finished.emit(report)
         except Exception as e:
@@ -508,7 +528,11 @@ class ExportDialog(QDialog):
         self._progress_bar.setVisible(False)
         self._progress_label.setVisible(False)
 
-        # 显示结果
+        # 运行 MOD 验证
+        from export.verify_mod import ModVerifier
+        verify_errors, verify_warnings = ModVerifier.verify_quiet(self._output_dir)
+
+        # 构建结果文本
         lines = [f"MOD 导出成功！\n路径: {self._output_dir}\n"]
         if report.stats:
             lines.append("── 统计 ──")
@@ -521,11 +545,73 @@ class ExportDialog(QDialog):
             for f in report.fixed:
                 lines.append(f"  [已修复] {f}")
         if report.warnings:
-            lines.append("\n── 警告 ──")
+            lines.append("\n── 导出警告 ──")
             for w in report.warnings:
                 lines.append(f"  [警告] {w}")
 
-        QMessageBox.information(self, "导出完成", "\n".join(lines))
+        # 追加验证结果
+        if not verify_errors and not verify_warnings:
+            lines.append("\n── MOD 验证 ──")
+            lines.append("  ✅ 所有检查通过，可以进游戏了！")
+        else:
+            if verify_errors:
+                lines.append(f"\n── MOD 验证：{len(verify_errors)} 个错误（可能导致崩溃）──")
+                for e in verify_errors:
+                    lines.append(f"  ❌ {e}")
+            if verify_warnings:
+                lines.append(f"\n── MOD 验证：{len(verify_warnings)} 个警告 ──")
+                for w in verify_warnings:
+                    lines.append(f"  ⚠ {w}")
+
+        # 显示详细结果对话框
+        self._show_export_result(lines, verify_errors)
+
+    def _show_export_result(
+        self, lines: list[str], verify_errors: list[str]
+    ) -> None:
+        """用可滚动对话框显示导出结果和验证报告。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle(
+            tr("export_result_title_errors") if verify_errors
+            else tr("export_result_title_ok")
+        )
+        dlg.setMinimumWidth(560)
+        dlg.setMinimumHeight(400)
+
+        layout = QVBoxLayout(dlg)
+
+        # 标题标签
+        if verify_errors:
+            header = QLabel(tr("export_done_has_errors"))
+            header.setStyleSheet(
+                "font-size: 15px; font-weight: bold; color: #ef4444;"
+            )
+        else:
+            header = QLabel(tr("export_done_all_pass"))
+            header.setStyleSheet(
+                "font-size: 15px; font-weight: bold; color: #22c55e;"
+            )
+        layout.addWidget(header)
+
+        # 可滚动文本区域
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText("\n".join(lines))
+        layout.addWidget(text_edit)
+
+        # 关闭按钮
+        btn_close = QPushButton(tr("export_result_close"))
+        btn_close.setStyleSheet(
+            "QPushButton { padding: 8px 20px; border-radius: 4px;"
+            " font-weight: bold; }"
+        )
+        btn_close.clicked.connect(dlg.accept)
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_close)
+        layout.addLayout(btn_layout)
+
+        dlg.exec_()
         self.accept()
 
     def _on_export_failed(self, error_msg: str) -> None:

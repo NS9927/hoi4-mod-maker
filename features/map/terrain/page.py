@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 
 from data.terrain_types import (
     TERRAIN_TYPES, PAINTABLE_GROUPS, GRAPHICAL_TERRAINS,
+    graphical_terrain_display_name,
 )
 
 from ui.styles import (
@@ -93,10 +94,10 @@ class TerrainPage(QWidget):
 
         # ═══════ 🎨 顶部：一键自动生成（推荐）═══════
         from ui.styles import _ACCENT
-        auto_top_box = _make_section("🎨 一键生成地形（推荐）")
+        auto_top_box = _make_section(tr("terrain_auto_top_section"))
         auto_top_layout = auto_top_box.layout()
 
-        auto_top_btn = QPushButton("🌋 基于高度图自动生成地形")
+        auto_top_btn = QPushButton(tr("terrain_auto_top_btn"))
         auto_top_btn.setMinimumHeight(44)
         auto_top_btn.setStyleSheet(
             f"QPushButton {{"
@@ -112,11 +113,11 @@ class TerrainPage(QWidget):
             f"  background: #9090ff;"
             f"}}"
         )
-        auto_top_btn.setToolTip("根据高度图自动画地形 + 自动同步属性地形。详细参数在下方")
+        auto_top_btn.setToolTip(tr("terrain_auto_top_tooltip"))
         auto_top_btn.clicked.connect(self.auto_terrain_requested.emit)
         auto_top_layout.addWidget(auto_top_btn)
 
-        auto_top_tip = QLabel("根据高度图自动生成 + 同步属性层。调完高度就点这个。")
+        auto_top_tip = QLabel(tr("terrain_auto_top_tip"))
         auto_top_tip.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 2px;")
         auto_top_tip.setWordWrap(True)
         auto_top_layout.addWidget(auto_top_tip)
@@ -204,7 +205,7 @@ class TerrainPage(QWidget):
             grid.setSpacing(4)
 
             for i, gt in enumerate(variants):
-                btn = QPushButton(gt.name_cn)
+                btn = QPushButton(graphical_terrain_display_name(gt))
                 btn.setToolTip(
                     f"{tr('terrain_tip_index')}: {gt.palette_index}  {tr('terrain_tip_texture')}: {gt.texture}\n"
                     f"{tr('terrain_tip_type')}: {gt.type}  ID: {gt.id}"

@@ -23,6 +23,7 @@ class StrategicRegionPage(QWidget):
 
     # 输出信号
     strategic_region_auto_requested = pyqtSignal()
+    auto_weather_requested = pyqtSignal()
     strategic_region_selected = pyqtSignal(int)
     strategic_region_new_requested = pyqtSignal()
     strategic_region_delete_requested = pyqtSignal()
@@ -56,6 +57,11 @@ class StrategicRegionPage(QWidget):
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(lambda: self.strategic_region_auto_requested.emit())
         lay.addWidget(auto_btn)
+
+        auto_weather_btn = QPushButton(tr("sr_auto_weather_btn"))
+        auto_weather_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        auto_weather_btn.clicked.connect(lambda: self.auto_weather_requested.emit())
+        lay.addWidget(auto_weather_btn)
 
         # 从州创建
         self._from_states_btn = QPushButton(tr("sr_from_states_btn"))

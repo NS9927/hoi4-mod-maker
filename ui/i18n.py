@@ -148,6 +148,7 @@ _translations: dict[str, dict[str, str]] = {
     # === 战略区域页面 ===
     "sr_tip": {"zh": "战略区域: 省份分组 + 天气 + 海军地形.\n建议先点'自动生成'按 State 创建初始分组，\n再手动调整。每个区域可设天气和海军地形类型.\n用拾取模式点省份可移入选中的区域.", "en": "Strategic regions: province grouping + weather + naval terrain.\nSuggest clicking 'Auto Generate' to create initial groups by state,\nthen adjust manually. Each region can set weather and naval terrain.\nUse pick mode to move provinces into the selected region."},
     "sr_auto_btn": {"zh": "自动生成 (按 State 分组)", "en": "Auto Generate (Group by State)"},
+    "sr_auto_weather_btn": {"zh": "\U0001f30d 按纬度自动分配天气", "en": "\U0001f30d Auto-Assign Weather by Latitude"},
     "sr_from_states_btn": {"zh": "选择州 → 创建战略区域", "en": "Select States → Create Strategic Region"},
     "sr_from_states_tip": {"zh": "开启后点击地图选择多个州，然后点确认合并为一个战略区域", "en": "Enable to select multiple states on map, then confirm to merge into one strategic region"},
     "sr_from_states_confirm_btn": {"zh": "确认创建战略区域", "en": "Confirm Create Strategic Region"},
@@ -402,6 +403,7 @@ _translations: dict[str, dict[str, str]] = {
     "river_tool_eraser": {"zh": "橡皮", "en": "Eraser"},
     "river_tool_pan": {"zh": "平移", "en": "Pan"},
     "sr_auto_btn": {"zh": "自动生成 (按 State 分组)", "en": "Auto Generate (Group by State)"},
+    "sr_auto_weather_btn": {"zh": "\U0001f30d 按纬度自动分配天气", "en": "\U0001f30d Auto-Assign Weather by Latitude"},
     "sr_delete_btn": {"zh": "删除", "en": "Delete"},
     "sr_from_states_btn": {"zh": "选择州 → 创建战略区域", "en": "Select States → Create Strategic Region"},
     "sr_from_states_confirm_btn": {"zh": "确认创建战略区域", "en": "Confirm Create Strategic Region"},
@@ -751,6 +753,169 @@ _translations: dict[str, dict[str, str]] = {
         "zh": "配置河流数量上限和树木调色板。",
         "en": "Configure max river count and tree color palette.",
     },
+
+    # === 河流 page (新版 UI) ===
+    "river_section_auto": {"zh": "🪄 一键生成河流（推荐）", "en": "🪄 Auto-Generate Rivers (Recommended)"},
+    "river_btn_auto_new": {"zh": "🌊 自动生成河流", "en": "🌊 Auto-Generate Rivers"},
+    "river_auto_tooltip": {
+        "zh": "基于高度图自动生成合理河流网络，几秒完成全图",
+        "en": "Auto-generate a reasonable river network based on heightmap, done in seconds",
+    },
+    "river_auto_tip": {
+        "zh": "根据高度图自动画河，不用手动。生成后可手动改/擦除。",
+        "en": "Auto-draw rivers from heightmap. Manual edit / erase still works after.",
+    },
+    "river_section_manual": {"zh": "✏️ 手动画河流（3 步）", "en": "✏️ Manual Drawing (3 Steps)"},
+    "river_step1_title": {"zh": "<b>步骤 1：</b>选河流宽度", "en": "<b>Step 1:</b> Select river width"},
+    "river_step2_title": {"zh": "<b>步骤 2：</b>在地图上画河", "en": "<b>Step 2:</b> Draw river on map"},
+    "river_step2_hint": {
+        "zh": "从山上某点按住鼠标 → 拖到海边 → 松手\n⚠️ 只能走上下左右，不能斜线",
+        "en": "Click-drag from mountains to sea → release\n⚠️ Only horizontal/vertical, no diagonal",
+    },
+    "river_step3_title": {"zh": "<b>步骤 3：</b>加起点/终点标记", "en": "<b>Step 3:</b> Add source/mouth markers"},
+    "river_step3_hint": {
+        "zh": "每条河至少 1 个源头（绿）\n入海口（黄）放河流末端\n汇入点（红）= 两条河合并处",
+        "en": "Each river needs ≥1 source (green)\nMouth marker (yellow) at sea entry\nFlow-in (red) where rivers merge",
+    },
+    "river_brush_btn": {"zh": "画笔", "en": "Brush"},
+    "river_eraser_btn": {"zh": "橡皮", "en": "Eraser"},
+    "river_pan_btn": {"zh": "平移", "en": "Pan"},
+    "river_eraser_range": {"zh": "橡皮范围:", "en": "Eraser size:"},
+    "river_width_note": {
+        "zh": "💡 河流必须 1px 宽（HOI4 规则），滑块只影响橡皮擦范围",
+        "en": "💡 Rivers must be 1px wide (HOI4 rule), slider only affects eraser",
+    },
+    "river_btn_validate_new": {"zh": "✓ 验证河流是否合法", "en": "✓ Validate Rivers"},
+    "river_validate_tooltip": {
+        "zh": "检查是否有对角线像素、缺失源头等问题",
+        "en": "Check for diagonal pixels, missing sources, etc.",
+    },
+
+    # === 属性地形 page ===
+    "pterrain_intro": {
+        "zh": ("🟢 <b>属性地形</b>（影响战斗 / 补给）\n\n"
+               "默认是<b>查看模式</b>：点 province 只显示信息，不改地形。\n"
+               "要改地形：勾选下面的<b>「分配模式」</b>，然后点 province。\n\n"
+               "💡 此模式只改 gameplay 数据，不动 terrain.bmp 视觉。"),
+        "en": ("🟢 <b>Attribute Terrain</b> (affects combat / supply)\n\n"
+               "Default is <b>view mode</b>: click province shows info only, no edit.\n"
+               "To edit: check <b>'Assign Mode'</b> below, then click province.\n\n"
+               "💡 This mode only changes gameplay data, not terrain.bmp visual."),
+    },
+    "pterrain_assign_mode": {"zh": "🖊 分配模式（开启后点击改地形）", "en": "🖊 Assign Mode (click to change terrain)"},
+    "pterrain_section_types": {"zh": "地形类型", "en": "Terrain Types"},
+    "pterrain_current_label": {"zh": "当前：{0} ({1})", "en": "Current: {0} ({1})"},
+
+    # === 地形（视觉）顶部大按钮 ===
+    "terrain_auto_top_section": {"zh": "🎨 一键生成地形（推荐）", "en": "🎨 One-Click Terrain (Recommended)"},
+    "terrain_auto_top_btn": {"zh": "🌋 基于高度图自动生成地形", "en": "🌋 Auto-Generate Terrain from Heightmap"},
+    "terrain_auto_top_tooltip": {
+        "zh": "根据高度图自动画地形 + 自动同步属性地形。详细参数在下方",
+        "en": "Auto-paint terrain from heightmap + sync attribute layer. Advanced params below",
+    },
+    "terrain_auto_top_tip": {
+        "zh": "根据高度图自动生成 + 同步属性层。调完高度就点这个。",
+        "en": "Auto-generate + sync attributes. Click after editing heightmap.",
+    },
+
+    # === 高度 tab 顶部大按钮 ===
+    "height_auto_top_section": {"zh": "🏔 一键生成高度图（推荐）", "en": "🏔 One-Click Heightmap (Recommended)"},
+    "height_auto_top_btn": {"zh": "🏔 智能生成高度图", "en": "🏔 Smart Generate Heightmap"},
+    "height_auto_top_tooltip": {
+        "zh": "根据陆海划分自动生成有起伏的高度图。详细参数在下方",
+        "en": "Auto-generate terrain-like heightmap from land/sea mask. Advanced params below",
+    },
+    "height_auto_top_tip": {
+        "zh": "画完陆海就点这个，自动生成合理高度。下方参数可调细节。",
+        "en": "Click after editing land/sea. Advanced params below for fine-tuning.",
+    },
+
+    # === 导航组 tooltip (风险等级) ===
+    "nav_tooltip_map_draw": {"zh": "🟢 基础数据（陆海划分、省份密度）— 低崩溃风险", "en": "🟢 Base data (land/sea, density) — low crash risk"},
+    "nav_tooltip_province": {"zh": "🟢 省份编辑 — 基础 gameplay 数据", "en": "🟢 Province editing — base gameplay data"},
+    "nav_tooltip_terrain": {"zh": "⛰ 地形组：🟠高度 → 🎨视觉地形(自动生成) → 🟢属性地形(微调)", "en": "⛰ Terrain group: 🟠Height → 🎨Visual → 🟢Attribute"},
+    "nav_tooltip_river": {"zh": "🔴 河流 — 崩溃高发区！调色板严格(0-4,6-7,9-11)+必须正交", "en": "🔴 Rivers — crash-prone! Strict palette (0-4,6-7,9-11) + orthogonal only"},
+    "nav_tooltip_region": {"zh": "🟢 区域行政（州/国家/大陆）— gameplay 数据", "en": "🟢 Region admin (state/country/continent) — gameplay data"},
+    "nav_tooltip_logistics": {"zh": "🟠 物流系统（战略区/铁路/补给）— 影响补给机制", "en": "🟠 Logistics (strategic region/railway/supply) — affects supply"},
+    "nav_tooltip_settings": {"zh": "⚙ 设置（🎨 colormap=纯视觉/🟠 default_map=配置）", "en": "⚙ Settings (🎨 colormap=visual / 🟠 default_map=config)"},
+
+    # === 欢迎页 ===
+    "welcome_recent_tooltip": {"zh": "双击打开项目；鼠标悬停可看完整路径", "en": "Double-click to open; hover to see full path"},
+
+    # === 状态消息 ===
+    "status_pterrain_view": {"zh": "属性地形：查看模式（勾选「分配模式」才能改）", "en": "Attribute terrain: view mode (enable 'Assign Mode' to edit)"},
+    "status_pterrain_view_on": {"zh": "👁 查看模式：点 province 只看信息", "en": "👁 View mode: click province to see info"},
+    "status_pterrain_assign_on": {"zh": "✏️ 分配模式开启：点击省份将其改为 {0}", "en": "✏️ Assign mode on: click province to set it to {0}"},
+    "status_pterrain_selected": {"zh": "已选 {0}，点击省份生效", "en": "Selected {0}, click province to apply"},
+    "status_pterrain_selected_view": {"zh": "已选 {0}（请勾选「分配模式」才能改）", "en": "Selected {0} (enable 'Assign Mode' to edit)"},
+    "status_pterrain_applied": {"zh": "省份 {0} 属性地形 → {1}", "en": "Province {0} attribute terrain → {1}"},
+    "status_pterrain_sea_skip": {"zh": "省份 {0} 是海洋/湖泊，不能改地形", "en": "Province {0} is sea/lake, cannot change terrain"},
+    "status_unassigned_warning": {"zh": "⚠️ 有 {0} 个省份未分配到 state（画布上红色高亮）", "en": "⚠️ {0} provinces not assigned to any state (red on canvas)"},
+    "status_all_assigned": {"zh": "✅ 所有省份都已分配到 state", "en": "✅ All provinces assigned to states"},
+    "status_auto_terrain_synced": {"zh": "（同步 {0} 个省份属性）", "en": " (synced {0} province attributes)"},
+
+    # === 节点区段标题 ===
+    "section_tools": {"zh": "工具", "en": "Tools"},
+
+    "terrain_unknown": {"zh": "未知", "en": "Unknown"},
+
+    # === 河流类型按钮 ===
+    "river_marker_source": {"zh": "源头", "en": "Source"},
+    "river_marker_confluence": {"zh": "汇入点", "en": "Confluence"},
+    "river_marker_mouth": {"zh": "入海口", "en": "Mouth"},
+    "river_width_1": {"zh": "细流", "en": "Trickle"},
+    "river_width_2": {"zh": "小河", "en": "Small"},
+    "river_width_4": {"zh": "中河", "en": "Medium"},
+    "river_width_5": {"zh": "大河", "en": "Large"},
+    "river_width_7": {"zh": "宽河", "en": "Wide"},
+    "river_width_8": {"zh": "巨河", "en": "Huge"},
+    "river_width_9": {"zh": "最宽", "en": "Widest"},
+
+    # === 地形类型（TerrainType.name） ===
+    "terrain_name_ocean":    {"zh": "海洋", "en": "Ocean"},
+    "terrain_name_lakes":    {"zh": "湖泊", "en": "Lakes"},
+    "terrain_name_plains":   {"zh": "平原", "en": "Plains"},
+    "terrain_name_forest":   {"zh": "森林", "en": "Forest"},
+    "terrain_name_hills":    {"zh": "丘陵", "en": "Hills"},
+    "terrain_name_mountain": {"zh": "山地", "en": "Mountain"},
+    "terrain_name_desert":   {"zh": "沙漠", "en": "Desert"},
+    "terrain_name_marsh":    {"zh": "沼泽", "en": "Marsh"},
+    "terrain_name_jungle":   {"zh": "丛林", "en": "Jungle"},
+    "terrain_name_urban":    {"zh": "城市", "en": "Urban"},
+
+    # === Graphical terrain 变体名 ===
+    "gt_terrain_0":             {"zh": "平原",        "en": "Plains"},
+    "gt_terrain_1":             {"zh": "森林",        "en": "Forest"},
+    "gt_desert_mountain":       {"zh": "沙漠丘陵",    "en": "Desert Hills"},
+    "gt_desert":                {"zh": "沙漠",        "en": "Desert"},
+    "gt_terrain_4":             {"zh": "森林(变体)",  "en": "Forest (var)"},
+    "gt_terrain_5":             {"zh": "平原(变体)",  "en": "Plains (var)"},
+    "gt_terrain_6":             {"zh": "山地",        "en": "Mountain"},
+    "gt_terrain_7":             {"zh": "沙漠(变体)",  "en": "Desert (var)"},
+    "gt_desert_hills":          {"zh": "沙漠丘陵",    "en": "Desert Hills"},
+    "gt_terrain_9":             {"zh": "沼泽",        "en": "Marsh"},
+    "gt_terrain_10":            {"zh": "山地(变体)",  "en": "Mountain (var)"},
+    "gt_desert_mountain_11":    {"zh": "沙漠山地",    "en": "Desert Mountain"},
+    "gt_desert_12":             {"zh": "沙漠(岩地)",  "en": "Desert (rocky)"},
+    "gt_forest_13":             {"zh": "城市",        "en": "Urban"},
+    "gt_forest_14":             {"zh": "湖泊",        "en": "Lakes"},
+    "gt_ocean_15":              {"zh": "海洋",        "en": "Ocean"},
+    "gt_snow_16":               {"zh": "雪山",        "en": "Snow Mountain"},
+    "gt_hills_blend":           {"zh": "丘陵",        "en": "Hills"},
+    "gt_mountain_variation_sand":  {"zh": "沙色山地", "en": "Sand Mountain"},
+    "gt_plains_snow":           {"zh": "雪原",        "en": "Snow Plains"},
+    "gt_mountain_variation_grass": {"zh": "草地山地", "en": "Grass Mountain"},
+    "gt_jungle_18":             {"zh": "丛林",        "en": "Jungle"},
+    "gt_jungle_blend_18":       {"zh": "丛林(变体)",  "en": "Jungle (var)"},
+    "gt_jungle_mountain":       {"zh": "丛林山地",    "en": "Jungle Mountain"},
+    "gt_desert_mountain_tops":  {"zh": "沙漠山顶",    "en": "Desert Peaks"},
+
+    # === 导出验证 ===
+    "export_result_title_ok":    {"zh": "导出完成", "en": "Export Complete"},
+    "export_result_title_errors": {"zh": "导出完成（有问题）", "en": "Export Complete (Issues Found)"},
+    "export_done_all_pass":      {"zh": "导出成功，验证全部通过！", "en": "Export succeeded, all checks passed!"},
+    "export_done_has_errors":    {"zh": "导出成功，但验证发现问题（进游戏可能崩溃）", "en": "Export succeeded, but verification found issues (may crash in game)"},
+    "export_result_close":       {"zh": "关闭", "en": "Close"},
 }
 
 

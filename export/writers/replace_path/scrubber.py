@@ -144,23 +144,39 @@ def write_replace_path_dirs(output_dir: str) -> None:
             if os.path.isfile(src):
                 _sh.copy2(src, os.path.join(dcat_dir, fn))
 
-    # events/GOE_Raj.txt 文件级覆盖 (走时间崩溃唯一根因)
-    # vanilla 行 487: `has_war_with = 733.controller` 引用 state 733 (不存在),
-    # AI tick 拿 null.controller → 访问违规 → client_ping 崩.
-    # 保留 add_namespace 声明避免其他文件 ID 引用失效, 清空所有 country_event 体.
+    # events/*.txt 文件级覆盖 (周期性 tick 报错)
+    # vanilla 事件文件引用了 TC MOD 不存在的 state ID 和 controller scope,
+    # 导致游戏每周期 tick 报 "State X not found" / "invalid event target: controller"
+    # 保留 add_namespace 声明避免其他文件 ID 引用失效, 清空所有 event 体.
     ev_dir = os.path.join(output_dir, "events")
     os.makedirs(ev_dir, exist_ok=True)
-    with open(os.path.join(ev_dir, "GOE_Raj.txt"), "w", encoding="utf-8") as f:
-        f.write("# Emptied — TC MOD overrides vanilla GOE_Raj.txt\n")
-        f.write("# Reason: line 487 has_war_with=733.controller, state 733 doesn't exist\n")
-        f.write("# Keep add_namespace declarations so other files' ID refs don't break\n")
-        for ns in (
+
+    # 需要覆盖的 vanilla event 文件 → namespaces 列表
+    _VANILLA_EVENTS_TO_EMPTY = {
+        "GOE_Raj.txt": [
             "GOE_RAJ", "GOE_RAJ_partition", "GOE_RAJ_famine", "GOE_RAJ_eic",
             "GOE_RAJ_princely", "GOE_RAJ_navy", "GOE_RAJ_goa",
             "GOE_RAJ_generals", "GOE_RAJ_mughals_peace_deal",
             "GOE_RAJ_loyalist", "GOE_RAJ_news",
-        ):
-            f.write(f"add_namespace = {ns}\n")
+        ],
+        # NewsEvents.txt: 引用 state 1032/1035/1036 (TC MOD 没有)
+        "NewsEvents.txt": ["news"],
+        # SEA_Japan.txt: 引用 controller scope 但事件触发时无对象
+        "SEA_Japan.txt": [
+            "SEA_japan", "SEA_japan_foreign_policy", "SEA_japan_popup_events",
+            "SEA_japan_tokko_arrest_events", "SEA_japan_news_events",
+            "SEA_japan_hidden_events", "SEA_japan_air_accidents_events",
+            "SEA_border_incidents_events", "SEA_imperial_influence_events",
+        ],
+    }
+
+    for filename, namespaces in _VANILLA_EVENTS_TO_EMPTY.items():
+        with open(os.path.join(ev_dir, filename), "w", encoding="utf-8") as f:
+            f.write(f"# Emptied — TC MOD overrides vanilla {filename}\n")
+            f.write("# Reason: references state IDs or scope targets not in TC MOD\n")
+            f.write("# Keep add_namespace declarations so other files' ID refs don't break\n")
+            for ns in namespaces:
+                f.write(f"add_namespace = {ns}\n")
 
     # 所有 vanilla on_actions 文件空覆盖
     # 原因: 00_on_actions.txt on_startup 硬编码 canal 省份 6389/7617 + state 58/685,

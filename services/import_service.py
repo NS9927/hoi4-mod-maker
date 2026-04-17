@@ -401,6 +401,11 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
     else:
         warnings.append("未找到 history/states/ 目录")
 
+    # 9a. 扫描美术资产（colormap / world_normal 等 HOI4 会读但工具不生成的文件）
+    assets = _collect_art_assets(mod_dir)
+    if assets:
+        warnings.append(f"保留了 {len(assets)} 个原始美术资产（导出时不会覆盖）")
+
     # 9. 读取 strategic regions (可选)
     sr_dir = os.path.join(mod_dir, "map", "strategicregions")
     sr_data: list[dict] = []
@@ -431,5 +436,80 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
         "provincial_terrain": provincial_terrain,
         "states": states_data,
         "strategic_regions": sr_data,
+        "assets": assets,
         "warnings": warnings,
     }
+
+
+# ── 美术资产扫描 ──────────────────────────────────────────────
+# "结构性文件" = 工具会从数据重新生成的文件（不保留原字节）
+# 其它文件 = 美术资产（保留原字节，除非用户编辑触发 dirty）
+
+# 这些 map/ 下文件工具会从 MapData / managers 重新生成 → 不收进 assets
+_STRUCTURAL_MAP_FILES = {
+    "provinces.bmp",
+    "heightmap.bmp",
+    "terrain.bmp",
+    "rivers.bmp",
+    "trees.bmp",
+    "cities.bmp",
+    "definition.csv",
+    "default.map",
+    "continent.txt",
+    "adjacencies.csv",
+    "adjacency_rules.txt",
+    "ambient_object.txt",
+    "buildings.txt",
+    "positions.txt",
+    "railways.txt",
+    "supply_nodes.txt",
+    "unitstacks.txt",
+    "airports.txt",
+    "rocket_sites.txt",
+    "weatherpositions.txt",
+    "seasons.txt",
+    "cities.txt",
+    "colors.txt",
+}
+
+
+def _collect_art_assets(mod_dir: str) -> dict[str, bytes]:
+    """扫描 MOD 的 map/ 和 map/terrain/ 下所有非结构性文件，返回 {rel_path: bytes}。
+
+    结构性文件（provinces/heightmap/terrain 等）由工具从数据重新生成，不收集。
+    美术资产（colormap_*.dds、world_normal.bmp 等）原样保留。
+
+    返回值的 key 形如 "map/terrain/colormap_rgb_cityemissivemask_a.dds"（斜杠分隔）。
+    """
+    assets: dict[str, bytes] = {}
+    map_dir = os.path.join(mod_dir, "map")
+    if not os.path.isdir(map_dir):
+        return assets
+
+    def _add_file(full_path: str, rel_to_mod: str) -> None:
+        try:
+            with open(full_path, "rb") as f:
+                assets[rel_to_mod.replace(os.sep, "/")] = f.read()
+        except OSError:
+            pass
+
+    # 扫 map/ 根目录
+    for fn in os.listdir(map_dir):
+        full = os.path.join(map_dir, fn)
+        if not os.path.isfile(full):
+            continue
+        if fn in _STRUCTURAL_MAP_FILES:
+            continue
+        # 收非结构性文件（world_normal.bmp 等）
+        _add_file(full, f"map/{fn}")
+
+    # 扫 map/terrain/ 下所有 .dds / .bmp（全都是美术，vanilla 生成，无结构性文件）
+    terrain_dir = os.path.join(map_dir, "terrain")
+    if os.path.isdir(terrain_dir):
+        for fn in os.listdir(terrain_dir):
+            full = os.path.join(terrain_dir, fn)
+            if not os.path.isfile(full):
+                continue
+            _add_file(full, f"map/terrain/{fn}")
+
+    return assets

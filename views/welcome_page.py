@@ -179,7 +179,7 @@ class WelcomePage(QWidget):
 
         self._recent_list = QListWidget()
         self._recent_list.setFixedSize(640, 220)  # 加宽到 640（原 360）显示长路径
-        self._recent_list.setToolTip("双击打开项目；鼠标悬停可看完整路径")
+        self._recent_list.setToolTip(tr("welcome_recent_tooltip"))
         self._recent_list.setStyleSheet(f"""
             QListWidget {{
                 background: {_INPUT_BG};

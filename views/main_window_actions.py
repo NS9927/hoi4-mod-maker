@@ -400,10 +400,14 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         map_data.provincial_terrain.clear()
         map_data.provincial_terrain.update(new_dict)
         self._project.mark_dirty()
+        # 自动生成地形 → colormap 要重生
+        self._project.mark_assets_dirty(
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+        )
         # 通知 canvas 地形数据已变 (触发重新渲染)
         self._canvas.terrain_map = map_data.terrain_map
         self._status_info.setText(
-            tr("status_auto_terrain_done") + f"（同步 {len(new_dict)} 个省份属性）"
+            tr("status_auto_terrain_done") + tr("status_auto_terrain_synced", len(new_dict))
         )
 
     def _on_auto_height(self) -> None:
@@ -420,6 +424,11 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         map_data.height_map[:] = new_height
         self._canvas.height_map = map_data.height_map
         self._project.mark_dirty()
+        # 自动生成高度 → world_normal / colormap 要重生
+        self._project.mark_assets_dirty(
+            "map/world_normal.bmp",
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+        )
         self._status_info.setText(tr("status_auto_height_done"))
 
     def _on_smooth_height(self) -> None:

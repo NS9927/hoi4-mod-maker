@@ -46,10 +46,14 @@ TREES_PALETTE_BYTES = b"".join(TREES_PALETTE_BGRA)  # 1024 bytes
 
 # 地形类型 → trees.bmp 索引 映射 (自动生成用)
 # 参考 Map modding.txt §Trees (行 419-470)
+#
+# ⚠️ vanilla trees.bmp 实际只使用 [0, 2, 3, 5, 6, 11, 28, 29]
+# 非法索引（7, 14 等）HOI4 引擎查不到树类型，可能崩溃
+# 本映射严格使用 vanilla 合法索引
 TERRAIN_TO_TREE_INDEX: dict[str, int] = {
-    "forest":   7,   # temperate dense
-    "hills":    5,   # temperate sparse (有些丘陵有树)
-    "jungle":  14,   # jungle medium
+    "forest":   6,   # temperate medium（原为 7，vanilla 不用）
+    "hills":    5,   # temperate sparse
+    "jungle":  11,   # jungle impassable（原为 14，vanilla 不用）
     "marsh":    6,   # temperate medium
     "mountain": 0,   # 无树
     "plains":   0,   # 无树 (平原默认不放树)

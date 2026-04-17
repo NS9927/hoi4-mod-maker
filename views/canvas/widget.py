@@ -1080,14 +1080,25 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._mark_dirty(x0, y0, x1, y1)
 
     def _paint_at(self, scene_x: int, scene_y: int) -> None:
-        """在指定位置绘制，并与上一个位置做线性插值避免断线"""
+        """在指定位置绘制，并与上一个位置做插值避免断线。
+
+        河流模式用**阶梯式正交路径**（先水平后垂直），符合 HOI4 规则
+        （pixels do not connect diagonally — Paradox wiki《Map modding》）。
+        其它模式用 Bresenham 斜线（更平滑）。
+        """
         if self._last_draw_pos is not None:
             lx, ly = self._last_draw_pos
-            # Bresenham 线性插值
             dx = abs(scene_x - lx)
             dy = abs(scene_y - ly)
             steps = max(dx, dy)
-            if steps > 1:
+            if self._display_mode == "river":
+                # 河流：永远走阶梯（哪怕只是 1 像素的对角移动也要走正交）
+                # 慢速拖鼠标每次只报 1px，dx=dy=1 时 steps=1，
+                # 走直接 stamp 会产生一串对角像素 → 不合法
+                if dx > 0 or dy > 0:
+                    self._stamp_orthogonal(lx, ly, scene_x, scene_y)
+            elif steps > 1:
+                # 其它模式：Bresenham 斜线插值（平滑）
                 for i in range(1, steps + 1):
                     t = i / steps
                     ix = int(lx + (scene_x - lx) * t)
@@ -1099,6 +1110,24 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             self._stamp_brush(scene_x, scene_y)
 
         self._last_draw_pos = (scene_x, scene_y)
+
+    def _stamp_orthogonal(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        """正交阶梯画线：先沿 x 方向走一格一格，再沿 y 方向。
+        保证相邻两像素必然上下左右相贴，不产生对角连接。
+        用于河流模式 — HOI4 规定河流只能正交连接。
+        """
+        # 水平段
+        x = x0
+        step_x = 1 if x1 > x0 else -1 if x1 < x0 else 0
+        while x != x1:
+            x += step_x
+            self._stamp_brush(x, y0)
+        # 垂直段
+        y = y0
+        step_y = 1 if y1 > y0 else -1 if y1 < y0 else 0
+        while y != y1:
+            y += step_y
+            self._stamp_brush(x1, y)
 
     def _flood_fill(self, x: int, y: int) -> None:
         if x < 0 or x >= self.map_w or y < 0 or y >= self.map_h:

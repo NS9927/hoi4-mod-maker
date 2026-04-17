@@ -40,10 +40,26 @@ for lo, hi, (r0, g0, b0), (r1, g1, b1) in _BANDS:
 
 
 def render(canvas) -> None:
-    canvas._display_buffer[:] = _HEIGHT_COLOR_LUT[canvas._height_map]
+    buf = canvas._display_buffer
+    hm = canvas._height_map
+    bh, bw = buf.shape[:2]
+    mh, mw = hm.shape[:2]
+    if (bh, bw) == (mh, mw):
+        buf[:] = _HEIGHT_COLOR_LUT[hm]
+    else:
+        # 尺寸不匹配（项目加载/切换时可能发生）— 用重叠区域，避免崩溃
+        rh, rw = min(bh, mh), min(bw, mw)
+        buf[:rh, :rw] = _HEIGHT_COLOR_LUT[hm[:rh, :rw]]
 
 
 def partial_render(canvas, x0: int, y0: int, x1: int, y1: int) -> None:
+    hm = canvas._height_map
+    mh, mw = hm.shape[:2]
+    # 裁剪到 height_map 实际范围
+    x1 = min(x1, mw)
+    y1 = min(y1, mh)
+    if x0 >= x1 or y0 >= y1:
+        return
     canvas._display_buffer[y0:y1, x0:x1] = (
-        _HEIGHT_COLOR_LUT[canvas._height_map[y0:y1, x0:x1]]
+        _HEIGHT_COLOR_LUT[hm[y0:y1, x0:x1]]
     )

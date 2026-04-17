@@ -56,3 +56,12 @@ class BaseController:
     def _emit_render(self, full: bool = False, bbox: tuple | None = None) -> None:
         """请求画布刷新。"""
         self.event_bus.emit("request_render", full=full, bbox=bbox)
+
+    def _invalidate_art_assets(self, *rel_paths: str) -> None:
+        """标记导入的美术资产需要在导出时重新生成。
+
+        场景：用户画了陆海/地形/高度，导入 MOD 时保留的 colormap 和 world_normal
+        就不再反映实际地图 → 需要重生。
+        rel_paths 示例："map/terrain/colormap_rgb_cityemissivemask_a.dds"
+        """
+        self.project.mark_assets_dirty(*rel_paths)

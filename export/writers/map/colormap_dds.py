@@ -164,6 +164,27 @@ def write_colormap_dds(
 
     pixels[lake_mask] = color_lake
 
+    # ── 消除"拼贴"硬边：给陆地加噪声 + gaussian 模糊 ──
+    # 为什么：vanilla colormap 是画家手绘 + 噪声，几千种颜色；
+    # 我们按地形类型填纯色只有 7 种颜色，atlas 材质叠上去就是硬边块。
+    # 加噪声 + 轻度模糊后，相邻地形之间有渐变带，肉眼看不到"拼贴"。
+    try:
+        from scipy.ndimage import gaussian_filter
+        rng = np.random.default_rng(42)
+        # 只对陆地 BGR 三通道做抖动 + 模糊（alpha 保持 0）
+        rgb = pixels[..., :3].astype(np.float32)
+        noise = rng.integers(-12, 13, size=rgb.shape, dtype=np.int16).astype(np.float32)
+        rgb = rgb + noise
+        for c in range(3):
+            rgb[..., c] = gaussian_filter(rgb[..., c], sigma=2.5)
+        rgb = np.clip(rgb, 0, 255).astype(np.uint8)
+        pixels[..., :3] = rgb
+        # 模糊会让颜色渗进海洋/湖泊，重新覆盖回纯海色/湖色（海面另有 colormap_water 渲染）
+        pixels[downsampled == TILE_SEA] = color_sea
+        pixels[lake_mask] = color_lake
+    except ImportError:
+        pass  # scipy 不在时退回硬边版本
+
     # 写文件
     out_dir = os.path.join(output_dir, "map", "terrain")
     os.makedirs(out_dir, exist_ok=True)

@@ -41,8 +41,18 @@ def export_full_mod(
     strategic_region_mgr=None,
     provincial_terrain: dict[int, str] | None = None,
     scope: dict[str, bool] | None = None,
+    assets: dict[str, bytes] | None = None,
+    dirty_assets: set[str] | None = None,
 ) -> None:
-    """一键导出完整 MOD。scope 控制导出范围，None=全部导出。"""
+    """一键导出完整 MOD。scope 控制导出范围，None=全部导出。
+
+    assets/dirty_assets: 美术资产系统。导入的 MOD 原始美术文件保存在 assets 中，
+    未被编辑触发 dirty 的资产在导出时直接写回原字节（保留原美术）。
+    """
+    if assets is None:
+        assets = {}
+    if dirty_assets is None:
+        dirty_assets = set()
     if int(province_map.max()) == 0:
         raise ValueError("没有省份数据，请先生成省份")
 
@@ -59,6 +69,10 @@ def export_full_mod(
         _tmp.province_map = province_map
         _tmp.tile_map = tile_map
         _tmp.compact_with_references(state_mgr=state_mgr, country_mgr=country_mgr)
+    province_count = int(province_map.max())
+
+    # 清理 < 8 像素的碎屑省份，合并到最大相邻省份（只改导出副本）
+    province_map = _merge_tiny_provinces(province_map, min_pixels=8)
     province_count = int(province_map.max())
 
     colors = generate_province_colors(province_count)
@@ -96,17 +110,43 @@ def export_full_mod(
     # cities.bmp: 从 urban terrain 生成城市标记 (Feature 11)
     from export.writers.map.cities_bmp import write_cities_bmp as _write_cities_new
     _write_cities_new(output_dir, terrain_map=terrain_map)
-    _write_normal_map(heightmap, output_dir)
+    # world_normal.bmp — 法线贴图，可被导入的原版本替代
+    from export.asset_helper import write_or_restore
+    write_or_restore(
+        "map/world_normal.bmp", output_dir, assets, dirty_assets,
+        lambda: _write_normal_map(heightmap, output_dir),
+    )
 
     # colormap_rgb_cityemissivemask_a.dds 战略视角总览贴图
     # (不覆盖会看到 vanilla 地球大陆)
     from export.writers.map.colormap_dds import write_colormap_dds
-    write_colormap_dds(tile_map, output_dir, settings=colormap_settings,
-                       terrain_map=terrain_map)
+    write_or_restore(
+        "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+        output_dir, assets, dirty_assets,
+        lambda: write_colormap_dds(tile_map, output_dir, settings=colormap_settings,
+                                   terrain_map=terrain_map),
+    )
 
-    # colormap_water_0/1/2.dds 海洋着色贴图
+    # colormap_water_0/1/2.dds 海洋着色贴图 — 三个 MIP 都视作一组
     from export.writers.map.colormap_dds import write_water_colormap_dds
-    write_water_colormap_dds(tile_map, output_dir)
+
+    def _gen_water_colormap():
+        write_water_colormap_dds(tile_map, output_dir)
+
+    # 只要有一个 MIP 是 clean 就用整组原字节；否则重新生成三个
+    water_paths = [
+        "map/terrain/colormap_water_0.dds",
+        "map/terrain/colormap_water_1.dds",
+        "map/terrain/colormap_water_2.dds",
+    ]
+    all_water_clean = all(
+        p in assets and p not in dirty_assets for p in water_paths
+    )
+    if all_water_clean:
+        for p in water_paths:
+            write_or_restore(p, output_dir, assets, dirty_assets, lambda: None)
+    else:
+        _gen_water_colormap()
 
     # ambient_object.txt — 地图边框 (frame_border_top/bottom 挡住上下空白)
     from export.writers.map.ambient_object import write_ambient_object_txt
@@ -790,6 +830,70 @@ def _get_province_type(pid, pm, tm):
     elif lake_n > sea_n:
         return "lake"
     return "sea"
+
+
+def _merge_tiny_provinces(province_map: np.ndarray, min_pixels: int = 8) -> np.ndarray:
+    """将面积 < min_pixels 的碎屑省份合并到最大相邻省份。
+
+    返回新数组，不修改原始 province_map。
+    使用 numpy 向量化：bincount 统计面积，边界像素批量提取邻居。
+    """
+    pm = province_map.copy()
+    h, w = pm.shape
+
+    # 统计每个省份的像素数
+    max_id = int(pm.max())
+    areas = np.bincount(pm.ravel(), minlength=max_id + 1)
+
+    # 找出所有 < min_pixels 的省份（跳过 ID 0 = 未分配）
+    tiny_ids = np.where((areas > 0) & (areas < min_pixels))[0]
+    tiny_ids = tiny_ids[tiny_ids > 0]
+    if len(tiny_ids) == 0:
+        return pm
+
+    # 按面积从小到大处理（最小的先合并，避免两个碎块互相指向）
+    tiny_ids = tiny_ids[np.argsort(areas[tiny_ids])]
+
+    for pid in tiny_ids:
+        # 该省份可能已被前一轮合并消灭
+        mask = (pm == pid)
+        if not np.any(mask):
+            continue
+
+        # 找边界像素的坐标
+        ys, xs = np.where(mask)
+
+        # 收集所有相邻像素的省份 ID（上下左右四方向）
+        neighbor_ids = []
+        for dy, dx in [(-1, 0), (1, 0), (0, -1), (0, 1)]:
+            ny = ys + dy
+            nx = xs + dx
+            valid = (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
+            if np.any(valid):
+                n_vals = pm[ny[valid], nx[valid]]
+                # 排除自身和 ID 0
+                n_vals = n_vals[(n_vals != pid) & (n_vals != 0)]
+                if len(n_vals) > 0:
+                    neighbor_ids.append(n_vals)
+
+        if not neighbor_ids:
+            continue
+
+        all_neighbors = np.concatenate(neighbor_ids)
+        # 统计每个邻居出现次数，再按邻居面积选最大的
+        unique_neighbors, counts = np.unique(all_neighbors, return_counts=True)
+        # 用邻居面积作为主排序键（选最大邻居）
+        neighbor_areas = areas[unique_neighbors]
+        best_idx = int(np.argmax(neighbor_areas))
+        target = unique_neighbors[best_idx]
+
+        # 把碎块像素改为目标省份
+        pm[mask] = target
+        # 更新面积缓存
+        areas[target] += areas[pid]
+        areas[pid] = 0
+
+    return pm
 
 
 def _classify_provinces_fast(province_count, province_map, tile_map):

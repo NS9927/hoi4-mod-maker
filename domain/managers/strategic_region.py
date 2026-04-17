@@ -21,43 +21,82 @@ import numpy as np
 
 WeatherPreset = Literal["polar", "cold", "temperate", "tropical", "desert"]
 
-# 天气预设 → 4 季 period 块参数
-# between 格式: DAY.MONTH, 0-indexed (0.0 = 1月1日, 30.11 = 12月31日)
+# 天气预设 → 12 个 period（每月一个），与 vanilla 格式一致
+# between 格式: {START_DAY.MONTH END_DAY.MONTH}，period 不能跨月
+# 月末日: Jan/Mar/May/Jul/Aug/Oct/Dec=30, Feb=27, Apr/Jun/Sep/Nov=29
+# 写错月末日会导致 HOI4 报 "overlapping temperature intervals"
+
+# 月份末日表（每月合法的最大 day 值，day 从 0 起算）
+_MONTH_LAST_DAY = [30, 27, 30, 29, 30, 29, 30, 30, 29, 30, 29, 30]
+
+# 每种气候的 12 个月参数（冬冷夏暖）— 季节性强度按预设调整
+# 索引 0=Jan ... 11=Dec
+def _make_seasonal(winter: dict, spring: dict, summer: dict, autumn: dict) -> list[dict]:
+    """给定 4 季参数，展开成 12 个月 period 列表。
+    冬=Dec/Jan/Feb, 春=Mar/Apr/May, 夏=Jun/Jul/Aug, 秋=Sep/Oct/Nov。
+    """
+    season_by_month = [winter, winter, spring, spring, spring, summer,
+                       summer, summer, autumn, autumn, autumn, winter]
+    periods = []
+    for m, s in enumerate(season_by_month):
+        periods.append({
+            "between": f"0.{m} {_MONTH_LAST_DAY[m]}.{m}",
+            **s,
+        })
+    return periods
+
+
 WEATHER_PRESETS: dict[str, list[dict]] = {
-    "polar": [
-        {"between": "0.0 30.11", "temp": "-30.0 -5.0", "no": 0.2, "snow": 0.4,
-         "blizzard": 0.3, "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.0,
-         "sandstorm": 0.0, "min_snow": 0.5},
-    ],
-    "cold": [
-        {"between": "0.0 29.1", "temp": "-15.0 0.0", "no": 0.3, "snow": 0.3,
-         "blizzard": 0.15, "rain_light": 0.1, "rain_heavy": 0.05, "mud": 0.05,
-         "sandstorm": 0.0, "min_snow": 0.2},
-        {"between": "0.2 30.4", "temp": "0.0 15.0", "no": 0.4, "snow": 0.1,
-         "blizzard": 0.0, "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.15,
-         "sandstorm": 0.0, "min_snow": 0.0},
-        {"between": "0.5 30.7", "temp": "10.0 25.0", "no": 0.5, "snow": 0.0,
-         "blizzard": 0.0, "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.1,
-         "sandstorm": 0.0, "min_snow": 0.0},
-        {"between": "0.8 30.11", "temp": "-10.0 5.0", "no": 0.3, "snow": 0.25,
-         "blizzard": 0.1, "rain_light": 0.15, "rain_heavy": 0.05, "mud": 0.1,
-         "sandstorm": 0.0, "min_snow": 0.1},
-    ],
-    "temperate": [
-        {"between": "0.0 30.11", "temp": "-5.0 25.0", "no": 0.5, "snow": 0.1,
-         "blizzard": 0.05, "rain_light": 0.15, "rain_heavy": 0.05, "mud": 0.1,
-         "sandstorm": 0.0, "min_snow": 0.0},
-    ],
-    "tropical": [
-        {"between": "0.0 30.11", "temp": "20.0 35.0", "no": 0.3, "snow": 0.0,
-         "blizzard": 0.0, "rain_light": 0.25, "rain_heavy": 0.2, "mud": 0.15,
-         "sandstorm": 0.0, "min_snow": 0.0},
-    ],
-    "desert": [
-        {"between": "0.0 30.11", "temp": "10.0 45.0", "no": 0.6, "snow": 0.0,
-         "blizzard": 0.0, "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.0,
-         "sandstorm": 0.25, "min_snow": 0.0},
-    ],
+    "polar": _make_seasonal(
+        winter={"temp": "-35.0 -10.0", "no": 0.2, "snow": 0.4, "blizzard": 0.35,
+                "rain_light": 0.0, "rain_heavy": 0.0, "mud": 0.0, "sandstorm": 0.0, "min_snow": 0.6},
+        spring={"temp": "-25.0 -5.0", "no": 0.25, "snow": 0.35, "blizzard": 0.25,
+                "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.05, "sandstorm": 0.0, "min_snow": 0.5},
+        summer={"temp": "-15.0 5.0", "no": 0.35, "snow": 0.2, "blizzard": 0.1,
+                "rain_light": 0.15, "rain_heavy": 0.05, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.3},
+        autumn={"temp": "-25.0 -5.0", "no": 0.25, "snow": 0.35, "blizzard": 0.25,
+                "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.05, "sandstorm": 0.0, "min_snow": 0.5},
+    ),
+    "cold": _make_seasonal(
+        winter={"temp": "-15.0 0.0", "no": 0.3, "snow": 0.3, "blizzard": 0.15,
+                "rain_light": 0.1, "rain_heavy": 0.05, "mud": 0.05, "sandstorm": 0.0, "min_snow": 0.2},
+        spring={"temp": "0.0 15.0", "no": 0.4, "snow": 0.1, "blizzard": 0.0,
+                "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.15, "sandstorm": 0.0, "min_snow": 0.0},
+        summer={"temp": "10.0 25.0", "no": 0.5, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.0},
+        autumn={"temp": "-5.0 10.0", "no": 0.35, "snow": 0.2, "blizzard": 0.05,
+                "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.1},
+    ),
+    "temperate": _make_seasonal(
+        winter={"temp": "-5.0 10.0", "no": 0.4, "snow": 0.15, "blizzard": 0.05,
+                "rain_light": 0.2, "rain_heavy": 0.1, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.0},
+        spring={"temp": "5.0 20.0", "no": 0.5, "snow": 0.05, "blizzard": 0.0,
+                "rain_light": 0.25, "rain_heavy": 0.1, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.0},
+        summer={"temp": "15.0 30.0", "no": 0.6, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.2, "rain_heavy": 0.15, "mud": 0.05, "sandstorm": 0.0, "min_snow": 0.0},
+        autumn={"temp": "5.0 18.0", "no": 0.5, "snow": 0.05, "blizzard": 0.0,
+                "rain_light": 0.25, "rain_heavy": 0.1, "mud": 0.1, "sandstorm": 0.0, "min_snow": 0.0},
+    ),
+    "tropical": _make_seasonal(
+        winter={"temp": "18.0 30.0", "no": 0.35, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.25, "rain_heavy": 0.25, "mud": 0.15, "sandstorm": 0.0, "min_snow": 0.0},
+        spring={"temp": "20.0 33.0", "no": 0.3, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.25, "rain_heavy": 0.25, "mud": 0.2, "sandstorm": 0.0, "min_snow": 0.0},
+        summer={"temp": "22.0 35.0", "no": 0.3, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.2, "rain_heavy": 0.3, "mud": 0.2, "sandstorm": 0.0, "min_snow": 0.0},
+        autumn={"temp": "20.0 33.0", "no": 0.3, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.25, "rain_heavy": 0.25, "mud": 0.2, "sandstorm": 0.0, "min_snow": 0.0},
+    ),
+    "desert": _make_seasonal(
+        winter={"temp": "5.0 25.0", "no": 0.65, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.0, "sandstorm": 0.2, "min_snow": 0.0},
+        spring={"temp": "15.0 35.0", "no": 0.6, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.0, "sandstorm": 0.3, "min_snow": 0.0},
+        summer={"temp": "25.0 50.0", "no": 0.55, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.02, "rain_heavy": 0.0, "mud": 0.0, "sandstorm": 0.35, "min_snow": 0.0},
+        autumn={"temp": "15.0 35.0", "no": 0.6, "snow": 0.0, "blizzard": 0.0,
+                "rain_light": 0.05, "rain_heavy": 0.0, "mud": 0.0, "sandstorm": 0.3, "min_snow": 0.0},
+    ),
 }
 
 PRESET_LABELS = {
@@ -218,6 +257,63 @@ class StrategicRegionManager:
             else:
                 # 赤道附近: 检查是否沙漠 (如果大部分省份是沙漠地形)
                 r.weather_preset = "tropical"
+
+    def auto_assign_weather_by_latitude(
+        self, province_map: np.ndarray,
+    ) -> int:
+        """按纬度自动分配天气预设, 返回修改的 region 数量.
+
+        HOI4 地图: 图像 y=0 是最北(极地), y=MAP_HEIGHT 是最南(极地),
+        中间是赤道. 用距赤道的归一化距离分带:
+          0-0.15 (赤道附近): tropical
+          0.15-0.35: desert
+          0.35-0.60: temperate
+          0.60-0.80: cold
+          0.80-1.0 (极地): polar
+        """
+        map_height = province_map.shape[0]
+        if map_height == 0 or not self._regions:
+            return 0
+
+        # 向量化质心计算
+        flat = province_map.ravel()
+        n = int(province_map.max()) + 1
+        pid_count = np.bincount(flat, minlength=n)
+        ys = np.mgrid[0:province_map.shape[0], 0:province_map.shape[1]][0]
+        sum_y = np.bincount(flat, weights=ys.ravel().astype(np.float64), minlength=n)
+
+        changed = 0
+        for r in self._regions.values():
+            if not r.province_ids:
+                continue
+            # region 质心 y（只用有像素的省份）
+            total_y = 0.0
+            valid = 0
+            for p in r.province_ids:
+                if p < n and pid_count[p] > 0:
+                    total_y += sum_y[p] / pid_count[p]
+                    valid += 1
+            if valid == 0:
+                continue
+            avg_y = total_y / valid
+            # 归一化到 [0,1]: 0=北极, 0.5=赤道, 1=南极
+            lat_frac = avg_y / map_height
+            dist = abs(lat_frac - 0.5) * 2  # 0=赤道, 1=极地
+
+            if dist > 0.80:
+                preset = "polar"
+            elif dist > 0.60:
+                preset = "cold"
+            elif dist > 0.35:
+                preset = "temperate"
+            elif dist > 0.15:
+                preset = "desert"
+            else:
+                preset = "tropical"
+
+            r.weather_preset = preset
+            changed += 1
+        return changed
 
     def clear(self) -> None:
         self._regions = {}

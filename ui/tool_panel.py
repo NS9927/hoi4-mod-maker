@@ -31,35 +31,36 @@ from ui.styles import (
 #   "🟢" 基础数据（必填但低风险）
 #   "🟠" 影响游戏机制（需谨慎）
 #   "🔴" 崩溃高发区（必须严格按规范）
+# 第 5 项是 tooltip 的 i18n key（渲染时 tr() 取翻译）
 _NAV_MODES: list[tuple[str, str, str, list[tuple[str, str, str]], str]] = [
     ("map_draw", "🏖", "nav_map_draw", [
         ("land", "tab_land", "🟢"),
         ("density", "tab_density", "🟢"),
-    ], "🟢 基础数据（陆海划分、省份密度）— 低崩溃风险"),
+    ], "nav_tooltip_map_draw"),
     ("province", "🧩", "nav_province", [
         ("province", "", "🟢"),
-    ], "🟢 省份编辑 — 基础 gameplay 数据"),
+    ], "nav_tooltip_province"),
     ("terrain_group", "⛰", "nav_terrain", [
         ("height", "tab_height", "🟠"),
         ("terrain", "tab_terrain", "🎨"),
         ("province_terrain", "tab_province_terrain", "🟢"),
-    ], "⛰ 地形组：🟠高度 → 🎨视觉地形(自动生成) → 🟢属性地形(微调)"),
+    ], "nav_tooltip_terrain"),
     ("river", "💧", "nav_river", [
         ("river", "", "🔴"),
-    ], "🔴 河流 — 崩溃高发区！调色板严格(0-4,6-7,9-11)+必须正交"),
+    ], "nav_tooltip_river"),
     ("region", "🏛", "nav_region", [
         ("state", "tab_state", "🟢"),
         ("country", "tab_country", "🟢"),
         ("continent", "tab_continent", "🟢"),
-    ], "🟢 区域行政（州/国家/大陆）— gameplay 数据"),
+    ], "nav_tooltip_region"),
     ("logistics_group", "🛤", "nav_logistics", [
         ("strategic_region", "tab_strategic_region", "🟠"),
         ("logistics", "tab_logistics", "🟠"),
-    ], "🟠 物流系统（战略区/铁路/补给）— 影响补给机制"),
+    ], "nav_tooltip_logistics"),
     ("settings_group", "⚙", "nav_settings", [
         ("colormap", "tab_colormap", "🎨"),
         ("default_map", "tab_default_map", "🟠"),
-    ], "⚙ 设置（🎨 colormap=纯视觉/🟠 default_map=配置）"),
+    ], "nav_tooltip_settings"),
 ]
 
 
@@ -112,13 +113,13 @@ class _IconModeBar(QWidget):
         self._btn_group = QButtonGroup(self)
         self._btn_group.setExclusive(True)
 
-        for nav_id, icon, label_key, _subs, tooltip in _NAV_MODES:
+        for nav_id, icon, label_key, _subs, tooltip_key in _NAV_MODES:
             btn = QPushButton(f"  {icon}  {tr(label_key)}")
             btn.setCheckable(True)
             btn.setProperty("nav_id", nav_id)
             btn.setStyleSheet(_ICON_BTN_STYLE)
             btn.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-            btn.setToolTip(tooltip)  # 风险等级提示
+            btn.setToolTip(tr(tooltip_key))  # 风险等级提示
             self._btn_group.addButton(btn)
             self._buttons[nav_id] = btn
             layout.addWidget(btn)
@@ -304,6 +305,7 @@ class ToolPanel(QWidget):
 
     # 战略区域信号
     strategic_region_auto_requested = pyqtSignal()
+    auto_weather_requested = pyqtSignal()
     strategic_region_selected = pyqtSignal(int)
     strategic_region_new_requested = pyqtSignal()
     strategic_region_delete_requested = pyqtSignal()
@@ -549,6 +551,7 @@ class ToolPanel(QWidget):
     def _connect_strategic_region_signals(self) -> None:
         p = self._strategic_region_page
         p.strategic_region_auto_requested.connect(self.strategic_region_auto_requested)
+        p.auto_weather_requested.connect(self.auto_weather_requested)
         p.strategic_region_selected.connect(self.strategic_region_selected)
         p.strategic_region_new_requested.connect(self.strategic_region_new_requested)
         p.strategic_region_delete_requested.connect(self.strategic_region_delete_requested)

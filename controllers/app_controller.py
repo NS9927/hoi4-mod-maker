@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from ui.i18n import tr
+
 if TYPE_CHECKING:
     from model.project import Project
     from model.events import EventBus
@@ -87,9 +89,22 @@ class ApplicationController:
         self._canvas.cleanup_mode_state()
         self._canvas.display_mode = mode
 
-        self._current_controller = self._controllers.get(mode)
-        if self._current_controller is not None:
-            self._current_controller.activate()
+        # 密度模式特殊：借用 LandController 但开启 density_mode
+        # （画的是 density_map 不是 tile_map，鼠标事件逻辑不同）
+        if mode == "density":
+            self._current_controller = self._controllers.get("land")
+            if self._current_controller is not None:
+                self._current_controller.density_mode = True
+                self._current_controller.activate()
+                self._current_controller._emit_status("密度画笔模式")
+        else:
+            # 切到其他模式时，确保 land controller 退出密度模式
+            land_ctrl = self._controllers.get("land")
+            if land_ctrl is not None:
+                land_ctrl.density_mode = False
+            self._current_controller = self._controllers.get(mode)
+            if self._current_controller is not None:
+                self._current_controller.activate()
 
         # 按模式刷新颜色图
         if mode == "state":
@@ -149,20 +164,23 @@ class ApplicationController:
 
         # 优先读 provincial_terrain dict（属性层 = gameplay 真值）
         # 没有时才退回 terrain.bmp 多数像素（视觉层推断）
-        from data.terrain_types import GRAPHICAL_TERRAIN_BY_INDEX, TERRAIN_TYPES
+        from data.terrain_types import (
+            GRAPHICAL_TERRAIN_BY_INDEX, TERRAIN_TYPES,
+            terrain_display_name, graphical_terrain_display_name,
+        )
         prov_terrain = self._project.map_data.provincial_terrain
         if pid in prov_terrain:
             ptype_key = prov_terrain[pid]
             terrain_obj = TERRAIN_TYPES.get(ptype_key)
-            terrain_name = terrain_obj.name_cn if terrain_obj else ptype_key
+            terrain_name = terrain_display_name(terrain_obj) if terrain_obj else ptype_key
         else:
             terrain_data = self._canvas.terrain_map[mask]
             if len(terrain_data) > 0:
                 terrain_idx = int(np.bincount(terrain_data).argmax())
                 gt = GRAPHICAL_TERRAIN_BY_INDEX.get(terrain_idx)
-                terrain_name = gt.name_cn if gt else "未知"
+                terrain_name = graphical_terrain_display_name(gt) if gt else tr("terrain_unknown")
             else:
-                terrain_name = "未知"
+                terrain_name = tr("terrain_unknown")
 
         info = {
             "ptype": ptype, "terrain": terrain_name,
@@ -200,11 +218,11 @@ class ApplicationController:
         if count > 0:
             self._project.event_bus.emit(
                 "status_message",
-                text=f"⚠️ 有 {count} 个省份未分配到 state（画布上红色高亮）"
+                text=tr("status_unassigned_warning", count)
             )
         else:
             self._project.event_bus.emit(
-                "status_message", text="✅ 所有省份都已分配到 state"
+                "status_message", text=tr("status_all_assigned")
             )
 
     def _refresh_provincial_terrain_colors(self) -> None:

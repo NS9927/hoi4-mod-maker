@@ -10,11 +10,12 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QButtonGroup, QCheckBox,
 )
 
-from data.terrain_types import TERRAIN_TYPES
+from data.terrain_types import TERRAIN_TYPES, terrain_display_name
 from ui.styles import (
     make_section as _make_section,
     _DIM, _DIM_LABEL_STYLE,
 )
+from ui.i18n import tr
 
 
 # 8 种 land 类型（不含 ocean/lakes）
@@ -37,19 +38,14 @@ class ProvincialTerrainPage(QWidget):
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(6)
 
-        intro = QLabel(
-            "🟢 <b>属性地形</b>（影响战斗 / 补给）\n\n"
-            "默认是<b>查看模式</b>：点 province 只显示信息，不改地形。\n"
-            "要改地形：勾选下面的<b>「分配模式」</b>，然后点 province。\n\n"
-            "💡 此模式只改 gameplay 数据，不动 terrain.bmp 视觉。"
-        )
+        intro = QLabel(tr("pterrain_intro"))
         intro.setWordWrap(True)
         intro.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px;")
         intro.setTextFormat(Qt.TextFormat.RichText)
         outer.addWidget(intro)
 
         # 分配模式开关
-        self._assign_chk = QCheckBox("🖊 分配模式（开启后点击改地形）")
+        self._assign_chk = QCheckBox(tr("pterrain_assign_mode"))
         self._assign_chk.setChecked(False)  # 默认关闭，避免误改
         self._assign_chk.setStyleSheet(
             f"QCheckBox {{ color: #f0f0ff; font-size: 14px; font-weight: 600; padding: 6px; }}"
@@ -58,7 +54,7 @@ class ProvincialTerrainPage(QWidget):
         self._assign_chk.toggled.connect(self.assign_mode_changed)
         outer.addWidget(self._assign_chk)
 
-        type_box = _make_section("地形类型")
+        type_box = _make_section(tr("pterrain_section_types"))
         type_layout = type_box.layout()
         grid = QGridLayout()
         grid.setSpacing(4)
@@ -71,7 +67,7 @@ class ProvincialTerrainPage(QWidget):
             if terrain is None:
                 continue
             r, g, b = terrain.color
-            btn = QPushButton(f"{terrain.name_cn}\n({tname})")
+            btn = QPushButton(f"{terrain_display_name(terrain)}\n({tname})")
             btn.setCheckable(True)
             btn.setMinimumHeight(50)
             btn.setStyleSheet(
@@ -93,7 +89,8 @@ class ProvincialTerrainPage(QWidget):
 
         self._btn_group.buttonClicked.connect(self._on_type_clicked)
 
-        self._status_label = QLabel("当前：平原 (plains)")
+        plains_name = terrain_display_name(TERRAIN_TYPES["plains"]) if "plains" in TERRAIN_TYPES else "plains"
+        self._status_label = QLabel(tr("pterrain_current_label", plains_name, "plains"))
         self._status_label.setStyleSheet(_DIM_LABEL_STYLE)
         outer.addWidget(self._status_label)
 
@@ -103,8 +100,8 @@ class ProvincialTerrainPage(QWidget):
         tname = btn.property("type_name")
         if tname:
             terrain = TERRAIN_TYPES.get(tname)
-            cn = terrain.name_cn if terrain else tname
-            self._status_label.setText(f"当前：{cn} ({tname})")
+            name = terrain_display_name(terrain) if terrain else tname
+            self._status_label.setText(tr("pterrain_current_label", name, tname))
             self.type_changed.emit(tname)
 
     def current_type(self) -> str:

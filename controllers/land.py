@@ -139,6 +139,14 @@ class LandController(BaseController):
             self.history.execute(cmd)
             self._stroke_changes = {}
             self.project.mark_dirty()
+            # 陆海划分变了 → colormap / world_normal / cities 需要重生
+            self._invalidate_art_assets(
+                "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+                "map/terrain/colormap_water_0.dds",
+                "map/terrain/colormap_water_1.dds",
+                "map/terrain/colormap_water_2.dds",
+                "map/world_normal.bmp",
+            )
             self._emit_render(full=True)
 
     def _do_fill(self, x: int, y: int) -> None:
@@ -164,4 +172,11 @@ class LandController(BaseController):
         cmd = FillTileCommand(map_data, fill_mask, new_val)
         self.history.execute(cmd)
         self.project.mark_dirty()
+        self._invalidate_art_assets(
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+            "map/terrain/colormap_water_0.dds",
+            "map/terrain/colormap_water_1.dds",
+            "map/terrain/colormap_water_2.dds",
+            "map/world_normal.bmp",
+        )
         self._emit_render(full=True)

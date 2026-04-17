@@ -68,24 +68,25 @@ for _idx, (_r, _g, _b) in RIVER_PALETTE.items():
     RIVER_DISPLAY_COLORS[_idx] = (_b, _g, _r, 255)
 
 # 可绘制的河流类型（工具面板中显示）
+# 第 2 项是 i18n key，UI 调 tr() 获取中/英文名
 # 标记类型 (单像素放置)
 RIVER_MARKER_TYPES = [
-    (RIVER_SOURCE, "源头"),     # 绿色, 每条河流一个
-    (RIVER_MARKER, "汇入点"),   # 红色, 支流汇入
-    (RIVER_MOUTH, "入海口"),    # 黄色, 河流分支/出海口
+    (RIVER_SOURCE, "river_marker_source"),     # 绿色, 每条河流一个
+    (RIVER_MARKER, "river_marker_confluence"), # 红色, 支流汇入
+    (RIVER_MOUTH,  "river_marker_mouth"),      # 黄色, 河流分支/出海口
 ]
 
 # 宽度画笔 (拖拽绘制)
 # 注意：跳过 index 5 和 8！vanilla rivers.bmp 从不用这两个索引，
 # 手动画时选 5/8 会导致 HOI4 加载崩溃（EXCEPTION_INT_DIVIDE_BY_ZERO）
 RIVER_WIDTH_TYPES = [
-    (RIVER_WIDTH_1, "细流"),    # index 3
-    (RIVER_WIDTH_2, "小河"),    # index 4
-    (RIVER_WIDTH_4, "中河"),    # index 6（跳过 5）
-    (RIVER_WIDTH_5, "大河"),    # index 7
-    (RIVER_WIDTH_7, "宽河"),    # index 9（跳过 8）
-    (RIVER_WIDTH_8, "巨河"),    # index 10
-    (RIVER_WIDTH_9, "最宽"),    # index 11
+    (RIVER_WIDTH_1, "river_width_1"),  # index 3 — 细流
+    (RIVER_WIDTH_2, "river_width_2"),  # index 4 — 小河
+    (RIVER_WIDTH_4, "river_width_4"),  # index 6（跳过 5）— 中河
+    (RIVER_WIDTH_5, "river_width_5"),  # index 7 — 大河
+    (RIVER_WIDTH_7, "river_width_7"),  # index 9（跳过 8）— 宽河
+    (RIVER_WIDTH_8, "river_width_8"),  # index 10 — 巨河
+    (RIVER_WIDTH_9, "river_width_9"),  # index 11 — 最宽
 ]
 
 # 保持向后兼容

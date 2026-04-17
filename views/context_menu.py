@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING
 from PyQt5.QtWidgets import QMenu, QApplication, QInputDialog
 from PyQt5.QtCore import QPoint
 
-from data.terrain_types import TERRAIN_TYPES, GRAPHICAL_TERRAIN_BY_INDEX
+from data.terrain_types import (
+    TERRAIN_TYPES, GRAPHICAL_TERRAIN_BY_INDEX,
+    graphical_terrain_display_name,
+)
 
 if TYPE_CHECKING:
     from model.project import Project
@@ -46,7 +49,7 @@ class ProvinceContextMenu:
         for gt in sorted(GRAPHICAL_TERRAIN_BY_INDEX.values(), key=lambda g: g.palette_index):
             if gt.type in ("ocean", "lakes"):
                 continue
-            act = terrain_menu.addAction(f"{gt.name_cn} ({gt.type})")
+            act = terrain_menu.addAction(f"{graphical_terrain_display_name(gt)} ({gt.type})")
             terrain_actions[act] = gt.palette_index
 
         menu.addSeparator()

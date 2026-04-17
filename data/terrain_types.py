@@ -136,3 +136,21 @@ PAINTABLE_GROUPS: dict[str, list[GraphicalTerrain]] = {}
 for _gt in GRAPHICAL_TERRAINS:
     if _gt.type not in ("ocean", "lakes"):
         PAINTABLE_GROUPS.setdefault(_gt.type, []).append(_gt)
+
+
+# ── 本地化显示名 ──────────────────────────────────────────────
+# UI 显示地形名时调这两个 helper，会根据当前语言返回中/英文。
+# 为什么不把 name_en 直接塞进 NamedTuple：
+#   GRAPHICAL_TERRAINS 25 条、位置参数已排好，改结构要全量改；
+#   用查 i18n 表的方式隔离中英文，减少 churn。
+
+def terrain_display_name(tt: "TerrainType") -> str:
+    """TerrainType 的本地化显示名（跟随 ui.i18n 当前语言）。"""
+    from ui.i18n import get_language
+    return tt.name_en if get_language() == "en" else tt.name_cn
+
+
+def graphical_terrain_display_name(gt: "GraphicalTerrain") -> str:
+    """GraphicalTerrain 的本地化显示名（key=gt_<id>，在 ui/i18n.py 注册）。"""
+    from ui.i18n import tr
+    return tr(f"gt_{gt.id}")

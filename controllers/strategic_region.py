@@ -76,6 +76,18 @@ class StrategicRegionController(BaseController):
         self.project.mark_dirty()
         self._emit_status(f"已生成 {sr_mgr.count()} 个战略区域")
 
+    def auto_assign_weather(self) -> None:
+        """按纬度自动分配所有战略区域的天气预设."""
+        sr_mgr = self.project.strategic_region_mgr
+        if sr_mgr.count() == 0:
+            self._emit_status("没有战略区域，请先生成")
+            return
+
+        province_map = self.project.map_data.province_map
+        changed = sr_mgr.auto_assign_weather_by_latitude(province_map)
+        self.project.mark_dirty()
+        self._emit_status(f"已按纬度分配 {changed} 个战略区域的天气预设")
+
     def select_region(self, rid: int) -> None:
         """选中战略区域（UI 刷新由事件驱动）。"""
         self.pick_rid = rid
