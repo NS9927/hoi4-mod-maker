@@ -25,6 +25,7 @@ def save_project(
     adjacency_rule_mgr=None,  # AdjacencyRuleManager (A6)
     strategic_region_mgr=None,  # StrategicRegionManager (A7)
     provincial_terrain: dict[int, str] | None = None,
+    tile_snapshot: np.ndarray | None = None,
 ) -> None:
     """保存项目到 .hoi4proj 文件（zip 格式）"""
     with ZipFile(path, "w", ZIP_DEFLATED) as zf:
@@ -37,6 +38,8 @@ def save_project(
         ]
         if river_map is not None:
             arrays_to_save.append(("river_map.npy", river_map))
+        if tile_snapshot is not None:
+            arrays_to_save.append(("tile_snapshot.npy", tile_snapshot))
         for name, arr in arrays_to_save:
             buf = BytesIO()
             np.save(buf, arr)
@@ -142,7 +145,7 @@ def load_project(
     supply_mgr=None,
     adjacency_rule_mgr=None,
     strategic_region_mgr=None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, dict[int, str]]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray | None, dict[int, str], np.ndarray | None]:
     """
     加载项目文件。
 
@@ -239,10 +242,15 @@ def load_project(
             strategic_region_mgr.clear()
             strategic_region_mgr.from_dict(json.loads(zf.read("strategic_regions.json")))
 
+        # tile_snapshot（省份生成时的 tile_map 快照，旧项目没有）
+        tile_snapshot = None
+        if "tile_snapshot.npy" in zf.namelist():
+            tile_snapshot = np.load(BytesIO(zf.read("tile_snapshot.npy")))
+
         # 省份级地形 (Feature A)
         provincial_terrain: dict[int, str] = {}
         if "provincial_terrain.json" in zf.namelist():
             raw_pt = json.loads(zf.read("provincial_terrain.json"))
             provincial_terrain = {int(k): v for k, v in raw_pt.items()}
 
-    return tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain
+    return tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain, tile_snapshot

@@ -62,7 +62,7 @@ def main() -> None:
     adjacency_rule_mgr = AdjacencyRuleManager()
     strategic_region_mgr = StrategicRegionManager()
 
-    tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain = \
+    tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain, _tile_snapshot = \
         load_project(
             args.project,
             state_mgr, country_mgr,

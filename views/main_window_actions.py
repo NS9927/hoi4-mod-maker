@@ -32,7 +32,8 @@ class _GenerateThread(QThread):
     error = pyqtSignal(str)
 
     def __init__(self, tile_map, count, province_map=None, incremental=False,
-                 sea_scale=0.15, lake_scale=0.3, density_map=None):
+                 sea_scale=0.15, lake_scale=0.3, density_map=None,
+                 skip_mismatch_clear=False):
         super().__init__()
         self._tile_map = tile_map.copy()
         self._count = count
@@ -41,13 +42,15 @@ class _GenerateThread(QThread):
         self._sea_scale = sea_scale
         self._lake_scale = lake_scale
         self._density_map = density_map.copy() if density_map is not None else None
+        self._skip_mismatch_clear = skip_mismatch_clear
 
     def run(self):
         try:
             if self._incremental and self._province_map is not None:
                 from domain.generators.province import generate_provinces_incremental
                 pm, cnt = generate_provinces_incremental(
-                    self._tile_map, self._province_map
+                    self._tile_map, self._province_map,
+                    skip_mismatch_clear=self._skip_mismatch_clear,
                 )
             else:
                 from domain.generators.province import generate_provinces
@@ -83,40 +86,55 @@ class _ValidateThread(QThread):
 class MainWindowActionsMixin(MainWindowFileOpsMixin):
     """省份生成/验证/国家对话框/河流/地形/大陆/战略区/后勤处理。"""
 
-    # ═══════════════════════ 新陆地省份扩展 ═══════════════════
+    # ═══════════════════════ 新大陆 ═══════════════════
 
-    def _on_expand_land(self) -> None:
-        """为新画的陆地分配省份（扩张已有省份 + 孤岛建新省份）。"""
-        if int(self._canvas.province_map.max()) == 0:
-            QMessageBox.information(self, "提示", "还没有省份，请先用「生成省份」按钮。")
+    def _on_new_land_generate(self) -> None:
+        """新大陆页面的生成按钮：用 mask 清零 → 增量生成 → 清空 mask。"""
+        import numpy as np
+
+        mask = self._canvas.new_land_mask
+        n = int(mask.sum())
+        if n == 0:
+            self._status_info.setText("没有画新陆地，先用画笔画。")
             return
 
-        self._status_info.setText("正在为新陆地分配省份...")
+        self._status_info.setText(f"正在为 {n} 像素新陆地生成省份...")
         QApplication.processEvents()
 
-        from domain.generators.province import expand_provinces_to_new_land
-        pm2, new_count, consumed = expand_provinces_to_new_land(
-            self._canvas.tile_map, self._canvas.province_map,
+        # 保存 mask 副本，立刻清空原 mask（用户可以马上画下一批）
+        mask_copy = mask.copy()
+        self._new_land_mask_copy = mask_copy  # 给 _on_generate_done 用于 terrain 同步
+        self._canvas.new_land_mask[:] = False
+        if hasattr(self._tool_panel, '_new_land_page'):
+            self._tool_panel._new_land_page.update_pixel_count(0)
+
+        # 清零 mask 像素的 province_map
+        pm_copy = self._canvas.province_map.copy()
+        pm_copy[mask_copy] = 0
+
+        # 读取省份数量参数
+        count = 12000
+        if hasattr(self._tool_panel, '_land_page') and self._tool_panel._land_page is not None:
+            params = self._tool_panel._land_page.get_generation_params()
+            count = params.get("target_count", 12000)
+
+        self._gen_thread = _GenerateThread(
+            self._canvas.tile_map, count,
+            province_map=pm_copy,
+            incremental=True,
+            skip_mismatch_clear=True,
         )
+        self._gen_thread.finished.connect(self._on_generate_done)
+        self._gen_thread.error.connect(self._on_generate_error)
+        self._gen_thread.start()
 
-        self._canvas.province_map = pm2
-        self._project.map_data.province_map = pm2
-        self._project.mark_dirty()
-        self._update_province_count()
-        self._canvas.refresh_display()
-
-        # 自动分配到 state/战略区
-        assigned = self._auto_assign_new_provinces(pm2)
-
-        # 切到省份模式看结果
-        self._tool_panel._switch_to_mode("province")
-
-        msg = f"完成：{new_count} 个新省份"
-        if assigned > 0:
-            msg += f"，{assigned} 个已自动分配到州"
-        if consumed:
-            msg += f"\n⚠ {len(consumed)} 个海洋省份被完全吞并"
-        self._status_info.setText(msg)
+    def _on_new_land_clear(self) -> None:
+        """清空新大陆画笔的 mask。"""
+        self._canvas.new_land_mask[:] = False
+        self._status_info.setText("新大陆画笔已清空。")
+        # 更新页面像素计数
+        if hasattr(self._tool_panel, '_new_land_page'):
+            self._tool_panel._new_land_page.update_pixel_count(0)
 
     # ═══════════════════════ 州自动分组 ═══════════════════
 
@@ -179,13 +197,23 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             sea_scale = params.get("sea_scale", 0.15)
             lake_scale = params.get("lake_scale", 0.3)
 
+        # 增量模式：用新大陆画笔的 mask 预清除像素
+        province_map_for_thread = None
+        if incremental:
+            province_map_for_thread = self._canvas.province_map.copy()
+            mask = self._canvas.new_land_mask
+            if mask.any():
+                province_map_for_thread[mask] = 0
+
+        has_new_land_mask = incremental and self._canvas.new_land_mask.any()
         self._gen_thread = _GenerateThread(
             self._canvas.tile_map, count,
-            province_map=self._canvas.province_map if incremental else None,
+            province_map=province_map_for_thread,
             incremental=incremental,
             sea_scale=sea_scale,
             lake_scale=lake_scale,
             density_map=density_map,
+            skip_mismatch_clear=has_new_land_mask,
         )
         self._gen_thread.finished.connect(self._on_generate_done)
         self._gen_thread.error.connect(self._on_generate_error)
@@ -194,8 +222,6 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_generate_done(self, province_map, count: int) -> None:
         was_incremental = getattr(self._gen_thread, '_incremental', False)
         self._canvas.province_map = province_map
-        # 确保 project.map_data 也同步（canvas 和 project 可能不共享同一个 map_data）
-        self._project.map_data.province_map = province_map
         self._project.mark_dirty()
         self._update_province_count()
 
@@ -204,21 +230,93 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             "province_map_regenerated", incremental=was_incremental,
         )
 
-        # 强制刷新画布 + 切到省份模式让用户看到新省份
+        # 强制刷新画布（增量模式不切模式，保持新大陆画笔工具状态）
         self._canvas.refresh_display()
-        if was_incremental:
-            # 切到省份模式显示结果（land 模式看不出新省份）
-            self._tool_panel._switch_to_mode("province")
 
-        # 增量生成后：新省份自动加入最近的 state/战略区
+        # 增量生成后：同步 terrain + 清理被吞省份 + 自动分配 + 清空画笔 mask
         if was_incremental:
+            import numpy as np
+            from data.constants import TILE_LAND, TILE_SEA, TILE_LAKE
+            from data.terrain_types import TERRAIN_PALETTE_INDEX, DEFAULT_TERRAIN_FOR_TILE
+
+            # 同步 terrain_map（用保存的 mask 副本，不依赖 canvas.new_land_mask）
+            saved_mask = getattr(self, '_new_land_mask_copy', None)
+            if saved_mask is not None and saved_mask.any():
+                tm = self._canvas.tile_map
+                terrain_map = self._project.map_data.terrain_map
+                for tile_type in (TILE_LAND, TILE_SEA, TILE_LAKE):
+                    t_name = DEFAULT_TERRAIN_FOR_TILE.get(tile_type)
+                    if t_name and t_name in TERRAIN_PALETTE_INDEX:
+                        t_mask = saved_mask & (tm == tile_type)
+                        if np.any(t_mask):
+                            terrain_map[t_mask] = TERRAIN_PALETTE_INDEX[t_name]
+                self._new_land_mask_copy = None
+
+            consumed = self._cleanup_consumed_provinces(province_map)
             assigned = self._auto_assign_new_provinces(province_map)
-            self._status_info.setText(
-                tr("status_gen_done").format(count=count)
-                + f" ({assigned} 个新省份已自动分配)"
-            )
+            msg = tr("status_gen_done").format(count=count)
+            msg += f" ({assigned} 个新省份已自动分配)"
+            if consumed:
+                ids_str = ", ".join(str(i) for i in sorted(consumed)[:10])
+                if len(consumed) > 10:
+                    ids_str += f" ... 共 {len(consumed)} 个"
+                msg += f"\n⚠ 被完全吞并的省份: {ids_str}"
+            self._status_info.setText(msg)
         else:
             self._status_info.setText(tr("status_gen_done").format(count=count))
+
+    def _cleanup_consumed_provinces(self, province_map) -> set[int]:
+        """清理被完全吞并的省份：从 state/country/战略区中移除不存在的省份引用。"""
+        import numpy as np
+
+        existing_pids = set(np.unique(province_map).tolist())
+        existing_pids.discard(0)
+        consumed: set[int] = set()
+
+        state_mgr = self._project.state_mgr
+        sr_mgr = self._project.strategic_region_mgr
+        country_mgr = self._project.country_mgr
+
+        # 清理 state 引用
+        for sid, state in list(state_mgr.states.items()):
+            old_provinces = state.provinces
+            new_provinces = [p for p in old_provinces if p in existing_pids]
+            removed = set(old_provinces) - set(new_provinces)
+            if removed:
+                consumed.update(removed)
+                state.provinces = new_provinces
+                if not new_provinces:
+                    state_mgr.states.pop(sid, None)
+
+        # 重建 province_to_state 索引
+        if consumed and hasattr(state_mgr, '_province_to_state'):
+            state_mgr._province_to_state = {
+                pid: sid for sid, s in state_mgr.states.items()
+                for pid in s.provinces
+            }
+
+        # 清理战略区引用
+        if sr_mgr:
+            for r in sr_mgr.regions.values():
+                r.province_ids = [p for p in r.province_ids if p in existing_pids]
+
+        # 清理国家首都引用
+        if country_mgr:
+            for tag, country in country_mgr.countries.items():
+                if country.capital > 0 and country.capital not in existing_pids:
+                    consumed.add(country.capital)
+                    # 找该国其他省份作为新首都
+                    new_cap = 0
+                    owned_states = country_mgr.get_states_of_country(tag)
+                    if state_mgr and owned_states:
+                        for osid in owned_states:
+                            s = state_mgr.get_state(osid)
+                            if s and s.provinces:
+                                new_cap = s.provinces[0]
+                                break
+                    country.capital = new_cap
+
+        return consumed
 
     def _auto_assign_new_provinces(self, province_map) -> int:
         """增量生成后，把没有 state 的陆地省份分配到相邻最近的 state/战略区。"""

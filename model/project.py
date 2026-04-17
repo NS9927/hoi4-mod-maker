@@ -143,6 +143,7 @@ class Project:
             adjacency_rule_mgr=self.adjacency_rule_mgr,
             strategic_region_mgr=self.strategic_region_mgr,
             provincial_terrain=self.map_data.provincial_terrain,
+            tile_snapshot=self.map_data.tile_snapshot,
         )
         # 同时持久化美术资产到 sidecar 目录
         self._save_assets_sidecar(save_path)
@@ -220,8 +221,7 @@ class Project:
             adjacency_rule_mgr=self.adjacency_rule_mgr,
             strategic_region_mgr=self.strategic_region_mgr,
         )
-        # load_project returns (tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain)
-        tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain = result
+        tile_map, province_map, terrain_map, height_map, river_map, provincial_terrain, tile_snapshot = result
 
         # Update map size from loaded data
         from data.constants import set_map_size
@@ -239,6 +239,7 @@ class Project:
         if river_map is not None:
             self.map_data.river_map[:] = river_map
         self.map_data.provincial_terrain = provincial_terrain or {}
+        self.map_data.tile_snapshot = tile_snapshot if tile_snapshot is not None else tile_map.copy()
 
         # 从 sidecar 读取美术资产
         self._load_assets_sidecar(path)

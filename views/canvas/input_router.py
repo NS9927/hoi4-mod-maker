@@ -206,7 +206,7 @@ class InputMixin:
                     event.accept()
                     return
 
-            if self._current_tool in ("brush", "eraser"):
+            if self._current_tool in ("brush", "eraser", "new_land"):
                 self._is_drawing = True
                 self.stroke_started.emit()
                 sx, sy = self._scene_pos(event)
@@ -347,7 +347,7 @@ class InputMixin:
             event.accept()
             return
 
-        if self._is_drawing and self._current_tool in ("brush", "eraser"):
+        if self._is_drawing and self._current_tool in ("brush", "eraser", "new_land"):
             self._paint_at(sx, sy)
             event.accept()
             return

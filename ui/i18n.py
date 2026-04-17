@@ -601,6 +601,7 @@ _translations: dict[str, dict[str, str]] = {
     # 子标签页
     "tab_land": {"zh": "陆海", "en": "Land"},
     "tab_density": {"zh": "密度", "en": "Density"},
+    "tab_new_land": {"zh": "新大陆", "en": "New Land"},
     "tab_height": {"zh": "高度", "en": "Height"},
     "tab_terrain": {"zh": "地形（视觉）", "en": "Terrain (Visual)"},
     "tab_province_terrain": {"zh": "地形（属性）", "en": "Terrain (Attribute)"},

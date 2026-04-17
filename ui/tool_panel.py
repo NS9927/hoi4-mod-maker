@@ -36,6 +36,7 @@ _NAV_MODES: list[tuple[str, str, str, list[tuple[str, str, str]], str]] = [
     ("map_draw", "🏖", "nav_map_draw", [
         ("land", "tab_land", "🟢"),
         ("density", "tab_density", "🟢"),
+        ("new_land", "tab_new_land", "🟢"),
     ], "nav_tooltip_map_draw"),
     ("province", "🧩", "nav_province", [
         ("province", "", "🟢"),
@@ -245,10 +246,13 @@ class ToolPanel(QWidget):
     province_terrain_assign_mode_changed = pyqtSignal(bool)
     height_value_changed = pyqtSignal(int)
     generate_provinces_requested = pyqtSignal(int)
-    expand_land_requested = pyqtSignal()
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
     smooth_coast_requested = pyqtSignal()
+
+    # 新大陆信号
+    new_land_generate_requested = pyqtSignal()
+    new_land_clear_requested = pyqtSignal()
 
     # 密度模式信号
     density_value_changed = pyqtSignal(float)
@@ -399,6 +403,7 @@ class ToolPanel(QWidget):
     def _create_pages(self) -> None:
         """实例化各 page 类, 加入 stack, 连接信号转发."""
         from features.map.land.page import LandPage
+        from features.map.land.new_land_page import NewLandPage
         from features.map.density.page import DensityPage
         from features.map.province.page import ProvincePage
         from features.map.terrain.page import TerrainPage
@@ -415,6 +420,7 @@ class ToolPanel(QWidget):
 
         # 创建实例
         self._land_page = LandPage()
+        self._new_land_page = NewLandPage()
         self._density_page = DensityPage()
         self._province_page = ProvincePage()
         self._terrain_page = TerrainPage()
@@ -433,6 +439,7 @@ class ToolPanel(QWidget):
         page_list = [
             ("land", self._land_page),
             ("density", self._density_page),
+            ("new_land", self._new_land_page),
             ("province", self._province_page),
             ("height", self._height_page),
             ("terrain", self._terrain_page),
@@ -456,6 +463,7 @@ class ToolPanel(QWidget):
 
         # ── 信号转发 ──
         self._connect_land_signals()
+        self._connect_new_land_signals()
         self._connect_density_signals()
         self._connect_province_signals()
         self._connect_terrain_signals()
@@ -475,10 +483,15 @@ class ToolPanel(QWidget):
         p.tile_type_changed.connect(self.tile_type_changed)
         p.brush_size_changed.connect(self.brush_size_changed)
         p.generate_provinces_requested.connect(self.generate_provinces_requested)
-        p.expand_land_requested.connect(self.expand_land_requested)
         p.validate_requested.connect(self.validate_requested)
         p.quick_init_requested.connect(self.quick_init_requested)
         p.smooth_coast_requested.connect(self.smooth_coast_requested)
+
+    def _connect_new_land_signals(self) -> None:
+        p = self._new_land_page
+        p.brush_size_changed.connect(self.brush_size_changed)
+        p.generate_requested.connect(self.new_land_generate_requested)
+        p.clear_mask_requested.connect(self.new_land_clear_requested)
 
     def _connect_density_signals(self) -> None:
         p = self._density_page
@@ -737,8 +750,10 @@ class ToolPanel(QWidget):
         """切换到指定 mode_id，更新 stack、hint、信号。"""
         idx = self._mode_index.get(mode, 0)
         self._stack.setCurrentIndex(idx)
-        # 切换模式时自动设工具为 brush（省份/state/country 模式除外）
-        if mode not in ("province", "state", "country"):
+        # 切换模式时自动设工具
+        if mode == "new_land":
+            self.tool_changed.emit("new_land")
+        elif mode not in ("province", "state", "country"):
             self.tool_changed.emit("brush")
         # 触发模式提示条
         self._hint_bar.on_mode_changed(mode)

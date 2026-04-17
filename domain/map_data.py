@@ -33,6 +33,8 @@ class MapData:
         self.height_map = np.full((MAP_HEIGHT, MAP_WIDTH), 40, dtype=np.uint8)
         self.river_map = np.full((MAP_HEIGHT, MAP_WIDTH), 255, dtype=np.uint8)  # 255=白色背景，0=源头！
         self.density_map: np.ndarray | None = None  # (H,W) float32 0~1, None=均匀
+        # 省份生成时的 tile_map 快照，用于检测"新画的陆地"
+        self.tile_snapshot: np.ndarray | None = None
         # 省份级地形：province_id → terrain type 字符串
         # 独立于 terrain_map (graphical terrain)，用于 definition.csv 的战斗属性
         self.provincial_terrain: dict[int, str] = {}
@@ -47,6 +49,7 @@ class MapData:
         self.height_map[:] = 40
         self.river_map[:] = 255  # 白色背景
         self.density_map = None
+        self.tile_snapshot = None
         self.provincial_terrain.clear()
 
     def replace_all(

@@ -76,7 +76,7 @@ class ApplicationController:
 
     # 模式名称映射
     _MODE_NAMES = {
-        "land": "大陆", "province": "省份", "terrain": "地形",
+        "land": "大陆", "new_land": "新大陆", "province": "省份", "terrain": "地形",
         "height": "高度", "state": "State", "country": "国家",
         "river": "河流", "continent": "大洲", "logistics": "后勤",
         "strategic_region": "战略区", "colormap": "总览贴图",
@@ -90,7 +90,8 @@ class ApplicationController:
             self._current_controller.deactivate()
 
         self._canvas.cleanup_mode_state()
-        self._canvas.display_mode = mode
+        # new_land 模式显示和 land 一样
+        self._canvas.display_mode = "land" if mode == "new_land" else mode
 
         # 密度模式特殊：借用 LandController 但开启 density_mode
         # （画的是 density_map 不是 tile_map，鼠标事件逻辑不同）
@@ -107,6 +108,12 @@ class ApplicationController:
                 self._current_controller.density_mode = True
                 self._current_controller.activate()
                 self._current_controller._emit_status("密度画笔模式")
+        elif mode == "new_land":
+            # 新大陆模式：借用 LandController
+            land_ctrl = self._controllers.get("land")
+            if land_ctrl is not None:
+                land_ctrl.density_mode = False
+            self._current_controller = land_ctrl
         else:
             # 切到其他模式时，确保 land controller 退出密度模式
             land_ctrl = self._controllers.get("land")
@@ -332,7 +339,7 @@ class ApplicationController:
         self._panel.update_province_gaps(gap_ids)
         # 状态栏也提示（不管当前在哪个页面都能看到）
         if gap_ids:
-            self.event_bus.emit(
+            self._event_bus.emit(
                 "status_message",
                 text=f"缺失省份 ID: {len(gap_ids)} 个（切割可自动补回）",
             )

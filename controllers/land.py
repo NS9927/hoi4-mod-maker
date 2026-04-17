@@ -23,7 +23,7 @@ class LandController(BaseController):
 
     def __init__(self, project: "Project", command_history: "CommandHistory") -> None:
         super().__init__(project, command_history)
-        self.current_tool: str = "brush"  # brush / eraser / fill / transform
+        self.current_tool: str = "brush"  # brush / eraser / fill / transform / new_land
         self.current_tile_type: int = 1  # TILE_LAND=1 default
         self.brush_size: int = 5
         self._stroke_changes: dict[tuple[int, int], int] = {}
@@ -31,6 +31,9 @@ class LandController(BaseController):
         # 密度画笔子模式
         self.density_mode: bool = False
         self.density_value: float = 1.0  # 0.0~1.0
+        # 新大陆画笔：记录画了哪些像素
+        h, w = project.map_data.tile_map.shape
+        self.new_land_mask: np.ndarray = np.zeros((h, w), dtype=bool)
 
     def activate(self) -> None:
         """进入大陆模式，默认画笔工具。有省份时提醒。"""
@@ -66,7 +69,7 @@ class LandController(BaseController):
             self._do_fill(x, y)
             return True
 
-        if self.current_tool in ("brush", "eraser"):
+        if self.current_tool in ("brush", "eraser", "new_land"):
             self._is_painting = True
             self._stroke_changes.clear()
             self._apply_brush(x, y)
@@ -95,6 +98,16 @@ class LandController(BaseController):
             self._commit_stroke()
         return True
 
+    # ── 新大陆画笔 ──
+
+    @property
+    def new_land_pixel_count(self) -> int:
+        return int(self.new_land_mask.sum())
+
+    def clear_new_land_mask(self) -> None:
+        """生成省份后清空 mask，新大陆变旧大陆。"""
+        self.new_land_mask[:] = False
+
     # ── 密度画笔 ──
 
     def _apply_density_brush(self, x: int, y: int) -> None:
@@ -118,15 +131,20 @@ class LandController(BaseController):
     # ── 普通画笔 ──
 
     def _apply_brush(self, x: int, y: int) -> None:
-        """在 (x, y) 处应用圆形画笔/橡皮。"""
-        from data.constants import TILE_SEA
+        """在 (x, y) 处应用圆形画笔/橡皮/新大陆画笔。"""
+        from data.constants import TILE_SEA, TILE_LAND
         map_data = self.project.map_data
         tile_map = map_data.tile_map
         h, w = tile_map.shape
         r = self.brush_size // 2
         r_sq = r * r
 
-        tile_value = self.current_tile_type if self.current_tool == "brush" else TILE_SEA
+        if self.current_tool == "new_land":
+            tile_value = TILE_LAND
+        elif self.current_tool == "eraser":
+            tile_value = TILE_SEA
+        else:
+            tile_value = self.current_tile_type
 
         for dy in range(-r, r + 1):
             for dx in range(-r, r + 1):
@@ -136,6 +154,9 @@ class LandController(BaseController):
                 if 0 <= ny < h and 0 <= nx < w:
                     if int(tile_map[ny, nx]) != tile_value:
                         self._stroke_changes[(ny, nx)] = tile_value
+                        # 新大陆画笔：只记录真正从海/湖变陆地的像素，旧陆地不记
+                        if self.current_tool == "new_land":
+                            self.new_land_mask[ny, nx] = True
 
     def _commit_stroke(self) -> None:
         """提交笔触为一个 Command。"""

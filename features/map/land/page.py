@@ -31,7 +31,6 @@ class LandPage(QWidget):
     tile_type_changed = pyqtSignal(int)
     brush_size_changed = pyqtSignal(int)
     generate_provinces_requested = pyqtSignal(int)
-    expand_land_requested = pyqtSignal()
     validate_requested = pyqtSignal()
     quick_init_requested = pyqtSignal()
     smooth_coast_requested = pyqtSignal()
@@ -127,12 +126,6 @@ class LandPage(QWidget):
         gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         gen_btn.clicked.connect(self._on_generate_provinces)
         gen_box.layout().addWidget(gen_btn)
-
-        expand_btn = QPushButton("🏝 为新陆地分配省份")
-        expand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        expand_btn.setToolTip("在海上画了新陆地后点这个：旁边有省份就扩张，孤岛就新建")
-        expand_btn.clicked.connect(self.expand_land_requested.emit)
-        gen_box.layout().addWidget(expand_btn)
 
         spin_row = QHBoxLayout()
         spin_lbl = QLabel(tr("land_label_province_count"))

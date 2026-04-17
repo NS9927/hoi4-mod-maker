@@ -70,6 +70,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._height_map = self._map_data.height_map
         self._river_map = self._map_data.river_map
 
+        # 新大陆画笔 mask：记录画了哪些像素（只记录真正从海/湖变陆地的）
+        self.new_land_mask = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=bool)
+
         # 河流编辑状态
         self._current_river_type = RIVER_SOURCE
 
@@ -986,6 +989,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         return True
 
     def refresh_display(self) -> None:
+        self._border_cache = None
+        if hasattr(self, '_border_base_pixmap'):
+            self._border_base_pixmap = None
         self._full_render()
         self._render_province_overlay()
 
@@ -1069,11 +1075,24 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
                     self._tile_map[y0:y1, x0:x1][circle] = TILE_SEA
                 else:
                     self._tile_map[y0:y1, x0:x1] = TILE_SEA
-            elif self._current_tool == "brush":
-                if circle is not None:
-                    self._tile_map[y0:y1, x0:x1][circle] = self._current_tile_type
+            elif self._current_tool in ("brush", "new_land"):
+                tile_val = TILE_LAND if self._current_tool == "new_land" else self._current_tile_type
+                if self._current_tool == "new_land":
+                    # 记录真正从非陆地变成陆地的像素（旧陆地不记）
+                    sub = self._tile_map[y0:y1, x0:x1]
+                    if circle is not None:
+                        changed = circle & (sub != TILE_LAND)
+                        self.new_land_mask[y0:y1, x0:x1][changed] = True
+                        sub[circle] = tile_val
+                    else:
+                        changed = sub != TILE_LAND
+                        self.new_land_mask[y0:y1, x0:x1][changed] = True
+                        sub[:] = tile_val
                 else:
-                    self._tile_map[y0:y1, x0:x1] = self._current_tile_type
+                    if circle is not None:
+                        self._tile_map[y0:y1, x0:x1][circle] = tile_val
+                    else:
+                        self._tile_map[y0:y1, x0:x1] = tile_val
 
         elif mode == "terrain":
             if not self._terrain_brush_mode:

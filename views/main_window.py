@@ -270,10 +270,12 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
         # 操作按钮 → 本窗口处理（含 UI 交互）
         tp.generate_provinces_requested.connect(self._on_generate_provinces)
-        tp.expand_land_requested.connect(self._on_expand_land)
         tp.validate_requested.connect(self._on_validate)
         tp.quick_init_requested.connect(self._on_quick_init)
         tp.smooth_coast_requested.connect(self._on_smooth_coast)
+        # 新大陆信号
+        tp.new_land_generate_requested.connect(self._on_new_land_generate)
+        tp.new_land_clear_requested.connect(self._on_new_land_clear)
         # 密度模式信号
         tp.density_value_changed.connect(
             lambda v: setattr(self._canvas, '_density_paint_value', v))

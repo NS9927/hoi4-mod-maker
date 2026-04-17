@@ -441,6 +441,7 @@ def generate_provinces_incremental(
     province_map: np.ndarray,
     target_density: float | None = None,
     lloyd_iterations: int = 2,
+    skip_mismatch_clear: bool = False,
 ) -> tuple[np.ndarray, int]:
     """
     增量省份生成：只为未分配省份的新区域生成省份，保留已有省份不变。
@@ -450,6 +451,7 @@ def generate_provinces_incremental(
         province_map: (H, W) int32, 已有省份 (>0 的不动)
         target_density: 每个省份的平均像素数（默认 = 总像素 / 12000）
         lloyd_iterations: Lloyd 松弛迭代次数
+        skip_mismatch_clear: 跳过 _clear_type_mismatched_pixels（调用方已用 mask 处理过）
     返回:
         (更新后的 province_map, 总省份数)
     """
@@ -463,9 +465,8 @@ def generate_provinces_incremental(
         target_density = max(1.0, (H * W) / 12000.0)
 
     # 找出需要分配省份的像素
-    # 包括: pm=0（真的没有），以及"海变陆/陆变海"的像素
-    # 后者需要先清除旧省份 ID
-    _clear_type_mismatched_pixels(result, tile_map)
+    if not skip_mismatch_clear:
+        _clear_type_mismatched_pixels(result, tile_map)
 
     unassigned_land = (tile_map == TILE_LAND) & (result == 0)
     unassigned_sea = (tile_map == TILE_SEA) & (result == 0)

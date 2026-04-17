@@ -208,10 +208,25 @@ class MainWindowFileOpsMixin:
                 adjacency_rule_mgr=self._project.adjacency_rule_mgr,
                 strategic_region_mgr=self._project.strategic_region_mgr,
             )
+            # 加载后检测省份 ID 空洞并提示
+            import numpy as np
+            pm = self._canvas.province_map
+            max_id = int(pm.max())
+            gap_count = 0
+            if max_id > 0:
+                existing = set(np.unique(pm).tolist())
+                existing.discard(0)
+                gap_count = max_id - len(existing)
+
             self._update_province_count()
             self._app._refresh_state_list()
             self._app._refresh_country_list()
-            self._status_info.setText(f"项目已加载: {path}")
+            if gap_count > 0:
+                self._status_info.setText(
+                    f"项目已加载: {path} | ⚠ 项目自带 {gap_count} 个省份 ID 空洞"
+                )
+            else:
+                self._status_info.setText(f"项目已加载: {path}")
             # 记录到最近项目 + 切换到编辑器
             from views.welcome_page import save_recent_project
             save_recent_project(path)

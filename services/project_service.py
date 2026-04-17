@@ -38,6 +38,7 @@ def save_project(
         adjacency_rule_mgr=adjacency_rule_mgr,
         strategic_region_mgr=strategic_region_mgr,
         provincial_terrain=canvas.map_data.provincial_terrain,
+        tile_snapshot=canvas.map_data.tile_snapshot,
     )
 
 
@@ -55,7 +56,7 @@ def load_project(
 ) -> None:
     """从 .hoi4proj 加载, 原地更新 canvas 和 manager. 失败抛异常."""
     from domain.project_io import load_project as _load
-    tm, pm, terrain, hm, rm, pt = _load(
+    tm, pm, terrain, hm, rm, pt, tile_snapshot = _load(
         path, state_mgr, country_mgr,
         continent_mgr=continent_mgr,
         adjacency_mgr=adjacency_mgr,
@@ -72,3 +73,6 @@ def load_project(
         canvas.river_map = rm
     # 省份级地形 (Feature A)
     canvas.map_data.provincial_terrain = pt if pt else {}
+    # tile_snapshot（省份生成时的 tile_map 快照）
+    # 旧项目没有快照 → 用当前 tile_map 作为快照（假设保存时 tile_map 未被修改过）
+    canvas.map_data.tile_snapshot = tile_snapshot if tile_snapshot is not None else tm.copy()
