@@ -159,6 +159,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_generate_done(self, province_map, count: int) -> None:
         was_incremental = getattr(self._gen_thread, '_incremental', False)
         self._canvas.province_map = province_map
+        # 确保 project.map_data 也同步（canvas 和 project 可能不共享同一个 map_data）
+        self._project.map_data.province_map = province_map
+        self._project.mark_dirty()
         self._update_province_count()
 
         # 发事件，级联清理由各 controller 自动处理
@@ -166,8 +169,11 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             "province_map_regenerated", incremental=was_incremental,
         )
 
-        # 强制刷新画布（增量生成后地图必须更新显示）
+        # 强制刷新画布 + 切到省份模式让用户看到新省份
         self._canvas.refresh_display()
+        if was_incremental:
+            # 切到省份模式显示结果（land 模式看不出新省份）
+            self._tool_panel._switch_to_mode("province")
 
         # 增量生成后：新省份自动加入最近的 state/战略区
         if was_incremental:
