@@ -384,10 +384,23 @@ class ApplicationController:
         self._refresh_vp_data()
 
     def _on_province_regen(self, event) -> None:
-        """省份重新生成 → 清除画布颜色缓存、刷新省份缓存。"""
+        """省份重新生成 → 清除所有颜色缓存，强制下次切模式时重建。"""
         self.invalidate_province_cache()
         self._canvas._state_color_rgb = None
         self._canvas._country_color_rgb = None
+        self._canvas._sr_color_rgb = None
+        self._canvas._railway_color_rgb = None
+        self._canvas._provincial_terrain_color_rgb = None
+        # 立即刷新当前模式的颜色（不然切模式前看到的是旧的）
+        mode = self._canvas.display_mode
+        if mode == "state":
+            self._refresh_state_colors()
+        elif mode == "country":
+            self._refresh_country_colors()
+        elif mode == "strategic_region":
+            self._refresh_sr_colors()
+        elif mode == "logistics":
+            self._refresh_railway_colors()
 
     # ═══════════════════════ 撤销/重做 ═══════════════════════
 
