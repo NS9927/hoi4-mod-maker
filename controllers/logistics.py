@@ -58,7 +58,7 @@ class LogisticsController(BaseController):
             self._handle_pick(pid)
             return
 
-        # 默认：点击省份设置/切换铁路等级
+        # 默认：点击省份设置/切换铁路等级 + 高亮所属战略区
         mgr = self.project.railway_mgr
         current = mgr.province_levels().get(pid, 0)
         new_level = self.railway_level
@@ -69,10 +69,19 @@ class LogisticsController(BaseController):
         self.project.mark_dirty()
         # 刷新着色
         self.event_bus.emit("railway_changed")
+
+        # 同时显示所属战略区 + 高亮
+        sr_mgr = self.project.strategic_region_mgr
+        rid = sr_mgr.get_region_of_province(pid)
+        region = sr_mgr.get_region(rid) if rid > 0 else None
+        sr_info = f" | 战略区 #{rid} \"{region.name}\"" if region else ""
+        if region:
+            self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
+
         if new_level > 0:
-            self._emit_status(f"省份 {pid} 铁路等级 → {new_level}")
+            self._emit_status(f"省份 {pid} 铁路等级 → {new_level}{sr_info}")
         else:
-            self._emit_status(f"省份 {pid} 铁路已移除")
+            self._emit_status(f"省份 {pid} 铁路已移除{sr_info}")
 
     def toggle_railway_draw(self, on: bool) -> None:
         """开始/结束铁路画笔。结束时把草稿变成一条 railway entry。"""
