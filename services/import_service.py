@@ -104,26 +104,23 @@ def _build_province_map(
     rgb: np.ndarray,
     color_to_id: dict[tuple[int, int, int], int],
 ) -> np.ndarray:
-    """从 RGB 数组和颜色映射构建 province_map (int32)。"""
-    h, w = rgb.shape[:2]
-    province_map = np.zeros((h, w), dtype=np.int32)
+    """从 RGB 数组和颜色映射构建 province_map (int32)。
 
-    # 构建查找表：把 RGB 编码为 24-bit int 做高效映射
+    用 24-bit 直接查找表（16M 条目 = 64MB）实现 O(N) 映射，
+    替代之前的 np.unique + inverse（O(N log N)，1150 万像素要 20 秒）。
+    """
+    h, w = rgb.shape[:2]
+
+    # RGB → 24-bit int
     flat = rgb.reshape(-1, 3).astype(np.int32)
     keys = (flat[:, 0] << 16) | (flat[:, 1] << 8) | flat[:, 2]
 
-    # 构建 key→id 字典
-    key_to_id: dict[int, int] = {}
+    # 直接查找表: 24-bit key → province ID
+    lut = np.zeros(1 << 24, dtype=np.int32)
     for (r, g, b), pid in color_to_id.items():
-        key_to_id[(r << 16) | (g << 8) | b] = pid
+        lut[(r << 16) | (g << 8) | b] = pid
 
-    # 向量化查找
-    unique_keys, inverse = np.unique(keys, return_inverse=True)
-    id_array = np.zeros(len(unique_keys), dtype=np.int32)
-    for i, k in enumerate(unique_keys):
-        id_array[i] = key_to_id.get(int(k), 0)
-
-    province_map = id_array[inverse].reshape(h, w)
+    province_map = lut[keys].reshape(h, w)
     return province_map
 
 
@@ -134,34 +131,28 @@ def _build_tile_map(
 ) -> tuple[np.ndarray, dict[int, str]]:
     """构建 tile_map (land/sea/lake) 和 provincial_terrain 字典。
 
-    如果有 definition.csv，用它的 type 列；否则全部默认为 land。
+    用 LUT 直接映射 province_id → tile_type，O(像素) 不逐省份扫描。
     """
     h, w = province_map.shape
-    tile_map = np.full((h, w), TILE_LAND, dtype=np.uint8)
     provincial_terrain: dict[int, str] = {}
 
     if definition_info is None:
-        return tile_map, provincial_terrain
+        return np.full((h, w), TILE_LAND, dtype=np.uint8), provincial_terrain
 
-    # 构建 province_id → (tile_type, terrain)
-    id_to_type: dict[int, int] = {}
+    # 构建 province_id → tile_type 查找表
+    max_pid = int(province_map.max())
+    type_lut = np.full(max_pid + 1, TILE_LAND, dtype=np.uint8)
     for color, info in definition_info.items():
         pid = info["id"]
+        if pid <= 0 or pid > max_pid:
+            continue
         ptype = _TYPE_MAP.get(info["type"], TILE_LAND)
-        id_to_type[pid] = ptype
+        type_lut[pid] = ptype
         if info.get("terrain"):
             provincial_terrain[pid] = info["terrain"]
 
-    # 向量化：对每个省份 ID 设置 tile_type
-    unique_ids = np.unique(province_map)
-    for pid in unique_ids:
-        pid_int = int(pid)
-        if pid_int <= 0:
-            continue
-        ttype = id_to_type.get(pid_int, TILE_LAND)
-        if ttype != TILE_LAND:
-            tile_map[province_map == pid_int] = ttype
-
+    # 直接 LUT 映射 — O(像素), 不逐省份
+    tile_map = type_lut[province_map]
     return tile_map, provincial_terrain
 
 
@@ -296,34 +287,22 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
 
     warnings: list[str] = []
 
-    # 1. 读取 provinces.bmp
-    rgb, auto_color_map = _read_provinces_bmp(provinces_path)
+    # 1. 读取 provinces.bmp（只读 RGB，不扫唯一颜色——那个 O(N log N) 太慢）
+    img = Image.open(provinces_path).convert("RGB")
+    rgb = np.array(img, dtype=np.uint8)
     h, w = rgb.shape[:2]
 
-    # 2. 读取 definition.csv (可选)
+    # 2. 读取 definition.csv (可选) — 有 csv 直接用它的 color→ID，跳过像素扫描
     definition_path = os.path.join(map_dir, "definition.csv")
     definition_info: dict[tuple[int, int, int], dict[str, Any]] | None = None
     if os.path.isfile(definition_path):
         definition_info = _parse_definition_csv(definition_path)
-        # 用 definition.csv 的 ID 映射替代自动分配
-        csv_color_map: dict[tuple[int, int, int], int] = {}
-        for color, info in definition_info.items():
-            csv_color_map[color] = info["id"]
-        # 检查 provinces.bmp 中有没有 definition.csv 没覆盖的颜色
-        missing_colors = set(auto_color_map.keys()) - set(csv_color_map.keys())
-        if missing_colors:
-            warnings.append(
-                f"provinces.bmp 中有 {len(missing_colors)} 种颜色不在 definition.csv 中，已自动分配 ID"
-            )
-            # 为缺失颜色分配 ID (从 definition.csv 最大 ID 之后开始)
-            max_csv_id = max(csv_color_map.values()) if csv_color_map else 0
-            next_id = max_csv_id + 1
-            for color in sorted(missing_colors):
-                csv_color_map[color] = next_id
-                next_id += 1
-        color_to_id = csv_color_map
+        color_to_id: dict[tuple[int, int, int], int] = {
+            c: info["id"] for c, info in definition_info.items()
+        }
     else:
-        color_to_id = auto_color_map
+        # 没有 definition.csv → 退回扫描唯一颜色自动分配 ID（慢路径）
+        _, color_to_id = _read_provinces_bmp(provinces_path)
         warnings.append("未找到 definition.csv，省份类型全部设为陆地")
 
     # 3. 构建 province_map

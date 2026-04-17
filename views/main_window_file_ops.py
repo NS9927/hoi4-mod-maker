@@ -73,7 +73,7 @@ def _populate_imported_data(project, result: dict) -> None:
     # 填充 supply_nodes
     for sd in result.get("supply_nodes", []):
         try:
-            project.supply_mgr.set_node(sd["province_id"], sd["level"])
+            project.supply_mgr.add(sd["province_id"], sd["level"])
         except (ValueError, KeyError):
             pass
 
