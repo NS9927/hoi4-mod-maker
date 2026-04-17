@@ -462,7 +462,11 @@ def generate_provinces_incremental(
     if target_density is None:
         target_density = max(1.0, (H * W) / 12000.0)
 
-    # 找出需要分配省份的像素：有地块类型但没省份
+    # 找出需要分配省份的像素
+    # 包括: pm=0（真的没有），以及"海变陆/陆变海"的像素
+    # 后者需要先清除旧省份 ID
+    _clear_type_mismatched_pixels(result, tile_map)
+
     unassigned_land = (tile_map == TILE_LAND) & (result == 0)
     unassigned_sea = (tile_map == TILE_SEA) & (result == 0)
     unassigned_lake = (tile_map == TILE_LAKE) & (result == 0)
@@ -532,27 +536,18 @@ def generate_provinces_incremental(
             result[pixel_ys, pixel_xs] = global_ids[nearest]
             next_id += actual_count
 
-    # 后处理：修复 X 型交叉（只处理新区域附近）
+    # 后处理：只对新增区域做修复，不动已有省份
+    # 记录哪些 ID 是旧的（不能动）
+    old_pids = set(np.unique(province_map).tolist())
+    old_pids.discard(0)
+
     from domain.validators.province import fix_x_crossings
-    for _ in range(5):
+    for _ in range(3):
         if fix_x_crossings(result) == 0:
             break
 
-    # 修复不连续省份
-    _fix_non_contiguous_fast(result)
-
-    for _ in range(5):
-        if fix_x_crossings(result) == 0:
-            break
-
-    # 清理过小省份（< 8 像素）→ 合并到最大邻居，循环直到全部清除
-    for _ in range(10):
-        merged = _merge_tiny_provinces(result, min_pixels=8)
-        if merged == 0:
-            break
-
-    # 压实 ID
-    province_count = compact_province_ids(result)
+    # 不做 compact_province_ids — 增量模式保留旧 ID 不变
+    province_count = int(result.max())
     return result, province_count
 
 
@@ -768,3 +763,129 @@ def generate_province_colors(province_count: int) -> dict[int, tuple[int, int, i
                     break
 
     return colors
+
+
+def expand_provinces_to_new_land(
+    tile_map: np.ndarray,
+    province_map: np.ndarray,
+) -> tuple[np.ndarray, int, list[int]]:
+    """简单的"海变陆"省份扩展。不跑 Voronoi，不重排 ID。
+
+    逻辑：
+    1. 找所有 tile=LAND 但 province 属于海洋省份 的像素
+    2. 如果该像素旁边有陆地省份 → 归入最大的相邻陆地省份
+    3. 剩余的（孤岛，周围全是海）→ 每个连通块建一个新省份
+    4. 被完全吞并的海省 → 返回警告列表
+
+    返回: (更新后的 province_map, 新省份数, 被吞并的海省ID列表)
+    """
+    from scipy.ndimage import label as _label
+
+    result = province_map.copy()
+    max_pid = int(result.max())
+
+    # 判断每个省份的主类型
+    flat_pm = result.ravel()
+    flat_tm = tile_map.ravel()
+    pid_total = np.bincount(flat_pm, minlength=max_pid + 1).astype(np.float64)
+    pid_land = np.bincount(flat_pm, weights=(flat_tm == TILE_LAND).astype(np.float64), minlength=max_pid + 1)
+    safe_total = np.maximum(pid_total, 1)
+    pid_is_land = np.zeros(max_pid + 1, dtype=bool)
+    pid_is_land[1:] = (pid_land[1:] / safe_total[1:]) > 0.5
+
+    # 找"需要重新分配"的像素：tile=LAND 但省份是海洋省份
+    pixel_needs_reassign = (tile_map == TILE_LAND) & ~pid_is_land[result] & (result > 0)
+    # 也包括 tile=LAND & pm=0
+    pixel_needs_reassign |= (tile_map == TILE_LAND) & (result == 0)
+
+    if not np.any(pixel_needs_reassign):
+        return result, 0, []
+
+    H, W = tile_map.shape
+    # 逐像素找相邻的陆地省份（用4方向邻居）
+    # 构建"每像素最佳陆地省份"查找：扩散已有陆地省份ID
+    # 简单做法：多轮扩散，每轮把未分配像素赋值为最大邻居
+    # 向量化扩散：每轮把未分配像素赋值为 4 方向邻居中的陆地省份
+    reassign_mask = pixel_needs_reassign.copy()
+    for _ in range(50):  # 最多扩散 50 轮（够覆盖 50px 距离的新陆地边缘）
+        if not np.any(reassign_mask):
+            break
+        # 4 方向的省份 ID（边界填 0）
+        up    = np.zeros_like(result); up[1:, :]    = result[:-1, :]
+        down  = np.zeros_like(result); down[:-1, :] = result[1:, :]
+        left  = np.zeros_like(result); left[:, 1:]  = result[:, :-1]
+        right = np.zeros_like(result); right[:, :-1] = result[:, 1:]
+        # 只取陆地省份的邻居
+        up[~pid_is_land[up]]       = 0
+        down[~pid_is_land[down]]   = 0
+        left[~pid_is_land[left]]   = 0
+        right[~pid_is_land[right]] = 0
+        # 取第一个非0邻居（简单优先：上→下→左→右）
+        neighbor = np.where(up > 0, up,
+                   np.where(down > 0, down,
+                   np.where(left > 0, left, right)))
+        # 只写未分配的像素
+        can_assign = reassign_mask & (neighbor > 0)
+        if not np.any(can_assign):
+            break
+        result[can_assign] = neighbor[can_assign]
+        reassign_mask[can_assign] = False
+
+    # 剩余未分配的（孤岛）→ 每个连通块一个新省份
+    new_count = 0
+    next_id = max_pid + 1
+    if np.any(reassign_mask):
+        labeled, num = _label(reassign_mask)
+        for rid in range(1, num + 1):
+            result[labeled == rid] = next_id
+            next_id += 1
+            new_count += 1
+
+    # 被完全吞并的海省
+    consumed = []
+    new_pid_total = np.bincount(result.ravel(), minlength=max_pid + 1)
+    for pid in range(1, max_pid + 1):
+        if pid_total[pid] > 0 and new_pid_total[pid] == 0:
+            consumed.append(pid)
+
+    return result, new_count, consumed
+
+
+def _clear_type_mismatched_pixels(province_map: np.ndarray, tile_map: np.ndarray) -> int:
+    """清除"类型不匹配"的像素省份 ID。
+
+    场景：用户在海上画了陆地 → tile=LAND 但 pm 还指向海洋省份。
+    把这些像素的 pm 设为 0（未分配），让增量生成器给它们分配新陆地省份。
+    反过来（陆地变海洋）也一样处理。
+
+    只清除**少数派**像素：如果一个省份 80% 像素是陆地，只清掉那 20% 海洋像素。
+    这样不会破坏已有陆地省份。
+    """
+    max_pid = int(province_map.max())
+    if max_pid == 0:
+        return 0
+
+    flat_pm = province_map.ravel()
+    flat_tm = tile_map.ravel()
+
+    pid_total = np.bincount(flat_pm, minlength=max_pid + 1)
+    pid_land = np.bincount(
+        flat_pm,
+        weights=(flat_tm == TILE_LAND).astype(np.float64),
+        minlength=max_pid + 1,
+    )
+    safe_total = np.maximum(pid_total, 1)
+    land_ratio = pid_land / safe_total
+
+    # 每个省份的"主类型"：>50% 陆地 → 陆地省份
+    pid_is_land = np.zeros(max_pid + 1, dtype=bool)
+    pid_is_land[1:] = land_ratio[1:] > 0.5
+
+    # 逐像素检查：tile 类型 != 省份主类型 → 清零
+    pixel_prov_is_land = pid_is_land[province_map]
+    pixel_is_land = tile_map == TILE_LAND
+    mismatch = (pixel_is_land != pixel_prov_is_land) & (province_map > 0)
+
+    cleared = int(mismatch.sum())
+    province_map[mismatch] = 0
+    return cleared

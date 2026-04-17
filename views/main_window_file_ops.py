@@ -57,10 +57,12 @@ def _populate_imported_data(project, result: dict) -> None:
     owners = set(sd.get("owner", "") for sd in result.get("states", []))
     owners.discard("")
     for tag in sorted(owners):
+        # 跳过非法 TAG（中文注释、过长、特殊字符等）
+        if len(tag) != 3 or not tag.isascii():
+            continue
         if tag not in project.country_mgr.countries:
             color = country_colors.get(tag, None)
             if color is None:
-                # 没有颜色定义 → 从 TAG 哈希生成
                 import hashlib
                 h = int(hashlib.md5(tag.encode()).hexdigest()[:6], 16)
                 color = (
@@ -68,7 +70,10 @@ def _populate_imported_data(project, result: dict) -> None:
                     max(60, min(220, (h >> 8) & 0xFF)),
                     max(60, min(220, h & 0xFF)),
                 )
-            project.country_mgr.create_country(tag, name=tag, color=color)
+            try:
+                project.country_mgr.create_country(tag, name=tag, color=color)
+            except ValueError:
+                continue  # 非法 TAG 直接跳过
         # 分配 state 到国家
         for sd in result.get("states", []):
             if sd.get("owner") == tag:
