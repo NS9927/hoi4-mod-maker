@@ -104,8 +104,8 @@ class StateController(BaseController):
         # 通知 UI 弹 VP 对话框（controller 不直接弹 Qt 对话框）
         self.event_bus.emit("vp_dialog_requested", pid=pid, state_id=sid)
 
-    def set_vp(self, pid: int, value: int) -> None:
-        """设置省份的 VP 值（由 UI 对话框回调调用）。"""
+    def set_vp(self, pid: int, value: int, name: str = "") -> None:
+        """设置省份的 VP 值 + 城市名（由 UI 对话框回调调用）。"""
         state_mgr = self.project.state_mgr
 
         # 获取旧值
@@ -117,10 +117,17 @@ class StateController(BaseController):
 
         cmd = SetVPCommand(state_mgr, pid, old_vp, new_vp)
         self.history.execute(cmd)
+
+        # 保存城市名
+        if new_vp and name:
+            state_mgr.set_vp(pid, value, name)
         self.project.mark_dirty()
 
         if new_vp:
-            self._emit_status(f"省份 {pid} 设为 {value} 分 VP")
+            label = f"省份 {pid} 设为 {value} VP"
+            if name:
+                label += f" ({name})"
+            self._emit_status(label)
         else:
             self._emit_status(f"省份 {pid} VP 已移除")
         self.event_bus.emit("vp_changed", pid=pid, value=value)

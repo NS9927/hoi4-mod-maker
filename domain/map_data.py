@@ -111,11 +111,40 @@ class MapData:
         return int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
 
     def get_province_centroid(self, pid: int) -> tuple[int, int] | None:
-        """返回省份重心 (x, y)，不存在返回 None。"""
+        """返回省份重心 (x, y)，不存在返回 None。优先用缓存。"""
+        cache = getattr(self, '_centroid_cache', None)
+        if cache is not None and pid in cache:
+            return cache[pid]
         ys, xs = np.where(self.province_map == pid)
         if len(ys) == 0:
             return None
-        return int(xs.mean()), int(ys.mean())
+        result = (int(xs.mean()), int(ys.mean()))
+        if cache is not None:
+            cache[pid] = result
+        return result
+
+    def build_centroid_cache(self) -> None:
+        """一次性计算所有省份质心，O(像素数) 而非 O(省份数×像素数)。"""
+        pm = self.province_map
+        max_pid = int(pm.max())
+        if max_pid <= 0:
+            self._centroid_cache = {}
+            return
+        h, w = pm.shape
+        flat = pm.ravel()
+        ys, xs = np.mgrid[0:h, 0:w]
+        count = np.bincount(flat, minlength=max_pid + 1)
+        sum_x = np.bincount(flat, weights=xs.ravel().astype(np.float64), minlength=max_pid + 1)
+        sum_y = np.bincount(flat, weights=ys.ravel().astype(np.float64), minlength=max_pid + 1)
+        cache: dict[int, tuple[int, int]] = {}
+        for pid in range(1, max_pid + 1):
+            if count[pid] > 0:
+                cache[pid] = (int(sum_x[pid] / count[pid]), int(sum_y[pid] / count[pid]))
+        self._centroid_cache = cache
+
+    def invalidate_centroid_cache(self) -> None:
+        """省份变化后清缓存。"""
+        self._centroid_cache = None
 
     def get_province_tile_type(self, pid: int) -> int:
         """返回省份的地块类型（land/sea/lake）。

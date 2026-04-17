@@ -118,7 +118,7 @@ def _write_map_files(output_dir, province_map, colors, province_count,
     # === definition.csv — 必须自己生成 ===
     coastal = get_coastal_provinces(tile_map, province_map)
     with open(os.path.join(map_dir, "definition.csv"), "w") as f:
-        f.write("0;0;0;0;land;false;unknown;0\n")
+        f.write("0;0;0;0;sea;false;ocean;0\n")
         for pid in range(1, province_count + 1):
             r, g, b = colors.get(pid, (1, 1, 1))
             if pid in land_ids:

@@ -315,15 +315,54 @@ class StrategicRegionManager:
             changed += 1
         return changed
 
-    def build_sr_color_map(self, province_map: np.ndarray) -> np.ndarray:
-        """生成战略区域着色图 (H, W, 3) — 每个 region 一种颜色（确定性哈希）。"""
+    def build_sr_color_map(
+        self, province_map: np.ndarray, tile_map: np.ndarray | None = None,
+    ) -> np.ndarray:
+        """生成战略区域着色图 (H, W, 3) — 每个 region 一种颜色.
+
+        如果提供 tile_map, 海洋省份用蓝色系、陆地省份用暖色系,
+        避免相邻的海洋/陆地区域颜色接近而无法区分.
+        """
+        from data.constants import TILE_SEA, TILE_LAKE
+
         max_pid = int(province_map.max())
         lut = np.full((max_pid + 1, 3), 50, dtype=np.uint8)  # 未分配=深灰
 
+        # 向量化判断每个省份是否为海洋/湖泊
+        is_sea = set()
+        if tile_map is not None:
+            flat_pm = province_map.ravel()
+            flat_tm = tile_map.ravel()
+            # 统计每个 pid 的海洋像素数和总像素数
+            sea_mask = np.isin(flat_tm, [TILE_SEA, TILE_LAKE])
+            total_count = np.bincount(flat_pm, minlength=max_pid + 1)
+            sea_count = np.bincount(flat_pm, weights=sea_mask.astype(np.float64), minlength=max_pid + 1)
+            # 海洋像素 > 50% 的省份视为海洋
+            for pid in range(1, max_pid + 1):
+                if total_count[pid] > 0 and sea_count[pid] > total_count[pid] * 0.5:
+                    is_sea.add(pid)
+
         for rid, region in self._regions.items():
-            # 确定性颜色：从 region id 哈希
+            # 判断该 region 是海洋还是陆地（按多数省份）
+            if is_sea and region.province_ids:
+                sea_count = sum(1 for p in region.province_ids if p in is_sea)
+                region_is_sea = sea_count > len(region.province_ids) // 2
+            else:
+                region_is_sea = False
+
             rng = np.random.RandomState(rid * 7 + 13)
-            color = rng.randint(60, 220, size=3).astype(np.uint8)
+            if region_is_sea:
+                # 蓝色系: R=40-100, G=60-140, B=150-230
+                r = rng.randint(40, 100)
+                g = rng.randint(60, 140)
+                b = rng.randint(150, 230)
+            else:
+                # 暖色系: R=120-230, G=80-200, B=40-120
+                r = rng.randint(120, 230)
+                g = rng.randint(80, 200)
+                b = rng.randint(40, 120)
+            color = np.array([r, g, b], dtype=np.uint8)
+
             for pid in region.province_ids:
                 if 0 < pid <= max_pid:
                     lut[pid] = color

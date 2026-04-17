@@ -83,9 +83,77 @@ class OverlayMixin:
         self._province_pixmap_item.setPixmap(result)
         self._province_pixmap_item.setVisible(True)
 
-    def set_vp_data(self, vp_dict: dict[int, int]) -> None:
-        """设置 VP 数据 {province_id: vp_value}，在 state/province 模式显示标记"""
+    def show_state_borders(self, visible: bool, state_mgr=None) -> None:
+        """显示/隐藏 State 着色 + 边界叠加层（用于战略区域选州模式）。
+
+        半透明 State 颜色填充 + 白色边界线，确保能清楚看到每个 State。
+        """
+        overlay = getattr(self, '_state_border_overlay', None)
+        if overlay is None:
+            return
+        if not visible:
+            overlay.setVisible(False)
+            return
+        if state_mgr is None or self._province_map.max() == 0:
+            overlay.setVisible(False)
+            return
+
+        # 构建省份→州 ID 映射表
+        max_pid = int(self._province_map.max())
+        pid_to_sid = np.zeros(max_pid + 1, dtype=np.int32)
+        for sid, state in state_mgr._states.items():
+            for pid in state.provinces:
+                if 0 < pid <= max_pid:
+                    pid_to_sid[pid] = sid
+
+        # 通过 LUT 把 province_map 转成 state_map
+        pm = np.clip(self._province_map, 0, max_pid)
+        state_map = pid_to_sid[pm]
+
+        h, w = state_map.shape
+
+        # 为每个 state 生成确定性颜色（半透明填充）
+        max_sid = int(state_map.max()) + 1
+        # 用黄金比例散列生成区分度高的颜色
+        color_lut = np.zeros((max_sid, 4), dtype=np.uint8)
+        for sid in range(1, max_sid):
+            hue = (sid * 137) % 360  # 黄金角散列
+            # 简易 HSV→RGB (S=0.5, V=0.9)
+            h_i = hue // 60
+            f = (hue % 60) / 60.0
+            v, s = 230, 0.5
+            p = int(v * (1 - s))
+            q = int(v * (1 - s * f))
+            t = int(v * (1 - s * (1 - f)))
+            v = int(v)
+            if h_i == 0:   r, g, b = v, t, p
+            elif h_i == 1: r, g, b = q, v, p
+            elif h_i == 2: r, g, b = p, v, t
+            elif h_i == 3: r, g, b = p, q, v
+            elif h_i == 4: r, g, b = t, p, v
+            else:          r, g, b = v, p, q
+            color_lut[sid] = (b, g, r, 90)  # BGRA, alpha=90 半透明
+
+        # 填充 state 颜色
+        rgba = color_lut[state_map]
+
+        # 计算 state 边界（白色亮线）
+        borders = np.zeros((h, w), dtype=bool)
+        borders[:-1, :] |= state_map[:-1, :] != state_map[1:, :]
+        borders[1:, :]  |= state_map[:-1, :] != state_map[1:, :]
+        borders[:, :-1] |= state_map[:, :-1] != state_map[:, 1:]
+        borders[:, 1:]  |= state_map[:, :-1] != state_map[:, 1:]
+        rgba[borders] = (255, 255, 255, 220)  # 白色边界
+
+        img = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_ARGB32)
+        img._ref = rgba
+        overlay.setPixmap(QPixmap.fromImage(img))
+        overlay.setVisible(True)
+
+    def set_vp_data(self, vp_dict: dict[int, int], name_dict: dict[int, str] | None = None) -> None:
+        """设置 VP 数据 {province_id: vp_value} + 城市名 {province_id: name}"""
         self._vp_data = dict(vp_dict)
+        self._vp_names = dict(name_dict) if name_dict else {}
         self._vp_cache_dirty = True
         self._update_vp_visibility()
 
@@ -95,6 +163,9 @@ class OverlayMixin:
             self._vp_overlay_item.setVisible(False)
             return
         if getattr(self, '_vp_cache_dirty', True):
+            # 确保质心缓存存在
+            if self._map_data and not getattr(self._map_data, '_centroid_cache', None):
+                self._map_data.build_centroid_cache()
             self._render_vp_overlay()
             self._vp_cache_dirty = False
         self._vp_overlay_item.setVisible(True)
@@ -118,18 +189,10 @@ class OverlayMixin:
                 continue
             cx, cy = centroid
 
-            radius = max(6, min(14, 4 + vp_val))
-            painter.setPen(QPen(QColor(0, 0, 0), 2))
+            # 极小红点（1px 圆）
+            painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(QBrush(QColor(220, 30, 30)))
-            painter.drawEllipse(cx - radius, cy - radius, radius * 2, radius * 2)
-
-            from PyQt5.QtGui import QFont
-            font = QFont("Arial", max(8, min(12, 6 + vp_val // 2)))
-            font.setBold(True)
-            painter.setFont(font)
-            painter.setPen(QColor(255, 255, 255))
-            text_rect = QRectF(cx - 20, cy - 10, 40, 20)
-            painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, str(vp_val))
+            painter.drawEllipse(cx - 1, cy - 1, 3, 3)
 
         painter.end()
         self._vp_overlay_item.setPixmap(QPixmap.fromImage(img))
@@ -208,8 +271,13 @@ class OverlayMixin:
         ) or getattr(self, '_density_overlay_visible', False)
 
         if show_brush:
-            r = self._brush_size // 2
-            self._brush_cursor.setRect(sx - r, sy - r, self._brush_size, self._brush_size)
+            # 密度模式用独立的画笔大小
+            if getattr(self, '_density_overlay_visible', False):
+                bs = getattr(self, '_density_brush_size', 30)
+            else:
+                bs = self._brush_size
+            r = bs // 2
+            self._brush_cursor.setRect(sx - r, sy - r, bs, bs)
             self._brush_cursor.setVisible(True)
         else:
             self._brush_cursor.setVisible(False)

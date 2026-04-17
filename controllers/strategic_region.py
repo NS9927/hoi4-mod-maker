@@ -20,6 +20,7 @@ class StrategicRegionController(BaseController):
         super().__init__(project, command_history)
         self.pick_on: bool = False
         self.pick_rid: int = 0
+        self.assign_mode: bool = False
         # 始终监听省份重新生成
         self.event_bus.subscribe("province_map_regenerated", self._on_province_regen)
 
@@ -41,29 +42,42 @@ class StrategicRegionController(BaseController):
         self.event_bus.emit("clear_batch_selection")
 
     def on_province_clicked(self, pid: int) -> None:
-        """点击省份：拾取模式 → 分配；普通模式 → 查看所属战略区。"""
+        """点击省份：分配模式 → 分配到选中区域；查看模式 → 高亮所属区域。"""
         if pid <= 0:
             return
 
         sr_mgr = self.project.strategic_region_mgr
 
-        # 拾取模式：分配省份
-        if self.pick_on and self.pick_rid > 0:
+        # 分配模式：把省份分配到当前选中区域
+        if self.assign_mode and self.pick_rid > 0:
             sr_mgr.assign_province(pid, self.pick_rid)
             self.project.mark_dirty()
-            region = sr_mgr.get_region(self.pick_rid)
+            region = sr_mgr.get(self.pick_rid)
             if region:
                 self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
-            self._emit_status(f"省份 {pid} 已加入战略区域 #{self.pick_rid}")
+            self.event_bus.emit("sr_colors_dirty")
+            self._emit_status(f"省份 {pid} → 战略区域 #{self.pick_rid}")
             return
 
-        # 查看模式：找省份所属战略区 → 选中并高亮
+        if self.assign_mode and self.pick_rid <= 0:
+            self._emit_status("请先在列表中选中一个区域")
+            return
+
+        # 查看模式：点击省份 → 高亮所属战略区 + 在列表中选中
         rid = sr_mgr.get_region_of_province(pid)
         if rid > 0:
             self.select_region(rid)
             self.event_bus.emit("sr_select_in_list", rid=rid)
         else:
             self._emit_status(f"省份 {pid} 未分配到任何战略区域")
+
+    def set_assign_mode(self, on: bool) -> None:
+        """开关分配模式。"""
+        self.assign_mode = on
+        if on:
+            self._emit_status("分配模式: 点击省份加入选中区域")
+        else:
+            self._emit_status("查看模式: 点击省份查看所属区域")
 
     def toggle_pick(self, on: bool, rid: int = 0) -> None:
         """开关拾取模式。"""
@@ -107,7 +121,7 @@ class StrategicRegionController(BaseController):
     def select_region(self, rid: int) -> None:
         """选中战略区域 → 高亮其所有省份。"""
         self.pick_rid = rid
-        region = self.project.strategic_region_mgr.get_region(rid)
+        region = self.project.strategic_region_mgr.get(rid)
         if region:
             self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
             self._emit_status(

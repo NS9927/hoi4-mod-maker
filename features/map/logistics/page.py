@@ -2,22 +2,31 @@
 
 三个 section:
 1. 相邻关系 (adjacencies) — 海峡/运河/不可通行
-2. 铁路 (railways) — 画线 + 等级 1-5
-3. 补给节点 (supply nodes) — 点击放置
+2. 铁路 + 补给 — 统一色块/图标选择 + 点击省份
 """
 
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSpinBox,
-    QGroupBox,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QGroupBox, QButtonGroup,
 )
 
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _SPINBOX_STYLE,
+    _SECTION_STYLE, _DIM_LABEL_STYLE,
+    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
+
+# 铁路等级对应颜色 (与 renderer 一致)
+_RAIL_COLORS = {
+    0: "#323232",   # 擦除
+    1: "#646478",   # 灰蓝
+    2: "#508C50",   # 绿
+    3: "#C8AA32",   # 金黄
+    4: "#D27832",   # 橙
+    5: "#D23232",   # 红
+}
 
 
 def _make_section(title: str) -> QGroupBox:
@@ -29,6 +38,11 @@ def _make_section(title: str) -> QGroupBox:
     return box
 
 
+# 按钮 ID 约定: 0-5 = 铁路等级, 10 = 补给节点, 11 = 擦除补给
+_ID_SUPPLY = 10
+_ID_SUPPLY_ERASE = 11
+
+
 class LogisticsPage(QWidget):
     """后勤系统页面."""
 
@@ -36,8 +50,7 @@ class LogisticsPage(QWidget):
     open_adjacency_dialog_requested = pyqtSignal()
     open_railway_list_requested = pyqtSignal()
     logistics_railway_level_changed = pyqtSignal(int)
-    logistics_railway_draw_toggled = pyqtSignal(bool)
-    logistics_supply_pick_toggled = pyqtSignal(bool)
+    logistics_supply_pick_toggled = pyqtSignal(bool, bool)  # (on, erase)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -68,64 +81,116 @@ class LogisticsPage(QWidget):
 
         lay.addWidget(adj_box)
 
-        # ── 铁路 ──
-        rail_box = _make_section(tr("logistics_rail_section"))
-        rail_lay = rail_box.layout()
+        # ── 铁路 + 补给 ──
+        tool_box = _make_section("铁路 / 补给")
+        tool_lay = tool_box.layout()
 
         self._logi_rail_status = QLabel(tr("logistics_rail_count", 0))
         self._logi_rail_status.setStyleSheet(_DIM_LABEL_STYLE)
-        rail_lay.addWidget(self._logi_rail_status)
+        tool_lay.addWidget(self._logi_rail_status)
 
-        rail_level_row = QHBoxLayout()
-        rl_lbl = QLabel(tr("logistics_rail_level_label"))
-        rl_lbl.setStyleSheet(_LABEL_STYLE)
-        rail_level_row.addWidget(rl_lbl)
-        self._logi_rail_level = QSpinBox()
-        self._logi_rail_level.setRange(1, 5)
-        self._logi_rail_level.setValue(3)
-        self._logi_rail_level.setStyleSheet(_SPINBOX_STYLE)
-        self._logi_rail_level.valueChanged.connect(
-            lambda v: self.logistics_railway_level_changed.emit(v)
-        )
-        rail_level_row.addWidget(self._logi_rail_level)
-        rail_lay.addLayout(rail_level_row)
+        self._logi_sup_status = QLabel(tr("logistics_supply_count", 0))
+        self._logi_sup_status.setStyleSheet(_DIM_LABEL_STYLE)
+        tool_lay.addWidget(self._logi_sup_status)
 
-        self._logi_rail_draw_btn = QPushButton(tr("logistics_rail_draw_btn"))
-        self._logi_rail_draw_btn.setCheckable(True)
-        self._logi_rail_draw_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._logi_rail_draw_btn.toggled.connect(
-            lambda on: self.logistics_railway_draw_toggled.emit(on)
+        lbl = QLabel("选择工具后点击省份:")
+        lbl.setStyleSheet(_DIM_LABEL_STYLE)
+        tool_lay.addWidget(lbl)
+
+        # 统一按钮组
+        self._tool_btn_group = QButtonGroup(self)
+
+        # 铁路色块行
+        rail_row = QHBoxLayout()
+        rail_row.setSpacing(4)
+        rail_lbl = QLabel("铁路")
+        rail_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
+        rail_lbl.setFixedWidth(30)
+        rail_row.addWidget(rail_lbl)
+
+        _btn_base = (
+            "QPushButton {{ background: {bg}; color: white;"
+            " font-weight: bold; font-size: 14px;"
+            " border: 2px solid #555; border-radius: 4px; }}"
+            "QPushButton:checked {{ border: 3px solid #FFE040; }}"
+            "QPushButton:hover {{ border: 2px solid #AAA; }}"
         )
-        rail_lay.addWidget(self._logi_rail_draw_btn)
+
+        for level in range(6):  # 0=擦除, 1-5
+            btn = QPushButton()
+            btn.setCheckable(True)
+            btn.setFixedSize(34, 34)
+            hex_color = _RAIL_COLORS[level]
+            if level == 0:
+                btn.setText("×")
+                btn.setToolTip("擦除铁路")
+            else:
+                btn.setText(str(level))
+                btn.setToolTip(f"铁路等级 {level}")
+            btn.setStyleSheet(_btn_base.format(bg=hex_color))
+            self._tool_btn_group.addButton(btn, level)
+            rail_row.addWidget(btn)
+
+        tool_lay.addLayout(rail_row)
+
+        # 补给图标行
+        sup_row = QHBoxLayout()
+        sup_row.setSpacing(4)
+        sup_lbl = QLabel("补给")
+        sup_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
+        sup_lbl.setFixedWidth(30)
+        sup_row.addWidget(sup_lbl)
+
+        sup_btn = QPushButton("◆+")
+        sup_btn.setCheckable(True)
+        sup_btn.setFixedSize(34, 34)
+        sup_btn.setToolTip("放置补给节点")
+        sup_btn.setStyleSheet(
+            "QPushButton { background: #2CA02C; color: white;"
+            " font-weight: bold; font-size: 13px;"
+            " border: 2px solid #555; border-radius: 4px; }"
+            "QPushButton:checked { border: 3px solid #FFE040; }"
+            "QPushButton:hover { border: 2px solid #AAA; }"
+        )
+        self._tool_btn_group.addButton(sup_btn, _ID_SUPPLY)
+        sup_row.addWidget(sup_btn)
+
+        sup_erase_btn = QPushButton("◆×")
+        sup_erase_btn.setCheckable(True)
+        sup_erase_btn.setFixedSize(34, 34)
+        sup_erase_btn.setToolTip("删除补给节点")
+        sup_erase_btn.setStyleSheet(
+            "QPushButton { background: #555; color: #ccc;"
+            " font-weight: bold; font-size: 13px;"
+            " border: 2px solid #555; border-radius: 4px; }"
+            "QPushButton:checked { border: 3px solid #FFE040; }"
+            "QPushButton:hover { border: 2px solid #AAA; }"
+        )
+        self._tool_btn_group.addButton(sup_erase_btn, _ID_SUPPLY_ERASE)
+        sup_row.addWidget(sup_erase_btn)
+
+        sup_row.addStretch()
+        tool_lay.addLayout(sup_row)
+
+        # 默认选中铁路等级 3
+        self._tool_btn_group.button(3).setChecked(True)
+        self._tool_btn_group.idClicked.connect(self._on_tool_clicked)
 
         rail_list_btn = QPushButton(tr("logistics_rail_list_btn"))
         rail_list_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         rail_list_btn.clicked.connect(lambda: self.open_railway_list_requested.emit())
-        rail_lay.addWidget(rail_list_btn)
+        tool_lay.addWidget(rail_list_btn)
 
-        lay.addWidget(rail_box)
-
-        # ── 补给节点 ──
-        sup_box = _make_section(tr("logistics_supply_section"))
-        sup_lay = sup_box.layout()
-
-        self._logi_sup_status = QLabel(tr("logistics_supply_count", 0))
-        self._logi_sup_status.setStyleSheet(_DIM_LABEL_STYLE)
-        sup_lay.addWidget(self._logi_sup_status)
-
-        self._logi_sup_toggle_btn = QPushButton(tr("logistics_supply_pick_btn"))
-        self._logi_sup_toggle_btn.setCheckable(True)
-        self._logi_sup_toggle_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._logi_sup_toggle_btn.toggled.connect(
-            lambda on: self.logistics_supply_pick_toggled.emit(on)
-        )
-        sup_lay.addWidget(self._logi_sup_toggle_btn)
-
-        hint = QLabel(tr("logistics_supply_hint"))
-        hint.setStyleSheet(_DIM_LABEL_STYLE)
-        hint.setWordWrap(True)
-        sup_lay.addWidget(hint)
-
-        lay.addWidget(sup_box)
+        lay.addWidget(tool_box)
 
         lay.addStretch(1)
+
+    def _on_tool_clicked(self, btn_id: int) -> None:
+        if btn_id <= 5:
+            # 铁路模式 — 关闭补给
+            self.logistics_supply_pick_toggled.emit(False, False)
+            self.logistics_railway_level_changed.emit(btn_id)
+        elif btn_id == _ID_SUPPLY:
+            self.logistics_supply_pick_toggled.emit(True, False)
+        elif btn_id == _ID_SUPPLY_ERASE:
+            self.logistics_supply_pick_toggled.emit(True, True)

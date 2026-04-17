@@ -35,6 +35,7 @@ def state_setup():
 def test_on_province_clicked_assigns(state_setup):
     ctrl, project, _ = state_setup
     ctrl.selected_state_id = 1
+    ctrl.assign_mode = True
 
     ctrl.on_province_clicked(2)
 

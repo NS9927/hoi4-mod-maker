@@ -351,11 +351,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.logistics_railway_level_changed.connect(
             lambda lv: self._controllers["logistics"].set_railway_level(lv)
         )
-        tp.logistics_railway_draw_toggled.connect(
-            lambda on: self._controllers["logistics"].toggle_railway_draw(on)
-        )
         tp.logistics_supply_pick_toggled.connect(
-            lambda on: self._controllers["logistics"].toggle_supply_pick(on)
+            lambda on, erase: self._controllers["logistics"].toggle_supply_pick(on, erase)
         )
 
         # Continent 信号 → controller
@@ -376,6 +373,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             lambda: (self._controllers["strategic_region"].auto_assign_weather(), self._refresh_sr_list())
         )
         tp.strategic_region_pick_toggled.connect(self._on_sr_pick_toggled)
+        tp.sr_assign_mode_changed.connect(
+            lambda on: self._controllers["strategic_region"].set_assign_mode(on)
+        )
         tp.strategic_region_new_requested.connect(
             lambda: (self._controllers["strategic_region"].create_region(), self._refresh_sr_list())
         )
@@ -428,12 +428,26 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         bus.subscribe("province_count_changed", self._on_evt_province_count)
         bus.subscribe("vp_dialog_requested", self._on_evt_vp_dialog)
         bus.subscribe("logistics_province_picked", self._on_evt_logistics_picked)
+        bus.subscribe("sr_select_in_list", self._on_evt_sr_select_in_list)
 
     def _on_evt_status(self, event) -> None:
         self._status_info.setText(event.data.get("text", ""))
 
     def _on_evt_undo_state(self, event) -> None:
         pass  # TODO: enable/disable undo/redo actions
+
+    def _on_evt_sr_select_in_list(self, event) -> None:
+        """点击省份查到所属战略区 → 在侧边栏列表中选中它。"""
+        rid = event.data.get("rid", 0)
+        if rid <= 0:
+            return
+        from PyQt5.QtCore import Qt
+        lst = self._tool_panel._sr_list
+        for i in range(lst.count()):
+            item = lst.item(i)
+            if item and int(item.data(Qt.UserRole) or 0) == rid:
+                lst.setCurrentRow(i)
+                break
 
     def _on_evt_province_count(self, event) -> None:
         count = event.data.get("count", 0)
@@ -444,10 +458,17 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         pid = event.data.get("pid", 0)
         if pid <= 0:
             return
+
+        # 读取当前值
+        state_mgr = self._project.state_mgr
+        sid = state_mgr.get_state_of_province(pid)
+        state = state_mgr.get_state(sid) if sid > 0 else None
+        cur_vp = state.victory_points.get(pid, 0) if state else 0
+
         value, ok = QInputDialog.getInt(
-            self, tr("dlg_set_vp_title"),
-            tr("dlg_set_vp_label").format(pid=pid),
-            1, 0, 50, 1,
+            self, f"胜利点 — 省份 {pid}",
+            f"VP 值 (0=删除):",
+            cur_vp if cur_vp > 0 else 1, 0, 50, 1,
         )
         if ok:
             ctrl: StateController = self._controllers["state"]
@@ -515,6 +536,13 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
                     self._sr_selected_states.remove(sid)
                 else:
                     self._sr_selected_states.append(sid)
+                # 收集所有选中州的省份 → 高亮
+                all_pids: list[int] = []
+                for s in self._sr_selected_states:
+                    state = self._project.state_mgr.get_state(s)
+                    if state:
+                        all_pids.extend(state.provinces)
+                self._canvas.set_batch_selection_pids(all_pids)
                 self._status_info.setText(tr("status_selected_states").format(n=len(self._sr_selected_states)))
             else:
                 self._status_info.setText(tr("status_province_no_state").format(pid=pid))
@@ -672,6 +700,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         """开关选州创建战略区域模式。"""
         self._sr_from_states_mode = on
         self._sr_selected_states = []
+        self._canvas.set_batch_selection_pids([])
+        self._canvas.show_state_borders(on, self._project.state_mgr if on else None)
         if on:
             self._status_info.setText(tr("status_sr_from_states_mode"))
         else:
@@ -689,8 +719,13 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 重置模式
         self._sr_from_states_mode = False
         self._sr_selected_states = []
+        self._canvas.set_batch_selection_pids([])
+        self._canvas.show_state_borders(False)
         if new_rid > 0:
+            # 刷新战略区域颜色图 + 列表
+            self._app._refresh_sr_colors()
             self._canvas.refresh_display()
+            self._refresh_sr_list()
             QMessageBox.information(self, tr("dlg_sr_from_states_title"), tr("dlg_sr_from_states_done").format(rid=new_rid, n=n))
 
     # ═══════════════════════ State 管理 ═══════════════════════
@@ -868,8 +903,13 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 刷新着色（不然切到 state/country 模式看不到颜色）
         self._app._refresh_state_colors()
         self._app._refresh_country_colors()
+        self._app._refresh_sr_colors()
+        # 预计算质心缓存（VP 渲染和导出都需要）
+        self._project.map_data.build_centroid_cache()
+        self._app._refresh_vp_data()
         self._app._refresh_country_list()
         self._app._refresh_state_list()
+        self._refresh_sr_list()
         self._project.mark_dirty()
 
         progress.close()

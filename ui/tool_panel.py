@@ -35,7 +35,7 @@ from ui.styles import (
 _NAV_MODES: list[tuple[str, str, str, list[tuple[str, str, str]], str]] = [
     ("map_draw", "🏖", "nav_map_draw", [
         ("land", "tab_land", "🟢"),
-        ("density", "tab_density", "🟢"),
+        # ("density", "tab_density", "🟢"),  # 暂时关闭密度功能
         ("new_land", "tab_new_land", "🟢"),
     ], "nav_tooltip_map_draw"),
     ("province", "🧩", "nav_province", [
@@ -299,8 +299,7 @@ class ToolPanel(QWidget):
     open_adjacency_dialog_requested = pyqtSignal()
     open_railway_list_requested = pyqtSignal()
     logistics_railway_level_changed = pyqtSignal(int)
-    logistics_railway_draw_toggled = pyqtSignal(bool)
-    logistics_supply_pick_toggled = pyqtSignal(bool)
+    logistics_supply_pick_toggled = pyqtSignal(bool, bool)
 
     # 大陆分区信号
     continent_pick_toggled = pyqtSignal(bool)
@@ -318,6 +317,7 @@ class ToolPanel(QWidget):
     strategic_region_weather_changed = pyqtSignal(str)
     strategic_region_naval_changed = pyqtSignal(str)
     strategic_region_pick_toggled = pyqtSignal(bool)
+    sr_assign_mode_changed = pyqtSignal(bool)
     create_from_states_toggled = pyqtSignal(bool)
     create_from_states_confirmed = pyqtSignal()
 
@@ -388,6 +388,10 @@ class ToolPanel(QWidget):
 
         # 创建各页面实例并连接信号
         self._create_pages()
+
+        # 初始化第一个导航组的子标签栏（图标栏 setChecked 不触发信号）
+        first_nav = _NAV_MODES[0][0]
+        self._on_nav_changed(first_nav)
 
         # 底部固定区域
         sep = QFrame()
@@ -574,6 +578,7 @@ class ToolPanel(QWidget):
         p.strategic_region_weather_changed.connect(self.strategic_region_weather_changed)
         p.strategic_region_naval_changed.connect(self.strategic_region_naval_changed)
         p.strategic_region_pick_toggled.connect(self.strategic_region_pick_toggled)
+        p.sr_assign_mode_changed.connect(self.sr_assign_mode_changed)
         p.create_from_states_toggled.connect(self.create_from_states_toggled)
         p.create_from_states_confirmed.connect(self.create_from_states_confirmed)
 
@@ -582,7 +587,6 @@ class ToolPanel(QWidget):
         p.open_adjacency_dialog_requested.connect(self.open_adjacency_dialog_requested)
         p.open_railway_list_requested.connect(self.open_railway_list_requested)
         p.logistics_railway_level_changed.connect(self.logistics_railway_level_changed)
-        p.logistics_railway_draw_toggled.connect(self.logistics_railway_draw_toggled)
         p.logistics_supply_pick_toggled.connect(self.logistics_supply_pick_toggled)
 
     def _connect_colormap_signals(self) -> None:
@@ -781,6 +785,19 @@ class ToolPanel(QWidget):
     def update_state_info(self, name: str, manpower: int, category: str) -> None:
         """填充 State 属性字段"""
         self._state_page.update_state_info(name, manpower, category)
+
+    def select_state_in_list(self, state_id: int) -> None:
+        """在 State 列表中选中指定 ID 的行。"""
+        from PyQt5.QtCore import Qt
+        lst = self._state_page._state_list
+        for i in range(lst.count()):
+            item = lst.item(i)
+            if item and int(item.data(Qt.UserRole) or 0) == state_id:
+                lst.blockSignals(True)
+                lst.setCurrentRow(i)
+                lst.blockSignals(False)
+                self._state_page._current_state_id = state_id
+                break
 
     def update_country_list(self, countries: list[tuple[str, str, tuple]]) -> None:
         """刷新国家列表"""

@@ -5,34 +5,84 @@ map/railways.txt 写入器.
 格式: Level Count ProvId1 ProvId2 ... (空格分隔, 每行一条)
 - 不能空 (CLAUDE.md 约束, 空文件会崩)
 - 无 BOM, LF 换行
+
+导出逻辑：把"省份→等级"映射转成"相邻省份之间的路径"。
+每对相邻且都有铁路的省份生成一条 level=min(两者等级) 的 2 省份铁路。
 """
 
 from __future__ import annotations
 
 import os
+import numpy as np
 
 
-def write_railways_txt(output_dir: str, railway_mgr=None, fallback_pid: int = 1) -> None:
-    """生成 map/railways.txt.
+def write_railways_txt(
+    output_dir: str,
+    railway_mgr=None,
+    province_map: np.ndarray | None = None,
+    fallback_pid: int = 1,
+) -> None:
+    """生成 map/railways.txt。
 
-    railway_mgr: RailwayManager 实例, None 或空时写一条 placeholder (必须非空).
-    fallback_pid: 当 mgr 为空时, placeholder 用的省份 ID (必须是合法的陆地省份).
+    从 railway_mgr.province_levels() 取每个省份的等级，
+    用 province_map 算邻接关系，输出相邻省份对。
     """
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "railways.txt")
 
     lines: list[str] = []
-    if railway_mgr is not None:
-        for entry in railway_mgr.get_all():
-            lines.append(entry.to_line())
 
-    # 必须非空 — vanilla 约束
+    if railway_mgr is not None and province_map is not None:
+        levels = railway_mgr.province_levels()
+        if levels:
+            lines = _build_railway_lines(levels, province_map)
+
+    # 必须非空
     if not lines:
-        # 单省份退化铁路 (level 1, 只经过 1 个省) — HOI4 接受 但可能警告
-        # 为保险起见用 2 个相同 ID 组成最小合法条目
         lines.append(f"1 2 {fallback_pid} {fallback_pid}")
 
     content = "\n".join(lines) + "\n"
     with open(path, "wb") as f:
         f.write(content.encode("utf-8"))
+
+
+def _build_railway_lines(
+    levels: dict[int, int],
+    province_map: np.ndarray,
+) -> list[str]:
+    """把省份等级映射转成相邻省份对的铁路线。
+
+    算法: 扫描 province_map 找相邻省份对，
+    如果两个省份都有铁路等级，生成一条 level=min 的铁路。
+    去重后输出。
+    """
+    # 找所有相邻省份对（向量化，不逐像素循环）
+    pm = province_map
+    pairs: set[tuple[int, int]] = set()
+
+    # 垂直相邻
+    diff_v = pm[:-1, :] != pm[1:, :]
+    ys, xs = np.where(diff_v)
+    for i in range(len(ys)):
+        a, b = int(pm[ys[i], xs[i]]), int(pm[ys[i] + 1, xs[i]])
+        if a > 0 and b > 0 and a in levels and b in levels:
+            pair = (min(a, b), max(a, b))
+            pairs.add(pair)
+
+    # 水平相邻
+    diff_h = pm[:, :-1] != pm[:, 1:]
+    ys, xs = np.where(diff_h)
+    for i in range(len(ys)):
+        a, b = int(pm[ys[i], xs[i]]), int(pm[ys[i], xs[i] + 1])
+        if a > 0 and b > 0 and a in levels and b in levels:
+            pair = (min(a, b), max(a, b))
+            pairs.add(pair)
+
+    # 生成铁路线: 每对相邻省份一条, level = min(两者等级)
+    lines: list[str] = []
+    for a, b in sorted(pairs):
+        lvl = min(levels[a], levels[b])
+        lines.append(f"{lvl} 2 {a} {b}")
+
+    return lines

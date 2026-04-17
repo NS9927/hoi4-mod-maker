@@ -18,112 +18,68 @@ class LogisticsController(BaseController):
 
     def __init__(self, project: "Project", command_history: "CommandHistory") -> None:
         super().__init__(project, command_history)
-        # 拾取目标: 'adj_from'/'adj_to'/'adj_through'/'supply'/'rule_required'/'rule_icon'
+        # 拾取目标: 'adj_from'/'adj_to'/'adj_through'/'supply'/'supply_erase'/'rule_required'/'rule_icon'
         self.pick_target: str | None = None
-        # 铁路画笔状态
-        self.railway_draw_on: bool = False
+        # 铁路等级 (0=擦除, 1-5)
         self.railway_level: int = 3
-        self.railway_draft: list[int] = []
 
     def activate(self) -> None:
         """进入后勤模式。"""
         self.pick_target = None
-        self.railway_draw_on = False
-        self.railway_draft.clear()
-        self._emit_status("后勤编辑模式")
+        self._emit_status("后勤编辑模式: 点击省份设置铁路等级")
 
     def deactivate(self) -> None:
         """离开后勤模式，清理所有临时状态。"""
         self.pick_target = None
-        self.railway_draw_on = False
-        self.railway_draft.clear()
 
     def on_province_clicked(self, pid: int) -> None:
-        """省份点击分发：铁路等级/补给/adjacency 拾取。"""
+        """省份点击分发：补给/adjacency 拾取 或 铁路等级设置。"""
         if pid <= 0:
             return
 
-        # 铁路画笔进行中
-        if self.railway_draw_on:
-            if pid not in self.railway_draft:
-                self.railway_draft.append(pid)
-                trail = " → ".join(str(p) for p in self.railway_draft[-5:])
-                self._emit_status(
-                    f"铁路草稿 ({len(self.railway_draft)} 省): {trail}"
-                )
-            return
-
-        # 拾取模式
-        if self.pick_target is not None:
+        # 补给/adjacency 拾取模式
+        if self.pick_target in ("supply", "supply_erase",
+                                "adj_from", "adj_to", "adj_through",
+                                "rule_required", "rule_icon"):
             self._handle_pick(pid)
             return
 
-        # 默认：点击省份设置/切换铁路等级 + 高亮所属战略区
+        # 其他情况：设置铁路等级
+        from commands.map.set_railway import SetRailwayLevelCommand
+
         mgr = self.project.railway_mgr
         current = mgr.province_levels().get(pid, 0)
         new_level = self.railway_level
         if current == new_level:
-            new_level = 0  # 点同等级 = 删除
+            new_level = 0  # 点同等级 = 擦除
 
-        mgr.set_province_level(pid, new_level)
+        if current == new_level:
+            return  # 无变化
+
+        cmd = SetRailwayLevelCommand(mgr, pid, current, new_level)
+        self.history.execute(cmd)
         self.project.mark_dirty()
-        # 刷新着色
         self.event_bus.emit("railway_changed")
 
-        # 同时显示所属战略区 + 高亮
-        sr_mgr = self.project.strategic_region_mgr
-        rid = sr_mgr.get_region_of_province(pid)
-        region = sr_mgr.get_region(rid) if rid > 0 else None
-        sr_info = f" | 战略区 #{rid} \"{region.name}\"" if region else ""
-        if region:
-            self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
-
         if new_level > 0:
-            self._emit_status(f"省份 {pid} 铁路等级 → {new_level}{sr_info}")
+            self._emit_status(f"省份 {pid} 铁路等级 → {new_level}")
         else:
-            self._emit_status(f"省份 {pid} 铁路已移除{sr_info}")
-
-    def toggle_railway_draw(self, on: bool) -> None:
-        """开始/结束铁路画笔。结束时把草稿变成一条 railway entry。"""
-        if on:
-            self.railway_draw_on = True
-            self.railway_draft = []
-            self._emit_status(
-                f"铁路画笔已启用 (等级 {self.railway_level}): "
-                "依次点击省份, 再次点击按钮结束"
-            )
-        else:
-            self.railway_draw_on = False
-            draft = list(self.railway_draft)
-            self.railway_draft = []
-            if len(draft) >= 2:
-                try:
-                    self.project.railway_mgr.add(
-                        level=self.railway_level,
-                        province_ids=draft,
-                    )
-                    self.project.mark_dirty()
-                    self._emit_status(
-                        f"铁路已保存: level {self.railway_level}, {len(draft)} 省"
-                    )
-                except ValueError as e:
-                    self._emit_status(f"铁路保存失败: {e}")
-            else:
-                self._emit_status("铁路画笔已取消 (至少需要 2 个省份)")
+            self._emit_status(f"省份 {pid} 铁路已移除")
 
     def set_railway_level(self, level: int) -> None:
         """设置铁路等级。"""
         self.railway_level = level
 
-    def toggle_supply_pick(self, on: bool) -> None:
-        """开关补给节点拾取模式。"""
+    def toggle_supply_pick(self, on: bool, erase: bool = False) -> None:
+        """开关补给节点拾取模式。erase=True 时为擦除模式。"""
         if on:
-            self.pick_target = "supply"
-            self._emit_status("点击陆地省份切换补给节点")
+            self.pick_target = "supply_erase" if erase else "supply"
+            mode_text = "删除" if erase else "放置"
+            self._emit_status(f"点击陆地省份{mode_text}补给节点")
         else:
-            if self.pick_target == "supply":
+            if self.pick_target in ("supply", "supply_erase"):
                 self.pick_target = None
-            self._emit_status("补给拾取已关闭")
+            self._emit_status("补给模式已关闭")
 
     def set_adjacency_pick(self, on: bool, target: str = "") -> None:
         """设置 adjacency 对话框拾取模式。"""
@@ -147,9 +103,9 @@ class LogisticsController(BaseController):
         """统一的拾取分发。"""
         target = self.pick_target
 
-        if target == "supply":
-            self._pick_supply(pid)
-            # supply 模式是持续的，不重置 target
+        if target in ("supply", "supply_erase"):
+            self._pick_supply(pid, erase=(target == "supply_erase"))
+            # supply 模式���持续的，不重置 target
         elif target in ("adj_from", "adj_to", "adj_through"):
             # 通知 UI 回填省份 ID
             self.event_bus.emit(
@@ -168,8 +124,8 @@ class LogisticsController(BaseController):
         else:
             self.pick_target = None
 
-    def _pick_supply(self, pid: int) -> None:
-        """补给节点拾取：切换陆地省份的补给节点状态。"""
+    def _pick_supply(self, pid: int, erase: bool = False) -> None:
+        """补给节点拾取：放置或删除。"""
         import numpy as np
         from data.constants import TILE_LAND
 
@@ -185,8 +141,20 @@ class LogisticsController(BaseController):
             self._emit_status(f"省份 {pid} 不是陆地, 跳过")
             return
 
-        added = self.project.supply_mgr.toggle(pid)
-        self.project.mark_dirty()
-        self._emit_status(
-            f"补给节点 {'已添加' if added else '已删除'}: 省份 {pid}"
-        )
+        mgr = self.project.supply_mgr
+        if erase:
+            if mgr.contains(pid):
+                mgr.remove(pid)
+                self.project.mark_dirty()
+                self.event_bus.emit("railway_changed")
+                self._emit_status(f"补给节点已删除: 省份 {pid}")
+            else:
+                self._emit_status(f"省份 {pid} 无补给节点")
+        else:
+            if not mgr.contains(pid):
+                mgr.add(pid)
+                self.project.mark_dirty()
+                self.event_bus.emit("railway_changed")
+                self._emit_status(f"补给节点已添加: 省份 {pid}")
+            else:
+                self._emit_status(f"省份 {pid} 已有补给节点")

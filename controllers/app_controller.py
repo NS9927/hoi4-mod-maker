@@ -70,6 +70,7 @@ class ApplicationController:
         bus.subscribe("clear_batch_selection", lambda e: self._canvas.set_batch_selection_pids([]))
         bus.subscribe("batch_highlight_pids", lambda e: self._canvas.set_batch_selection_pids(e.data.get("pids", [])))
         bus.subscribe("railway_changed", self._on_railway_changed)
+        bus.subscribe("sr_colors_dirty", self._on_sr_colors_dirty)
         bus.subscribe("province_gaps_changed", self._on_province_gaps)
 
     # ═══════════════════════ 模式切换 ═══════════════════════
@@ -90,19 +91,22 @@ class ApplicationController:
             self._current_controller.deactivate()
 
         self._canvas.cleanup_mode_state()
-        # new_land 模式显示和 land 一样
-        self._canvas.display_mode = "land" if mode == "new_land" else mode
+        # density / new_land 模式底图都是 land
+        if mode in ("new_land", "density"):
+            self._canvas.display_mode = "land"
+        else:
+            self._canvas.display_mode = mode
 
         # 密度模式特殊：借用 LandController 但开启 density_mode
-        # （画的是 density_map 不是 tile_map，鼠标事件逻辑不同）
+        # 密度图作为遮罩叠加在 land 视图上
         if mode == "density":
-            # 确保 density_map 存在（首次进入时创建）
             md = self._project.map_data
             if md.density_map is None:
                 md.density_map = np.full(
                     (md.tile_map.shape[0], md.tile_map.shape[1]),
                     0.5, dtype=np.float32,
                 )
+            self._canvas.set_density_overlay_visible(True)
             self._current_controller = self._controllers.get("land")
             if self._current_controller is not None:
                 self._current_controller.density_mode = True
@@ -110,12 +114,14 @@ class ApplicationController:
                 self._current_controller._emit_status("密度画笔模式")
         elif mode == "new_land":
             # 新大陆模式：借用 LandController
+            self._canvas.set_density_overlay_visible(False)
             land_ctrl = self._controllers.get("land")
             if land_ctrl is not None:
                 land_ctrl.density_mode = False
             self._current_controller = land_ctrl
         else:
-            # 切到其他模式时，确保 land controller 退出密度模式
+            # 切到其他模式时，确保 land controller 退出密度模式，隐藏密度遮罩
+            self._canvas.set_density_overlay_visible(False)
             land_ctrl = self._controllers.get("land")
             if land_ctrl is not None:
                 land_ctrl.density_mode = False
@@ -132,8 +138,13 @@ class ApplicationController:
             self._refresh_sr_colors()
         elif mode == "logistics":
             self._refresh_railway_colors()
+            self._canvas.refresh_logistics_overlay()
         elif mode == "province_terrain":
             self._refresh_provincial_terrain_colors()
+
+        # 离开战略区模式时隐藏 state 边界叠加
+        if mode != "strategic_region":
+            self._canvas.show_state_borders(False)
 
         return self._MODE_NAMES.get(mode, mode)
 
@@ -268,11 +279,15 @@ class ApplicationController:
 
     def _refresh_vp_data(self) -> None:
         vp_dict: dict[int, int] = {}
+        name_dict: dict[int, str] = {}
         for state in self._project.state_mgr.states.values():
             for pid, vp_val in state.victory_points.items():
                 if vp_val > 0:
                     vp_dict[pid] = vp_val
-        self._canvas.set_vp_data(vp_dict)
+            for pid, name in state.vp_names.items():
+                if name:
+                    name_dict[pid] = name
+        self._canvas.set_vp_data(vp_dict, name_dict)
 
     def _refresh_country_list(self) -> None:
         self._panel.update_country_list(self._project.country_mgr.get_country_list())
@@ -289,13 +304,19 @@ class ApplicationController:
         if int(self._canvas.province_map.max()) == 0:
             return
         rgb = self._project.strategic_region_mgr.build_sr_color_map(
-            self._canvas.province_map
+            self._canvas.province_map, self._canvas.tile_map
         )
         self._canvas.set_sr_colors(rgb)
 
     def _on_railway_changed(self, event=None) -> None:
         if self._canvas.display_mode == "logistics":
             self._refresh_railway_colors()
+            self._canvas.refresh_logistics_overlay()
+
+    def _on_sr_colors_dirty(self, event=None) -> None:
+        if self._canvas.display_mode == "strategic_region":
+            self._refresh_sr_colors()
+            self._canvas.refresh_display()
 
     def _refresh_railway_colors(self) -> None:
         if int(self._canvas.province_map.max()) == 0:
@@ -370,6 +391,8 @@ class ApplicationController:
                 )
                 # 高亮选中州的所有省份
                 self._canvas.set_batch_selection_pids(list(state.provinces))
+                # 在列表中选中对应行 + 更新 page 的 _current_state_id
+                self._panel.select_state_in_list(sid)
             else:
                 self._canvas.set_batch_selection_pids([])
 
@@ -415,6 +438,7 @@ class ApplicationController:
             self._refresh_sr_colors()
         elif mode == "logistics":
             self._refresh_railway_colors()
+            self._canvas.refresh_logistics_overlay()
 
     # ═══════════════════════ 撤销/重做 ═══════════════════════
 
@@ -481,7 +505,7 @@ class ApplicationController:
             cmd.set_target_arrays(self._get_all_arrays())
 
         self._cmd_history.undo()
-        self._canvas.refresh_display()
+        self._post_undo_redo_refresh()
         return "已撤销"
 
     def redo(self) -> str:
@@ -497,8 +521,22 @@ class ApplicationController:
             cmd.set_target_arrays(self._get_all_arrays())
 
         self._cmd_history.redo()
-        self._canvas.refresh_display()
+        self._post_undo_redo_refresh()
         return "已重做"
+
+    def _post_undo_redo_refresh(self) -> None:
+        """撤销/重做后刷新画布 + 按模式重建颜色图。"""
+        mode = self._canvas.display_mode
+        if mode == "logistics":
+            self._refresh_railway_colors()
+            self._canvas.refresh_logistics_overlay()
+        elif mode == "state":
+            self._refresh_state_colors()
+        elif mode == "country":
+            self._refresh_country_colors()
+        elif mode == "strategic_region":
+            self._refresh_sr_colors()
+        self._canvas.refresh_display()
 
     # ═══════════════════════ 省份点击路由 ═══════════════════
 

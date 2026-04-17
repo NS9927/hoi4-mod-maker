@@ -290,7 +290,7 @@ def export_full_mod(
 
         if railway_mgr is not None and railway_mgr.count() > 0:
             from export.writers.map.railways import write_railways_txt
-            write_railways_txt(output_dir, railway_mgr=railway_mgr)
+            write_railways_txt(output_dir, railway_mgr=railway_mgr, province_map=province_map)
         else:
             _write_railways(states, province_map, output_dir)
         _write_supply_areas(states, output_dir)
@@ -336,6 +336,10 @@ def export_full_mod(
     if _enabled("countries"):
         country_tags = list(country_mgr.countries.keys()) if country_mgr and country_mgr.countries else [tag]
         _write_bookmark(mod_name, country_tags, output_dir)
+
+    # === NDefines 覆盖（防止 AI 除零崩溃）===
+    from export.writers.common.defines import write_defines_lua
+    write_defines_lua(output_dir, province_count=province_count)
 
     # === descriptor + replace_path ===
     if _enabled("replace_path"):
@@ -505,7 +509,7 @@ def _write_definition_csv(count, colors, pm, tm, output_dir,
         count, pm, terrain_map, provincial_terrain)
 
     with open(os.path.join(d, "definition.csv"), "w") as f:
-        f.write("0;0;0;0;land;false;unknown;0\n")
+        f.write("0;0;0;0;sea;false;ocean;0\n")
         for pid in range(1, count + 1):
             r, g, b = colors.get(pid, (1, 1, 1))
             ptype = type_map.get(pid, "sea")

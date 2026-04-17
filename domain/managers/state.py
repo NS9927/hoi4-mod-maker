@@ -17,6 +17,7 @@ class StateData:
     category: str = "town"  # wasteland/pastoral/tiny/small/town/large_town/city/large_city/megalopolis
     owner_tag: str = ""
     victory_points: dict[int, int] = field(default_factory=dict)  # {province_id: vp_value}
+    vp_names: dict[int, str] = field(default_factory=dict)  # {province_id: city_name}
 
     # ── 进阶字段 (State modding 规范) ──
     impassable: bool = False  # 不可通行 state, 不能部署单位/建楼
@@ -92,16 +93,21 @@ class StateManager:
             self._province_to_state[pid] = state_id
 
     def set_vp(self, province_id: int, value: int, name: str = "") -> None:
-        """设置胜利点"""
+        """设置胜利点 + 城市名"""
         sid = self._province_to_state.get(province_id, 0)
         if sid > 0 and sid in self._states:
             self._states[sid].victory_points[province_id] = value
+            if name:
+                self._states[sid].vp_names[province_id] = name
+            elif province_id not in self._states[sid].vp_names:
+                self._states[sid].vp_names[province_id] = ""
 
     def remove_vp(self, province_id: int) -> None:
         """移除胜利点"""
         sid = self._province_to_state.get(province_id, 0)
         if sid > 0 and sid in self._states:
             self._states[sid].victory_points.pop(province_id, None)
+            self._states[sid].vp_names.pop(province_id, None)
 
     def clear(self) -> None:
         """清空所有数据"""

@@ -436,10 +436,10 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             self._status_info.setText(tr("status_coast_smoothed"))
 
     def _on_density_clear(self) -> None:
-        """清除密度图，恢复均匀。"""
+        """清除密度图，恢复均匀。密度遮罩保持当前显隐状态。"""
         self._project.map_data.density_map = None
-        self._tool_panel._land_page._density_map = None
-        self._canvas.set_density_overlay_visible(self._canvas._display_mode == "density")
+        # 刷新遮罩内容（density_map=None 时 overlay 会自动隐藏）
+        self._canvas._render_density_overlay()
         self._status_info.setText(tr("status_density_cleared"))
 
     def _on_quick_init(self) -> None:
@@ -843,6 +843,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         r = self._project.strategic_region_mgr.get(rid)
         if r is None:
             return
+        # 高亮该区域所有省份
+        self._controllers["strategic_region"].select_region(rid)
+        # 更新编辑字段
         self._tool_panel._sr_name_edit.blockSignals(True)
         self._tool_panel._sr_name_edit.setText(r.name)
         self._tool_panel._sr_name_edit.blockSignals(False)

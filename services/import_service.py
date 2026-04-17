@@ -217,6 +217,14 @@ def _parse_state_file(path: str) -> dict | None:
     if not province_ids:
         return None
 
+    # 解析 victory_points = { pid value } （可能多个）
+    import re
+    victory_points: dict[int, int] = {}
+    for m in re.finditer(r'victory_points\s*=\s*\{\s*(\d+)\s+(\d+)\s*\}', text):
+        vp_pid, vp_val = int(m.group(1)), int(m.group(2))
+        if vp_val > 0:
+            victory_points[vp_pid] = vp_val
+
     return {
         "id": sid,
         "name": name,
@@ -224,11 +232,12 @@ def _parse_state_file(path: str) -> dict | None:
         "owner": owner,
         "manpower": manpower,
         "category": category,
+        "victory_points": victory_points,
     }
 
 
 def _parse_strategic_region_file(path: str) -> dict | None:
-    """解析 map/strategicregions/*.txt，返回 {id, name, provinces}。"""
+    """解析 map/strategicregions/*.txt，返回 {id, name, provinces, weather_preset, naval_terrain}。"""
     with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
         text = f.read()
 
@@ -249,11 +258,56 @@ def _parse_strategic_region_file(path: str) -> dict | None:
         except ValueError:
             pass
 
+    # 读取 naval_terrain（如 naval_terrain=water_deep_ocean）
+    naval_terrain = ""
+    import re
+    nt_match = re.search(r'naval_terrain\s*=\s*(\S+)', text)
+    if nt_match:
+        raw = nt_match.group(1).strip()
+        # 映射 vanilla 值到内部值
+        if "deep_ocean" in raw:
+            naval_terrain = "deep_ocean"
+        elif "shallow" in raw:
+            naval_terrain = "shallow_sea"
+        elif "ocean" in raw or "water" in raw:
+            naval_terrain = "ocean"
+
+    # 从 weather 的 temperature 推断天气 preset
+    weather_preset = _guess_weather_preset(text)
+
     return {
         "id": rid,
         "name": name,
         "provinces": province_ids,
+        "weather_preset": weather_preset,
+        "naval_terrain": naval_terrain,
     }
+
+
+def _guess_weather_preset(text: str) -> str:
+    """从 weather block 的 temperature 值推断最接近的天气预设。"""
+    import re
+    temps = re.findall(r'temperature\s*=\s*\{\s*([-\d.]+)\s+([-\d.]+)\s*\}', text)
+    if not temps:
+        return "temperate"
+
+    # 取所有月份的平均高温
+    avg_high = sum(float(t[1]) for t in temps) / len(temps)
+    avg_low = sum(float(t[0]) for t in temps) / len(temps)
+
+    # 检查沙尘暴（沙漠特征）
+    sandstorms = re.findall(r'sandstorm\s*=\s*([\d.]+)', text)
+    has_sandstorm = any(float(s) > 0.1 for s in sandstorms)
+
+    if has_sandstorm:
+        return "desert"
+    if avg_high >= 28 and avg_low >= 15:
+        return "tropical"
+    if avg_high <= 5:
+        return "polar"
+    if avg_high <= 15:
+        return "cold"
+    return "temperate"
 
 
 def import_mod_map(mod_dir: str) -> dict[str, Any]:
@@ -411,6 +465,19 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
             key = sd.get("name", "")
             if key in loc_map:
                 sd["name"] = loc_map[key]
+            # VP 城市名
+            vp_names: dict[int, str] = {}
+            for vp_pid in sd.get("victory_points", {}):
+                vp_key = f"VICTORY_POINTS_{vp_pid}"
+                if vp_key in loc_map:
+                    vp_names[vp_pid] = loc_map[vp_key]
+            if vp_names:
+                sd["vp_names"] = vp_names
+        # 战略区域名
+        for rd in sr_data:
+            key = rd.get("name", "")
+            if key in loc_map:
+                rd["name"] = loc_map[key]
         warnings.append(f"读取了 {len(loc_map)} 条本地化文本")
 
     # 10. 读取 railways (可选)
@@ -540,7 +607,7 @@ def _scan_localisation(mod_dir: str) -> dict[str, str]:
 
 
 def _parse_railways(path: str) -> list[dict]:
-    """解析 map/railways.txt。每行: level province1 province2 province3 ..."""
+    """解析 map/railways.txt。每行: level count pid1 pid2 pid3 ..."""
     result = []
     with open(path, "r", encoding="utf-8-sig", errors="ignore") as f:
         for line in f:
@@ -548,12 +615,14 @@ def _parse_railways(path: str) -> list[dict]:
             if not line or line.startswith("#"):
                 continue
             tokens = line.split()
-            if len(tokens) < 3:
+            if len(tokens) < 4:  # level + count + 至少2个省份
                 continue
             try:
                 level = int(tokens[0])
-                pids = [int(t) for t in tokens[1:]]
-                result.append({"level": level, "province_ids": pids})
+                count = int(tokens[1])
+                pids = [int(t) for t in tokens[2:2 + count]]
+                if len(pids) >= 2:
+                    result.append({"level": level, "province_ids": pids})
             except ValueError:
                 continue
     return result

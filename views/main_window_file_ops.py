@@ -30,6 +30,8 @@ def _populate_imported_data(project, result: dict) -> None:
             manpower=sd.get("manpower", 100000),
             category=sd.get("category", "town"),
             owner_tag=sd.get("owner", ""),
+            victory_points=sd.get("victory_points", {}),
+            vp_names=sd.get("vp_names", {}),
         )
         project.state_mgr.states[sd["id"]] = state
         for pid in state.provinces:
@@ -46,6 +48,8 @@ def _populate_imported_data(project, result: dict) -> None:
             id=rd["id"],
             name=rd.get("name", f"STRATEGICREGION_{rd['id']}"),
             province_ids=rd.get("provinces", []),
+            weather_preset=rd.get("weather_preset", "temperate"),
+            naval_terrain=rd.get("naval_terrain", ""),
         )
         sr_mgr._regions[r.id] = r
     if sr_mgr._regions:

@@ -148,9 +148,9 @@ REPLACE_PATHS = [
     "common/country_tags",
     "common/countries",
 
-    # --- 全部 AI 系统（必须替换，vanilla 引用 ENG/GER/JAP 等已删国家
-    # + 引用 ENG_INF_01 等不存在的 division template → AI 初始化时
-    # ACCESS_VIOLATION 崩溃。EaW 全替换确认可行）
+    # --- AI 系统：必须 replace ---
+    # vanilla AI 文件引用 ENG/GER/JAP 等国家标签，
+    # 不存在时 AI tick 触发 EXCEPTION_INT_DIVIDE_BY_ZERO。
     "common/ai_equipment",
     "common/ai_focuses",
     "common/ai_peace",
@@ -187,10 +187,9 @@ REPLACE_PATHS = [
     # 每 tick 刷几万行错误 → 走时间崩溃 (LastRead=client_ping).
     # replace 后导出器必须同时拷贝 vanilla 的 decisions/categories/ 目录,
     # 否则加载时找不到 decision category 定义 → 加载崩溃.
+    # --- raids / decisions / strategic_locations ---
     "common/raids",
     "common/decisions",
-
-    # --- strategic_locations 引用原版省份 ID → 崩溃 (LastRead=strategic_locations.txt) ---
     "common/strategic_locations",
 
     # ════════════════════════════════════════════════════════════

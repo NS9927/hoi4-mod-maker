@@ -215,6 +215,12 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._density_overlay_visible = False
         self._scene.addItem(self._density_overlay_item)
 
+        # State 边界叠加层（选州创建战略区域时显示）
+        self._state_border_overlay = QGraphicsPixmapItem()
+        self._state_border_overlay.setZValue(6)
+        self._state_border_overlay.setVisible(False)
+        self._scene.addItem(self._state_border_overlay)
+
         # 套索路径反馈（黄色虚线）
         self._lasso_path_item = QGraphicsPathItem()
         pen = QPen(QColor(255, 230, 0, 230), 2)
@@ -518,8 +524,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         mask = np.isin(self._province_map, list(pids))
         h, w = self._province_map.shape
         rgba = np.zeros((h, w, 4), dtype=np.uint8)
-        # 半透明亮黄（选中感），RGB 255,220,0 + alpha 100
-        rgba[mask] = (255, 220, 0, 100)
+        # 半透明亮黄 (BGRA 字节序: B=0, G=220, R=255, A=160)
+        rgba[mask] = (0, 220, 255, 160)
         img = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_ARGB32)
         img._ref = rgba  # 防止内存被释放
         self._lasso_overlay.setPixmap(QPixmap.fromImage(img))
@@ -607,20 +613,28 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 海峡/邻接 — 不在后勤 overlay 画（太多会乱），只在邻接对话框里管理
         # 如果需要可在邻接对话框打开时单独渲染
 
-        # 补给节点（绿圆，中心有白心）
+        # 补给节点（菱形 + 十字标志，HOI4 风格）
         if supply_mgr is not None:
+            from PyQt5.QtCore import QPointF
+            from PyQt5.QtGui import QPolygonF
             for pid, node in supply_mgr._nodes.items():
                 if 0 < pid <= max_pid and pid_count[pid] > 0:
                     cx = int(sum_x[pid] / pid_count[pid])
                     cy = int(sum_y[pid] / pid_count[pid])
-                    r = 5 + node.level  # 半径 6-10
-                    # 绿色外圈
-                    painter.setPen(QPen(QColor(0, 0, 0, 200), 2))
-                    painter.setBrush(QColor(80, 220, 80, 230))
-                    painter.drawEllipse(cx - r, cy - r, 2 * r, 2 * r)
-                    # 白心
-                    painter.setBrush(QColor(255, 255, 255, 255))
-                    painter.drawEllipse(cx - 2, cy - 2, 4, 4)
+                    r = 4  # 菱形半径
+                    diamond = QPolygonF([
+                        QPointF(cx, cy - r),
+                        QPointF(cx + r, cy),
+                        QPointF(cx, cy + r),
+                        QPointF(cx - r, cy),
+                    ])
+                    painter.setPen(QPen(QColor(0, 0, 0, 230), 1))
+                    painter.setBrush(QColor(60, 200, 60, 240))
+                    painter.drawPolygon(diamond)
+                    # 白色十字
+                    painter.setPen(QPen(QColor(255, 255, 255, 255), 1))
+                    painter.drawLine(cx - 2, cy, cx + 2, cy)
+                    painter.drawLine(cx, cy - 2, cx, cy + 2)
 
         painter.end()
         self._lasso_overlay.setPixmap(QPixmap.fromImage(img))
@@ -727,7 +741,6 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "country": self._render_country_mode,
             "river": self._render_river_mode,
             "logistics": self._render_logistics_mode,
-            "density": self._render_land_mode,
             "continent": self._render_land_mode,
             "strategic_region": self._render_sr_mode,
             "colormap": self._render_land_mode,
@@ -738,8 +751,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._update_pixmap_from_buffer()
         # VP 叠加层可见性切换（不重绘，用缓存）
         self._update_vp_visibility()
-        # 密度叠加层：density 模式自动显示
-        self.set_density_overlay_visible(self._display_mode == "density")
+        # 密度叠加层：由 app_controller 管理显隐，这里只刷新内容
+        if getattr(self, '_density_overlay_visible', False):
+            self._render_density_overlay()
 
     def _partial_render(self, x0: int, y0: int, x1: int, y1: int) -> None:
         """局部渲染指定矩形区域（根据当前模式）"""
@@ -752,7 +766,6 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "country": self._partial_render_country,
             "river": self._partial_render_river,
             "logistics": self._partial_render_logistics,
-            "density": self._partial_render_land,
             "continent": self._partial_render_land,
             "strategic_region": self._partial_render_sr,
             "colormap": self._partial_render_land,
@@ -1042,9 +1055,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
         mode = self._display_mode
 
-        if mode in ("land", "density"):
-            # 密度画笔模式
-            if self._display_mode == "density":
+        if mode == "land":
+            # 密度画笔模式（密度遮罩开启时）
+            if getattr(self, '_density_overlay_visible', False):
                 dm = getattr(self._map_data, 'density_map', None) if self._map_data else None
                 if dm is not None:
                     # 用密度专属画笔大小

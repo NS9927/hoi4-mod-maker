@@ -68,7 +68,7 @@ def write_definition_csv(
     file_path = os.path.join(map_dir, "definition.csv")
     with open(file_path, "w", encoding="utf-8") as f:
         # 第一行：ID=0 特殊行（HOI4 要求，无表头）
-        f.write("0;0;0;0;land;false;unknown;0\n")
+        f.write("0;0;0;0;sea;false;ocean;0\n")
 
         for pid in range(1, province_count + 1):
             r, g, b = colors.get(pid, (1, 1, 1))

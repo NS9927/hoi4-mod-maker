@@ -151,10 +151,15 @@ class StatePage(QWidget):
         lay.addWidget(detail_btn)
 
         # 提示
-        hint = QLabel(tr("state_hint"))
-        hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 8px;")
+        hint = QLabel("双击地图省份 = 设置胜利点(VP)")
+        hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
+
+        hint2 = QLabel(tr("state_hint"))
+        hint2.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px;")
+        hint2.setWordWrap(True)
+        lay.addWidget(hint2)
 
         lay.addStretch()
 

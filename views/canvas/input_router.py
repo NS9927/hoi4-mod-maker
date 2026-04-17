@@ -124,8 +124,10 @@ class InputMixin:
                 event.accept()
                 return
 
-            # 地形/高度/State/Country/属性地形 模式：点击省份 → 委托 controller 处理
-            if self._display_mode in ("terrain", "height", "state", "country", "province_terrain"):
+            # 地形/高度/State/Country/后勤/战略区/属性地形 模式：点击省份 → 委托 controller 处理
+            if self._display_mode in ("terrain", "height", "state", "country",
+                                       "province_terrain", "logistics", "strategic_region",
+                                       "continent"):
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     pid = int(self._province_map[sy, sx])
