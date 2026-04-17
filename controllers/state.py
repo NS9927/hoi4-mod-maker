@@ -71,6 +71,10 @@ class StateController(BaseController):
                 property="assign",
             )
             self._emit_status(f"省份 {pid} 已分配到 State {self.selected_state_id}")
+            # 刷新高亮（省份变了，选中州的范围也变了）
+            updated = state_mgr.get_state(self.selected_state_id)
+            if updated:
+                self.event_bus.emit("state_changed", state_id=self.selected_state_id, action="selected")
             return
 
         # 查看模式：点击省份 → 选中其所属州 → 显示信息
