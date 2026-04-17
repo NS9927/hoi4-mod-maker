@@ -368,9 +368,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         )
 
         # Strategic region 信号 → controller
-        tp.strategic_region_auto_requested.connect(
-            lambda: self._controllers["strategic_region"].auto_generate()
-        )
+        tp.strategic_region_auto_requested.connect(self._on_auto_sr_with_confirm)
         tp.auto_weather_requested.connect(
             lambda: (self._controllers["strategic_region"].auto_assign_weather(), self._refresh_sr_list())
         )

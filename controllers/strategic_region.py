@@ -35,19 +35,35 @@ class StrategicRegionController(BaseController):
         self._emit_status("战略区域编辑模式")
 
     def deactivate(self) -> None:
-        """离开战略区域模式。"""
+        """离开战略区域模式，清除高亮。"""
         self.pick_on = False
         self.pick_rid = 0
+        self.event_bus.emit("clear_batch_selection")
 
     def on_province_clicked(self, pid: int) -> None:
-        """拾取模式下点击省份分配到战略区域。"""
-        if not self.pick_on or self.pick_rid <= 0 or pid <= 0:
+        """点击省份：拾取模式 → 分配；普通模式 → 查看所属战略区。"""
+        if pid <= 0:
             return
 
         sr_mgr = self.project.strategic_region_mgr
-        sr_mgr.assign_province(pid, self.pick_rid)
-        self.project.mark_dirty()
-        self._emit_status(f"省份 {pid} 已加入战略区域 #{self.pick_rid}")
+
+        # 拾取模式：分配省份
+        if self.pick_on and self.pick_rid > 0:
+            sr_mgr.assign_province(pid, self.pick_rid)
+            self.project.mark_dirty()
+            region = sr_mgr.get_region(self.pick_rid)
+            if region:
+                self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
+            self._emit_status(f"省份 {pid} 已加入战略区域 #{self.pick_rid}")
+            return
+
+        # 查看模式：找省份所属战略区 → 选中并高亮
+        rid = sr_mgr.get_region_of_province(pid)
+        if rid > 0:
+            self.select_region(rid)
+            self.event_bus.emit("sr_select_in_list", rid=rid)
+        else:
+            self._emit_status(f"省份 {pid} 未分配到任何战略区域")
 
     def toggle_pick(self, on: bool, rid: int = 0) -> None:
         """开关拾取模式。"""
@@ -89,8 +105,17 @@ class StrategicRegionController(BaseController):
         self._emit_status(f"已按纬度分配 {changed} 个战略区域的天气预设")
 
     def select_region(self, rid: int) -> None:
-        """选中战略区域（UI 刷新由事件驱动）。"""
+        """选中战略区域 → 高亮其所有省份。"""
         self.pick_rid = rid
+        region = self.project.strategic_region_mgr.get_region(rid)
+        if region:
+            self.event_bus.emit("batch_highlight_pids", pids=list(region.province_ids))
+            self._emit_status(
+                f"战略区 #{rid} \"{region.name}\" "
+                f"({len(region.province_ids)} 省份, {region.weather_preset})"
+            )
+        else:
+            self.event_bus.emit("batch_highlight_pids", pids=[])
 
     def create_region(self) -> None:
         """创建新战略区域。"""

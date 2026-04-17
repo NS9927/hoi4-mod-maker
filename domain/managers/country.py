@@ -63,9 +63,9 @@ class CountryManager:
         """创建国家"""
         tag = tag.upper()[:3]
         if len(tag) != 3:
-            raise ValueError("TAG 必须是 3 个字母")
-        if not tag.isalpha():
-            raise ValueError("TAG 只能包含字母")
+            raise ValueError("TAG 必须是 3 个字符")
+        if not tag.isalnum():
+            raise ValueError("TAG 只能包含字母和数字")
         country = CountryData(tag=tag, name=name or tag, color=color)
         self._countries[tag] = country
         return country

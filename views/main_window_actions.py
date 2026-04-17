@@ -99,6 +99,21 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
                 return
         self._controllers["state"].auto_states(per_state)
 
+    # ═══════════════════════ 战略区域自动生成 ═══════════════════
+
+    def _on_auto_sr_with_confirm(self) -> None:
+        """自动生成战略区域前确认。"""
+        existing = self._project.strategic_region_mgr.count()
+        if existing > 0:
+            reply = QMessageBox.question(
+                self, "确认自动生成",
+                f"当前已有 {existing} 个战略区域。\n"
+                f"自动生成将清空所有现有战略区域数据。\n\n是否继续？",
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        self._controllers["strategic_region"].auto_generate()
+
     # ═══════════════════════ 省份生成与验证 ═══════════════════
 
     def _on_generate_provinces(self, count: int) -> None:

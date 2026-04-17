@@ -68,6 +68,7 @@ class ApplicationController:
         bus.subscribe("vp_changed", self._on_vp_changed)
         bus.subscribe("province_map_regenerated", self._on_province_regen)
         bus.subscribe("clear_batch_selection", lambda e: self._canvas.set_batch_selection_pids([]))
+        bus.subscribe("batch_highlight_pids", lambda e: self._canvas.set_batch_selection_pids(e.data.get("pids", [])))
         bus.subscribe("railway_changed", self._on_railway_changed)
         bus.subscribe("province_gaps_changed", self._on_province_gaps)
 
