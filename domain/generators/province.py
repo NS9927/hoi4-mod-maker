@@ -769,13 +769,17 @@ def expand_provinces_to_new_land(
     tile_map: np.ndarray,
     province_map: np.ndarray,
 ) -> tuple[np.ndarray, int, list[int]]:
-    """简单的"海变陆"省份扩展。不跑 Voronoi，不重排 ID。
+    """为"海变陆"的区域创建新省份。极简逻辑：
 
-    逻辑：
-    1. 找所有 tile=LAND 但 province 属于海洋省份 的像素
-    2. 如果该像素旁边有陆地省份 → 归入最大的相邻陆地省份
-    3. 剩余的（孤岛，周围全是海）→ 每个连通块建一个新省份
-    4. 被完全吞并的海省 → 返回警告列表
+    1. 找新陆地（tile=LAND 但 province 是海洋省份）
+    2. 每个连通块 = 一个新陆地省份
+    3. 海洋省份丢掉那些像素（自然缩小）
+    4. 如果某海洋省份被完全吞掉 → 返回警告
+
+    用户场景：
+    - 在海洋边界画陆地 → 海省吐出一些像素给新省份
+    - 吞掉整个海省 → 报告缺失
+    - 新陆地横跨陆海 → 海洋部分照上面处理，陆地部分的边界自然贴合
 
     返回: (更新后的 province_map, 新省份数, 被吞并的海省ID列表)
     """
@@ -783,69 +787,36 @@ def expand_provinces_to_new_land(
 
     result = province_map.copy()
     max_pid = int(result.max())
+    if max_pid == 0:
+        return result, 0, []
 
-    # 判断每个省份的主类型
+    # 判断每个省份是陆地还是海洋
     flat_pm = result.ravel()
     flat_tm = tile_map.ravel()
     pid_total = np.bincount(flat_pm, minlength=max_pid + 1).astype(np.float64)
     pid_land = np.bincount(flat_pm, weights=(flat_tm == TILE_LAND).astype(np.float64), minlength=max_pid + 1)
-    safe_total = np.maximum(pid_total, 1)
     pid_is_land = np.zeros(max_pid + 1, dtype=bool)
-    pid_is_land[1:] = (pid_land[1:] / safe_total[1:]) > 0.5
+    pid_is_land[1:] = (pid_land[1:] / np.maximum(pid_total[1:], 1)) > 0.5
 
-    # 找"需要重新分配"的像素：tile=LAND 但省份是海洋省份
-    pixel_needs_reassign = (tile_map == TILE_LAND) & ~pid_is_land[result] & (result > 0)
-    # 也包括 tile=LAND & pm=0
-    pixel_needs_reassign |= (tile_map == TILE_LAND) & (result == 0)
-
-    if not np.any(pixel_needs_reassign):
+    # 新陆地 = tile是LAND 但省份不是陆地省份
+    new_land = (tile_map == TILE_LAND) & ~pid_is_land[result]
+    if not np.any(new_land):
         return result, 0, []
 
-    H, W = tile_map.shape
-    # 逐像素找相邻的陆地省份（用4方向邻居）
-    # 构建"每像素最佳陆地省份"查找：扩散已有陆地省份ID
-    # 简单做法：多轮扩散，每轮把未分配像素赋值为最大邻居
-    # 向量化扩散：每轮把未分配像素赋值为 4 方向邻居中的陆地省份
-    reassign_mask = pixel_needs_reassign.copy()
-    for _ in range(50):  # 最多扩散 50 轮（够覆盖 50px 距离的新陆地边缘）
-        if not np.any(reassign_mask):
-            break
-        # 4 方向的省份 ID（边界填 0）
-        up    = np.zeros_like(result); up[1:, :]    = result[:-1, :]
-        down  = np.zeros_like(result); down[:-1, :] = result[1:, :]
-        left  = np.zeros_like(result); left[:, 1:]  = result[:, :-1]
-        right = np.zeros_like(result); right[:, :-1] = result[:, 1:]
-        # 只取陆地省份的邻居
-        up[~pid_is_land[up]]       = 0
-        down[~pid_is_land[down]]   = 0
-        left[~pid_is_land[left]]   = 0
-        right[~pid_is_land[right]] = 0
-        # 取第一个非0邻居（简单优先：上→下→左→右）
-        neighbor = np.where(up > 0, up,
-                   np.where(down > 0, down,
-                   np.where(left > 0, left, right)))
-        # 只写未分配的像素
-        can_assign = reassign_mask & (neighbor > 0)
-        if not np.any(can_assign):
-            break
-        result[can_assign] = neighbor[can_assign]
-        reassign_mask[can_assign] = False
-
-    # 剩余未分配的（孤岛）→ 每个连通块一个新省份
+    # 每个连通块 = 一个新省份
+    labeled, num_chunks = _label(new_land)
     new_count = 0
     next_id = max_pid + 1
-    if np.any(reassign_mask):
-        labeled, num = _label(reassign_mask)
-        for rid in range(1, num + 1):
-            result[labeled == rid] = next_id
-            next_id += 1
-            new_count += 1
+    for cid in range(1, num_chunks + 1):
+        result[labeled == cid] = next_id
+        next_id += 1
+        new_count += 1
 
-    # 被完全吞并的海省
+    # 检查被完全吞掉的海省
     consumed = []
     new_pid_total = np.bincount(result.ravel(), minlength=max_pid + 1)
     for pid in range(1, max_pid + 1):
-        if pid_total[pid] > 0 and new_pid_total[pid] == 0:
+        if not pid_is_land[pid] and pid_total[pid] > 0 and new_pid_total[pid] == 0:
             consumed.append(pid)
 
     return result, new_count, consumed
