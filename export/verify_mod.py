@@ -499,7 +499,10 @@ class ModVerifier:
         with open(path, "r") as f:
             content = f.read()
 
-        if "path=" in content:
+        # path= 不能出现在内部 descriptor（只有外层 .mod 才有）
+        # 注意不能误匹配 replace_path=
+        import re
+        if re.search(r'^path\s*=', content, re.MULTILINE):
             self.errors.append("内部 descriptor.mod 不应包含 path= 字段")
 
         # 检查外层 .mod 文件

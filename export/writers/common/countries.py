@@ -414,12 +414,18 @@ def write_bookmark(mod_name, country_tags, output_dir):
     os.makedirs(d, exist_ok=True)
     safe = mod_name.replace(" ", "_").upper()
 
-    # --- 1. 屏蔽原版 bookmark ---
-    empty_bookmarks = "bookmarks = {\n}\n"
-    with open(os.path.join(d, "the_gathering_storm.txt"), "w") as f:
-        f.write(empty_bookmarks)
-    with open(os.path.join(d, "blitzkrieg.txt"), "w") as f:
-        f.write(empty_bookmarks)
+    # --- 1. 屏蔽原版 bookmark（必须有完整结构，不能空块） ---
+    for bm_file in ("the_gathering_storm.txt", "blitzkrieg.txt"):
+        with open(os.path.join(d, bm_file), "w") as f:
+            f.write("bookmarks = {\n")
+            f.write("\tbookmark = {\n")
+            f.write(f'\t\tname = "DISABLED_{bm_file.replace(".txt", "").upper()}"\n')
+            f.write('\t\tdesc = ""\n')
+            f.write('\t\tdate = 1936.1.1.12\n')
+            f.write('\t\tpicture = GFX_select_date_1936\n')
+            f.write('\t\teffect = { randomize_weather = 12345 }\n')
+            f.write("\t}\n")
+            f.write("}\n")
 
     # --- 2. 写我们自己的 bookmark ---
     safe_file = mod_name.replace(" ", "_").lower()

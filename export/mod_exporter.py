@@ -152,6 +152,9 @@ def export_full_mod(
     from export.writers.map.ambient_object import write_ambient_object_txt
     write_ambient_object_txt(output_dir)
 
+    # seasons.txt — 季节视觉定义（必须有，否则崩溃）
+    _write_seasons_txt(output_dir)
+
     # default.map 引擎配置文件 (A3, 用户可通过菜单调整 tree palette / river_max_level)
     from export.writers.map.default_map import write_default_map
     write_default_map(
@@ -600,8 +603,63 @@ def _write_adjacencies(output_dir):
         f.write("-1;-1;;-1;-1;-1;-1;-1;-1\n")
 
 
+def _write_seasons_txt(output_dir):
+    """写 map/seasons.txt — 季节视觉（颜色/树叶变化）。用 vanilla 默认值。"""
+    d = os.path.join(output_dir, "map")
+    os.makedirs(d, exist_ok=True)
+    with open(os.path.join(d, "seasons.txt"), "w") as f:
+        f.write("""winter = {
+\tstart_date=00.12.01
+\tend_date=00.02.10
+\thsv_north= { 0 0.1 1 }
+\tcolorbalance_north= { 0.9 0.9 1 }
+\thsv_center= { 0.0 1.0 1.0 }
+\tcolorbalance_center= { 1.0 1.0 1.0 }
+\thsv_south= { 0.0 1.0 1.0 }
+\tcolorbalance_south= { 1.0 1.0 1.0 }
+}
+spring = {
+\tstart_date=00.03.10
+\tend_date=00.04.22
+\thsv_north= { 0 0.1 1 }
+\tcolorbalance_north= { 0.9 0.9 1 }
+\thsv_center= { 0.0 1.0 1.0 }
+\tcolorbalance_center= { 1.0 1.0 1.0 }
+\thsv_south= { 0.0 1.0 1.0 }
+\tcolorbalance_south= { 1.0 1.0 1.0 }
+}
+summer = {
+\tstart_date=00.05.20
+\tend_date=00.09.10
+\thsv_north= { 0 0.1 1 }
+\tcolorbalance_north= { 0.9 0.9 1 }
+\thsv_center= { 0.0 1.0 1.0 }
+\tcolorbalance_center= { 1.0 1.0 1.0 }
+\thsv_south= { 0.0 1.0 1.0 }
+\tcolorbalance_south= { 1.0 1.0 1.0 }
+}
+autumn = {
+\tstart_date=00.10.10
+\tend_date=00.10.31
+\thsv_north= { 0 0.1 1 }
+\tcolorbalance_north= { 0.9 0.9 1 }
+\thsv_center= { 0.0 1.0 1.0 }
+\tcolorbalance_center= { 1.0 1.0 1.0 }
+\thsv_south= { 0.0 1.0 1.0 }
+\tcolorbalance_south= { 1.0 1.0 1.0 }
+}
+tree_winter = { start_date=00.11.15 end_date=00.12.01 }
+tree_winter2 = { start_date=00.12.20 end_date=00.01.20 }
+tree_spring = { start_date=00.02.20 end_date=00.03.01 }
+tree_spring2 = { start_date=00.03.20 end_date=00.04.20 }
+tree_summer = { start_date=00.05.20 end_date=00.06.01 }
+tree_summer2 = { start_date=00.06.20 end_date=00.09.10 }
+tree_autumn = { start_date=00.10.01 end_date=00.10.10 }
+tree_autumn2 = { start_date=00.10.25 end_date=00.11.01 }
+""")
+
+
 # 注意：不再生成 adjacency_rules/ambient_object/weatherpositions/unitstacks/rocket_sites
-# 不再生成 seasons.txt — 全部用原版（EaW 验证做法）
 
 
 # ────────────────── State 拆分 ──────────────────
