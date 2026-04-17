@@ -27,7 +27,6 @@ class RiverPage(QWidget):
     brush_size_changed = pyqtSignal(int)
     river_type_changed = pyqtSignal(int)
     validate_river_requested = pyqtSignal()
-    auto_river_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -37,37 +36,6 @@ class RiverPage(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(10, 10, 10, 10)
         lay.setSpacing(10)
-
-        # ═══════════════════ 🪄 自动生成（主推荐）═══════════════════
-        auto_box = _make_section(tr("river_section_auto"))
-        auto_layout = auto_box.layout()
-
-        auto_btn = QPushButton(tr("river_btn_auto_new"))
-        auto_btn.setMinimumHeight(44)
-        auto_btn.setStyleSheet(
-            f"QPushButton {{"
-            f"  background: {_ACCENT};"
-            f"  color: white;"
-            f"  border: none;"
-            f"  border-radius: 6px;"
-            f"  font-size: 15px;"
-            f"  font-weight: 600;"
-            f"  padding: 8px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"  background: #9090ff;"
-            f"}}"
-        )
-        auto_btn.setToolTip(tr("river_auto_tooltip"))
-        auto_btn.clicked.connect(self.auto_river_requested.emit)
-        auto_layout.addWidget(auto_btn)
-
-        auto_tip = QLabel(tr("river_auto_tip"))
-        auto_tip.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 2px;")
-        auto_tip.setWordWrap(True)
-        auto_layout.addWidget(auto_tip)
-
-        lay.addWidget(auto_box)
 
         # ═══════════════════ ✏️ 手动画河流 ═══════════════════
         manual_box = _make_section(tr("river_section_manual"))

@@ -340,7 +340,6 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # River 信号
         tp.river_type_changed.connect(cv.set_river_type)
         tp.validate_river_requested.connect(self._on_validate_river)
-        tp.auto_river_requested.connect(self._on_auto_river)
 
         # Logistics 信号 → controller
         tp.open_adjacency_dialog_requested.connect(self._open_adjacency_dialog)

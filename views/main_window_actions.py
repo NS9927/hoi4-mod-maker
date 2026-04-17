@@ -347,32 +347,6 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         warnings = validate_rivers(self._canvas.river_map)
         QMessageBox.information(self, tr("dlg_river_validate_title"), "\n".join(warnings))
 
-    def _on_auto_river(self) -> None:
-        """从高度图自动生成河流网络。"""
-        map_data = self._project.map_data
-        if int(map_data.province_map.max()) == 0:
-            QMessageBox.warning(self, tr("dlg_error"), tr("river_auto_need_provinces"))
-            return
-
-        self._status_info.setText(tr("status_auto_river"))
-        QApplication.processEvents()
-
-        import numpy as np
-        from domain.generators.river import generate_rivers
-        river_map = generate_rivers(
-            map_data.province_map,
-            map_data.height_map,
-            map_data.tile_map,
-        )
-        map_data.river_map = river_map
-        self._canvas._river_map = river_map
-        # 强制切到河流模式显示结果
-        self._tool_panel._switch_to_mode("river")
-        self._canvas._full_render()
-
-        river_count = int(np.sum((river_map >= 3) & (river_map <= 11)))
-        self._status_info.setText(tr("status_auto_river_done") + f" ({river_count} px)")
-
     def _on_auto_terrain(self) -> None:
         from services.terrain_service import (
             smart_auto_terrain, TerrainGenConfig,
