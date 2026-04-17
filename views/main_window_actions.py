@@ -83,6 +83,22 @@ class _ValidateThread(QThread):
 class MainWindowActionsMixin(MainWindowFileOpsMixin):
     """省份生成/验证/国家对话框/河流/地形/大陆/战略区/后勤处理。"""
 
+    # ═══════════════════════ 州自动分组 ═══════════════════
+
+    def _on_auto_states_with_confirm(self, per_state: int) -> None:
+        """自动分组前确认（会清空现有州数据）。"""
+        existing = len(self._project.state_mgr.states)
+        if existing > 0:
+            reply = QMessageBox.question(
+                self, "确认自动分组",
+                f"当前已有 {existing} 个州。\n"
+                f"自动分组将清空所有现有州数据，重新按每州 {per_state} 个省份分组。\n\n"
+                f"是否继续？",
+            )
+            if reply != QMessageBox.StandardButton.Yes:
+                return
+        self._controllers["state"].auto_states(per_state)
+
     # ═══════════════════════ 省份生成与验证 ═══════════════════
 
     def _on_generate_provinces(self, count: int) -> None:

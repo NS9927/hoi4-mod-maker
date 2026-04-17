@@ -313,9 +313,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         cv.split_line_drawn.connect(self._on_split_line_drawn)
 
         # State 信号 → controller
-        tp.auto_states_requested.connect(
-            lambda count: self._controllers["state"].auto_states(count)
-        )
+        tp.auto_states_requested.connect(self._on_auto_states_with_confirm)
         tp.state_selected.connect(
             lambda sid: self._controllers["state"].select_state(sid)
         )
