@@ -325,6 +325,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.state_detail_requested.connect(self._on_state_detail_requested)
         tp.batch_create_state_toggled.connect(self._on_batch_state_toggled)
         tp.batch_create_state_confirmed.connect(self._on_batch_state_confirmed)
+        tp.state_assign_mode_changed.connect(
+            lambda on: setattr(self._controllers["state"], "assign_mode", on)
+        )
 
         # Country 信号 → controller
         tp.create_country_requested.connect(self._on_create_country)

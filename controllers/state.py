@@ -22,6 +22,7 @@ class StateController(BaseController):
     def __init__(self, project: "Project", command_history: "CommandHistory") -> None:
         super().__init__(project, command_history)
         self.selected_state_id: int = 0
+        self.assign_mode: bool = False  # False=查看模式, True=分配模式
         # 始终监听省份重新生成（不管当前模式）
         self.event_bus.subscribe("province_map_regenerated", self._on_province_regen)
 
@@ -42,29 +43,47 @@ class StateController(BaseController):
         pass
 
     def on_province_clicked(self, pid: int) -> None:
-        """点击省份分配到当前选中的 State。"""
-        if pid <= 0 or self.selected_state_id <= 0:
+        """点击省份 → 查看该省份所属州的信息（不直接分配）。
+
+        如果省份未分配到任何州 → 提示。
+        如果 assign_mode=True → 分配到当前选中州。
+        """
+        if pid <= 0:
             return
 
         state_mgr = self.project.state_mgr
-        old_state_id = state_mgr.get_state_of_province(pid)
+        sid = state_mgr.get_state_of_province(pid)
 
-        if old_state_id == self.selected_state_id:
-            return  # 已在此 State
+        # 分配模式：把省份加到选中的州
+        if self.assign_mode and self.selected_state_id > 0:
+            if sid == self.selected_state_id:
+                return
+            cmd = AssignProvinceToStateCommand(
+                state_mgr, pid, sid, self.selected_state_id,
+            )
+            self.history.execute(cmd)
+            self.project.mark_dirty()
+            self.event_bus.emit(
+                "state_changed",
+                state_id=self.selected_state_id,
+                action="modified",
+                property="assign",
+            )
+            self._emit_status(f"省份 {pid} 已分配到 State {self.selected_state_id}")
+            return
 
-        cmd = AssignProvinceToStateCommand(
-            state_mgr, pid, old_state_id, self.selected_state_id,
-        )
-        self.history.execute(cmd)
-        self.project.mark_dirty()
-
-        self.event_bus.emit(
-            "state_changed",
-            state_id=self.selected_state_id,
-            action="modified",
-            property="assign",
-        )
-        self._emit_status(f"省份 {pid} 已分配到 State {self.selected_state_id}")
+        # 查看模式：点击省份 → 选中其所属州 → 显示信息
+        if sid > 0:
+            self.selected_state_id = sid
+            state = state_mgr.get_state(sid)
+            name = state.name if state else f"STATE_{sid}"
+            prov_count = len(state.provinces) if state else 0
+            self._emit_status(f"州 #{sid} \"{name}\" ({prov_count} 省份)")
+            self.event_bus.emit(
+                "state_changed", state_id=sid, action="selected",
+            )
+        else:
+            self._emit_status(f"省份 {pid} 未分配到任何州（红色高亮区域）")
 
     def on_province_double_clicked(self, pid: int) -> None:
         """双击省份设置 VP。通过事件通知 UI 弹对话框。"""

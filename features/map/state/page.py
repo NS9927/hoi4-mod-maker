@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QSpinBox, QListWidget, QListWidgetItem,
-    QComboBox, QLineEdit,
+    QComboBox, QLineEdit, QCheckBox,
 )
 
 from domain.managers.state import StateManager
@@ -30,6 +30,7 @@ class StatePage(QWidget):
     state_detail_requested = pyqtSignal(int)
     batch_create_state_toggled = pyqtSignal(bool)
     batch_create_state_confirmed = pyqtSignal()
+    assign_mode_changed = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -77,6 +78,21 @@ class StatePage(QWidget):
         self._batch_confirm_btn.clicked.connect(self.batch_create_state_confirmed.emit)
         batch_box.layout().addWidget(self._batch_confirm_btn)
         lay.addWidget(batch_box)
+
+        # 分配模式开关
+        self._assign_chk = QCheckBox("✏ 分配模式（点省份加入选中州）")
+        self._assign_chk.setChecked(False)
+        self._assign_chk.setStyleSheet(
+            f"QCheckBox {{ color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }}"
+            f"QCheckBox:checked {{ color: #86efac; }}"
+        )
+        self._assign_chk.toggled.connect(self.assign_mode_changed)
+        lay.addWidget(self._assign_chk)
+
+        hint_view = QLabel("💡 默认点击地图 = 查看州信息。勾选上面开关才能分配省份。")
+        hint_view.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 2px;")
+        hint_view.setWordWrap(True)
+        lay.addWidget(hint_view)
 
         # State 列表
         list_box = _make_section(tr("state_list_section"))

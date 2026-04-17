@@ -279,6 +279,7 @@ class ToolPanel(QWidget):
     state_detail_requested = pyqtSignal(int)
     batch_create_state_toggled = pyqtSignal(bool)
     batch_create_state_confirmed = pyqtSignal()
+    state_assign_mode_changed = pyqtSignal(bool)
     create_country_requested = pyqtSignal()
     quick_create_country_requested = pyqtSignal(str, str, str)
     country_selected = pyqtSignal(str)
@@ -530,6 +531,7 @@ class ToolPanel(QWidget):
         p.state_detail_requested.connect(self.state_detail_requested)
         p.batch_create_state_toggled.connect(self.batch_create_state_toggled)
         p.batch_create_state_confirmed.connect(self.batch_create_state_confirmed)
+        p.assign_mode_changed.connect(self.state_assign_mode_changed)
 
     def _connect_country_signals(self) -> None:
         p = self._country_page
