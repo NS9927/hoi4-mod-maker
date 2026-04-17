@@ -39,7 +39,7 @@ class LogisticsController(BaseController):
         self.railway_draft.clear()
 
     def on_province_clicked(self, pid: int) -> None:
-        """省份点击分发：补给/铁路/adjacency 拾取。"""
+        """省份点击分发：铁路等级/补给/adjacency 拾取。"""
         if pid <= 0:
             return
 
@@ -57,6 +57,22 @@ class LogisticsController(BaseController):
         if self.pick_target is not None:
             self._handle_pick(pid)
             return
+
+        # 默认：点击省份设置/切换铁路等级
+        mgr = self.project.railway_mgr
+        current = mgr.province_levels().get(pid, 0)
+        new_level = self.railway_level
+        if current == new_level:
+            new_level = 0  # 点同等级 = 删除
+
+        mgr.set_province_level(pid, new_level)
+        self.project.mark_dirty()
+        # 刷新着色
+        self.event_bus.emit("railway_changed")
+        if new_level > 0:
+            self._emit_status(f"省份 {pid} 铁路等级 → {new_level}")
+        else:
+            self._emit_status(f"省份 {pid} 铁路已移除")
 
     def toggle_railway_draw(self, on: bool) -> None:
         """开始/结束铁路画笔。结束时把草稿变成一条 railway entry。"""

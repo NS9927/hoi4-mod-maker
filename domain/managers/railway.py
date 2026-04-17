@@ -20,6 +20,7 @@ Level 上限 5 (默认, 见 NDefines.NSupply.MAX_RAILWAY_LEVEL).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import numpy as np
 
 
 @dataclass
@@ -105,6 +106,58 @@ class RailwayManager:
             if not broken and len(new_ids) >= 2:
                 new_entries.append(RailwayEntry(level=e.level, province_ids=new_ids))
         self._entries = new_entries
+
+    # ─────────── 省份级别查询/着色 ───────────
+
+    def province_levels(self) -> dict[int, int]:
+        """每个省份的最大铁路等级。"""
+        levels: dict[int, int] = {}
+        for e in self._entries:
+            for pid in e.province_ids:
+                levels[pid] = max(levels.get(pid, 0), e.level)
+        return levels
+
+    def set_province_level(self, pid: int, level: int) -> None:
+        """设置省份铁路等级（0=删除）。更新所有经过该省份的铁路链。"""
+        if level == 0:
+            # 从所有铁路中移除该省份
+            for e in self._entries:
+                if pid in e.province_ids:
+                    e.province_ids.remove(pid)
+            # 清理空铁路
+            self._entries = [e for e in self._entries if len(e.province_ids) >= 2]
+        else:
+            found = False
+            for e in self._entries:
+                if pid in e.province_ids:
+                    e.level = max(e.level, level)
+                    found = True
+            if not found:
+                # 新建单省份占位（导出时会和邻居合并）
+                self._entries.append(RailwayEntry(level=level, province_ids=[pid, pid]))
+
+    def build_railway_color_map(self, province_map: np.ndarray) -> np.ndarray:
+        """生成铁路着色图 (H, W, 3)。等级 0=灰, 1=浅灰, 5=红。"""
+        # 等级颜色 (RGB)
+        LEVEL_COLORS = {
+            0: (50, 50, 50),      # 无铁路 — 深灰
+            1: (100, 100, 120),   # 灰蓝
+            2: (80, 140, 80),     # 绿
+            3: (200, 170, 50),    # 金黄
+            4: (210, 120, 50),    # 橙
+            5: (210, 50, 50),     # 红
+        }
+        max_pid = int(province_map.max())
+        lut = np.full((max_pid + 1, 3), 50, dtype=np.uint8)
+
+        levels = self.province_levels()
+        for pid, lvl in levels.items():
+            if 0 < pid <= max_pid:
+                r, g, b = LEVEL_COLORS.get(lvl, LEVEL_COLORS[0])
+                lut[pid] = (r, g, b)
+
+        flat = np.clip(province_map.ravel(), 0, max_pid)
+        return lut[flat].reshape(province_map.shape[0], province_map.shape[1], 3)
 
     # ─────────── 序列化 ───────────
 

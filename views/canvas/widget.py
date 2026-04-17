@@ -80,10 +80,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._display_buffer = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
         self._province_border_buffer = None  # 延迟创建
 
-        # State / Country / Strategic Region 颜色缓冲区
+        # State / Country / Strategic Region / Railway 颜色缓冲区
         self._state_color_rgb = None   # np.ndarray (H, W, 3) or None
         self._country_color_rgb = None  # np.ndarray (H, W, 3) or None
         self._sr_color_rgb = None      # np.ndarray (H, W, 3) or None
+        self._railway_color_rgb = None # np.ndarray (H, W, 3) or None
         # 省份属性地形（gameplay terrain）颜色缓冲区
         self._provincial_terrain_color_rgb = None  # np.ndarray (H, W, 3) or None
 
@@ -293,6 +294,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._state_color_rgb = None
         self._country_color_rgb = None
         self._sr_color_rgb = None
+        self._railway_color_rgb = None
         h, w = map_data.tile_map.shape[0], map_data.tile_map.shape[1]
         self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
         self._scene.setSceneRect(0, 0, w, h)
@@ -440,10 +442,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             return
         self._display_mode = mode
         self._full_render()
-        # 后勤模式：自动显示 supply/railway overlay
-        if mode == "logistics":
-            self.refresh_logistics_overlay()
-        elif self._lasso_overlay.isVisible():
+        # 后勤模式不再需要 overlay（改用着色图）
+        if mode != "logistics" and self._lasso_overlay.isVisible():
             # 离开后勤模式：清掉后勤 overlay（但套索/批量选择的 overlay 会被别处管理）
             # 只有在不是批量选择等状态时才清
             pass  # 先不动，让 set_batch_selection_pids 等管理
@@ -489,6 +489,12 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         """存储 Strategic Region 颜色 RGB 数组并触发渲染"""
         self._sr_color_rgb = rgb
         if self._display_mode == "strategic_region":
+            self._full_render()
+
+    def set_railway_colors(self, rgb: np.ndarray) -> None:
+        """存储铁路等级颜色 RGB 数组并触发渲染"""
+        self._railway_color_rgb = rgb
+        if self._display_mode == "logistics":
             self._full_render()
 
     def set_provincial_terrain_colors(self, rgb: np.ndarray) -> None:

@@ -1,25 +1,34 @@
 """
-后勤模式画布渲染.
+后勤模式画布渲染 — 铁路等级着色图.
 
-底层沿用 land 模式的陆海显示, 然后叠加:
-- adjacencies: sea=蓝虚线, impassable=红叉, canal=黄线
-- railways: 按 level 粗细的彩色线
-- supply nodes: 绿圆点
-
-渲染时需要能访问 adjacency_mgr / railway_mgr / supply_mgr, 这些挂在 canvas 实例上.
+每个有铁路的省份按等级着色（1=灰蓝 → 5=红）。
+比画线段快得多，KR 1027 条铁路也不卡。
 """
 
 from __future__ import annotations
 
-import numpy as np
-
-from features.map.land import renderer as land_renderer
-
 
 def render(canvas) -> None:
-    """后勤模式全量渲染: 陆海底图 + 省份边界 (后勤层由 canvas overlay 绘制)."""
-    land_renderer.render(canvas)
+    """后勤模式: 铁路等级着色。"""
+    if canvas._railway_color_rgb is not None:
+        canvas._display_buffer[:, :, 0] = canvas._railway_color_rgb[:, :, 2]
+        canvas._display_buffer[:, :, 1] = canvas._railway_color_rgb[:, :, 1]
+        canvas._display_buffer[:, :, 2] = canvas._railway_color_rgb[:, :, 0]
+        canvas._display_buffer[:, :, 3] = 255
+    else:
+        # fallback: 陆海底图
+        from features.map.land import renderer as land_renderer
+        land_renderer.render(canvas)
 
 
 def partial_render(canvas, x0: int, y0: int, x1: int, y1: int) -> None:
-    land_renderer.partial_render(canvas, x0, y0, x1, y1)
+    buf = canvas._display_buffer[y0:y1, x0:x1]
+    if canvas._railway_color_rgb is not None:
+        region = canvas._railway_color_rgb[y0:y1, x0:x1]
+        buf[:, :, 0] = region[:, :, 2]
+        buf[:, :, 1] = region[:, :, 1]
+        buf[:, :, 2] = region[:, :, 0]
+        buf[:, :, 3] = 255
+    else:
+        from features.map.land import renderer as land_renderer
+        land_renderer.partial_render(canvas, x0, y0, x1, y1)

@@ -67,6 +67,7 @@ class ApplicationController:
         bus.subscribe("country_changed", self._on_country_changed)
         bus.subscribe("vp_changed", self._on_vp_changed)
         bus.subscribe("province_map_regenerated", self._on_province_regen)
+        bus.subscribe("railway_changed", self._on_railway_changed)
         bus.subscribe("province_gaps_changed", self._on_province_gaps)
 
     # ═══════════════════════ 模式切换 ═══════════════════════
@@ -113,6 +114,8 @@ class ApplicationController:
             self._refresh_country_colors()
         elif mode == "strategic_region":
             self._refresh_sr_colors()
+        elif mode == "logistics":
+            self._refresh_railway_colors()
         elif mode == "province_terrain":
             self._refresh_provincial_terrain_colors()
 
@@ -273,6 +276,18 @@ class ApplicationController:
             self._canvas.province_map
         )
         self._canvas.set_sr_colors(rgb)
+
+    def _on_railway_changed(self, event=None) -> None:
+        if self._canvas.display_mode == "logistics":
+            self._refresh_railway_colors()
+
+    def _refresh_railway_colors(self) -> None:
+        if int(self._canvas.province_map.max()) == 0:
+            return
+        rgb = self._project.railway_mgr.build_railway_color_map(
+            self._canvas.province_map
+        )
+        self._canvas.set_railway_colors(rgb)
 
     def update_province_count(self) -> int:
         """返回当前省份数量。"""
