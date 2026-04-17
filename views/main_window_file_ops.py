@@ -64,17 +64,18 @@ def _populate_imported_data(project, result: dict) -> None:
                 project.country_mgr.assign_state(sd["id"], tag)
 
     # 填充 railways
-    from domain.managers.railway import RailwayEntry
     for rd in result.get("railways", []):
-        entry = RailwayEntry(
-            level=rd["level"],
-            province_ids=rd["province_ids"],
-        )
-        project.railway_mgr.add(entry)
+        try:
+            project.railway_mgr.add(rd["level"], rd["province_ids"])
+        except (ValueError, KeyError):
+            pass  # 跳过格式不合法的铁路
 
     # 填充 supply_nodes
     for sd in result.get("supply_nodes", []):
-        project.supply_mgr.set_node(sd["province_id"], sd["level"])
+        try:
+            project.supply_mgr.set_node(sd["province_id"], sd["level"])
+        except (ValueError, KeyError):
+            pass
 
     # 填充 adjacencies
     from domain.managers.adjacency import AdjacencyEntry
