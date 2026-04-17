@@ -572,6 +572,32 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
                     x2, y2 = pts[i + 1]
                     painter.drawLine(int(x1), int(y1), int(x2), int(y2))
 
+        # 海峡/邻接（蓝色虚线 sea / 红色叉 impassable）
+        adjacency_mgr = getattr(self, '_adjacency_mgr', None)
+        if adjacency_mgr is not None:
+            for entry in adjacency_mgr.get_all():
+                fid, tid = entry.from_id, entry.to_id
+                if (0 < fid <= max_pid and pid_count[fid] > 0
+                        and 0 < tid <= max_pid and pid_count[tid] > 0):
+                    fx = int(sum_x[fid] / pid_count[fid])
+                    fy = int(sum_y[fid] / pid_count[fid])
+                    tx = int(sum_x[tid] / pid_count[tid])
+                    ty = int(sum_y[tid] / pid_count[tid])
+                    if entry.type == "sea":
+                        pen = QPen(QColor(60, 140, 255, 220), 3)
+                        pen.setStyle(Qt.PenStyle.DashLine)
+                    else:
+                        pen = QPen(QColor(255, 80, 80, 220), 3)
+                        pen.setStyle(Qt.PenStyle.DashDotLine)
+                    painter.setPen(pen)
+                    painter.drawLine(fx, fy, tx, ty)
+                    # 两端画小圆
+                    painter.setBrush(QColor(60, 140, 255, 180) if entry.type == "sea"
+                                     else QColor(255, 80, 80, 180))
+                    painter.setPen(QPen(QColor(0, 0, 0, 160), 1))
+                    painter.drawEllipse(fx - 4, fy - 4, 8, 8)
+                    painter.drawEllipse(tx - 4, ty - 4, 8, 8)
+
         # 补给节点（绿圆，中心有白心）
         if supply_mgr is not None:
             for pid, node in supply_mgr._nodes.items():

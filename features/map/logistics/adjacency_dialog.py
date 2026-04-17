@@ -20,7 +20,61 @@ from PyQt5.QtWidgets import (
     QGroupBox, QFormLayout,
 )
 
+import numpy as np
+
 from domain.managers.adjacency import AdjacencyManager, AdjacencyEntry
+
+
+def _auto_strait_params(
+    from_id: int, to_id: int,
+    province_map: np.ndarray, tile_map: np.ndarray,
+) -> tuple[int, int, int, int, int, int]:
+    """自动计算海峡的 start/stop 坐标和 through 海省.
+
+    返回 (start_x, start_y, stop_x, stop_y, through_id, hoi4_start_y).
+    坐标是 HOI4 坐标系 (x=pixel_x, y=MAP_HEIGHT - pixel_y).
+    """
+    from data.constants import TILE_SEA, TILE_LAKE
+    h, w = province_map.shape
+
+    # 找两省的边界像素
+    from_ys, from_xs = np.where(province_map == from_id)
+    to_ys, to_xs = np.where(province_map == to_id)
+    if len(from_ys) == 0 or len(to_ys) == 0:
+        return -1, -1, -1, -1, -1, -1
+
+    # 两省质心
+    from_cy, from_cx = int(from_ys.mean()), int(from_xs.mean())
+    to_cy, to_cx = int(to_ys.mean()), int(to_xs.mean())
+
+    # from 省最靠近 to 质心的像素
+    dist_from = (from_xs - to_cx) ** 2 + (from_ys - to_cy) ** 2
+    best_from = int(np.argmin(dist_from))
+    sx, sy = int(from_xs[best_from]), int(from_ys[best_from])
+
+    # to 省最靠近 from 质心的像素
+    dist_to = (to_xs - from_cx) ** 2 + (to_ys - from_cy) ** 2
+    best_to = int(np.argmin(dist_to))
+    ex, ey = int(to_xs[best_to]), int(to_ys[best_to])
+
+    # 找中间线段上的海省（through）
+    through_id = -1
+    mid_x, mid_y = (sx + ex) // 2, (sy + ey) // 2
+    # 在中点附近 5x5 搜索海省
+    for dy in range(-2, 3):
+        for dx in range(-2, 3):
+            ny, nx = mid_y + dy, mid_x + dx
+            if 0 <= ny < h and 0 <= nx < w:
+                t = int(tile_map[ny, nx])
+                if t in (TILE_SEA, TILE_LAKE):
+                    through_id = int(province_map[ny, nx])
+                    if through_id > 0:
+                        break
+        if through_id > 0:
+            break
+
+    # 转 HOI4 坐标系（y 翻转）
+    return sx, h - sy, ex, h - ey, through_id, through_id
 
 
 class AdjacencyDialog(QDialog):
@@ -32,9 +86,13 @@ class AdjacencyDialog(QDialog):
 
     pick_mode_changed = pyqtSignal(bool, str)
 
-    def __init__(self, adjacency_mgr: AdjacencyManager, parent=None) -> None:
+    def __init__(self, adjacency_mgr: AdjacencyManager, parent=None,
+                 province_map: np.ndarray | None = None,
+                 tile_map: np.ndarray | None = None) -> None:
         super().__init__(parent)
         self._mgr = adjacency_mgr
+        self._province_map = province_map
+        self._tile_map = tile_map
         self._pick_target: str | None = None  # 'from' / 'to' / 'through'
         self.setWindowTitle("相邻关系编辑器")
         self.setMinimumSize(400, 520)
@@ -189,16 +247,30 @@ class AdjacencyDialog(QDialog):
         through_text = self._through_edit.text().strip()
         through_id = int(through_text) if through_text else -1
 
+        # 自动计算坐标和 through（sea 类型）
+        start_x = start_y = stop_x = stop_y = -1
+        if t == "sea" and self._province_map is not None and self._tile_map is not None:
+            sx, sy, ex, ey, auto_through, _ = _auto_strait_params(
+                from_id, to_id, self._province_map, self._tile_map
+            )
+            start_x, start_y, stop_x, stop_y = sx, sy, ex, ey
+            if through_id <= 0 and auto_through > 0:
+                through_id = auto_through
+                self._through_edit.setText(str(through_id))
+
         entry = AdjacencyEntry(
             from_id=from_id,
             to_id=to_id,
             type=t,
             through_id=through_id if t == "sea" else -1,
+            start_x=start_x, start_y=start_y,
+            stop_x=stop_x, stop_y=stop_y,
             comment=self._comment_edit.text().strip(),
         )
         self._mgr.add(entry)
         self._refresh_list()
-        self._status.setText(f"已保存: {from_id} → {to_id} ({t})")
+        coord_info = f" ({start_x},{start_y})→({stop_x},{stop_y})" if start_x >= 0 else ""
+        self._status.setText(f"已保存: {from_id} → {to_id} ({t}){coord_info}")
 
     # ─────────── 拾取模式 ───────────
 

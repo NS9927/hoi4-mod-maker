@@ -656,7 +656,11 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             self._adjacency_dialog.activateWindow()
             return
         from features.map.logistics.adjacency_dialog import AdjacencyDialog
-        dlg = AdjacencyDialog(self._project.adjacency_mgr, parent=self)
+        dlg = AdjacencyDialog(
+            self._project.adjacency_mgr, parent=self,
+            province_map=self._canvas.province_map,
+            tile_map=self._canvas.tile_map,
+        )
         dlg.pick_mode_changed.connect(self._on_adjacency_pick_mode)
         dlg.finished.connect(self._on_adjacency_dialog_closed)
         self._adjacency_dialog = dlg
