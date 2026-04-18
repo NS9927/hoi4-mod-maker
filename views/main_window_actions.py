@@ -95,7 +95,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         mask = self._canvas.new_land_mask
         n = int(mask.sum())
         if n == 0:
-            self._status_info.setText("没有画新陆地，先用画笔画。")
+            self._status_info.setText(tr("status_no_new_land"))
             return
 
         self._status_info.setText(f"正在为 {n} 像素新陆地生成省份...")
@@ -131,7 +131,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_new_land_clear(self) -> None:
         """清空新大陆画笔的 mask。"""
         self._canvas.new_land_mask[:] = False
-        self._status_info.setText("新大陆画笔已清空。")
+        self._status_info.setText(tr("status_new_land_cleared"))
         # 更新页面像素计数
         if hasattr(self._tool_panel, '_new_land_page'):
             self._tool_panel._new_land_page.update_pixel_count(0)
@@ -972,7 +972,7 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
     def _on_toggle_language(self) -> None:
         new_lang = "en" if get_language() == "zh" else "zh"
         set_language(new_lang)
-        # 保存语言设置
+        # 保存语言设置到 json
         import json, os
         config_path = os.path.join(os.path.expanduser("~"), ".hoi4_map_maker.json")
         config = {}
@@ -986,17 +986,21 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         with open(config_path, "w") as f:
             json.dump(config, f)
 
-        reply = QMessageBox.question(
-            self,
-            "Language / 语言",
-            "Language changed. Restart to apply.\n语言已切换，重启软件生效。\n\nRestart now? / 现在重启？",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if reply == QMessageBox.StandardButton.Yes:
-            import sys
-            from PyQt5.QtWidgets import QApplication
-            QApplication.quit()
-            os.execl(sys.executable, sys.executable, *sys.argv)
+        # 立即刷新 UI
+        self._retranslate_ui()
+
+    def _retranslate_ui(self) -> None:
+        """语言切换后刷新整个界面文字（无需重启）。"""
+        # 窗口标题
+        self.setWindowTitle(tr("app_title"))
+        # 重建菜单栏
+        self.menuBar().clear()
+        self._init_menu()
+        # 刷新工具面板
+        self._tool_panel.retranslateUi()
+        # 刷新欢迎页
+        if hasattr(self, '_welcome_page') and self._welcome_page:
+            self._welcome_page.retranslateUi()
 
     def _on_about(self) -> None:
         QMessageBox.about(

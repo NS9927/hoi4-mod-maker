@@ -51,7 +51,7 @@ class StrategicRegionPage(QWidget):
         lay.setSpacing(6)
 
         # 提示
-        tip = QLabel("在列表选中一个区域，然后点击地图省份分配。\n白色边界线 = State 边界。")
+        tip = QLabel(tr("sr_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
@@ -85,7 +85,7 @@ class StrategicRegionPage(QWidget):
         lay.addWidget(self._from_states_confirm_btn)
 
         # 分配模式开关
-        self._assign_chk = QCheckBox("分配模式（点省份加入选中区域）")
+        self._assign_chk = QCheckBox(tr("sr_assign_mode_label"))
         self._assign_chk.setChecked(False)
         self._assign_chk.setStyleSheet(
             "QCheckBox { color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }"

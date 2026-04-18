@@ -13,6 +13,8 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import QSettings, Qt
 from PyQt5.QtGui import QKeySequence
 
+from ui.i18n import tr
+
 
 # ── 默认快捷键映射 ──
 _DEFAULTS: dict[str, str] = {
@@ -39,29 +41,29 @@ _DEFAULTS: dict[str, str] = {
     "zoom_fit": "Ctrl+0",
 }
 
-# 显示用中文名
+# 显示用名称 (tr key)
 _LABELS: dict[str, str] = {
-    "undo": "撤销",
-    "redo": "重做",
-    "save": "保存项目",
-    "open": "打开项目",
-    "new": "新建项目",
-    "export": "导出MOD",
-    "mode_land": "大陆模式",
-    "mode_province": "省份模式",
-    "mode_terrain": "地形模式",
-    "mode_height": "高度模式",
-    "mode_river": "河流模式",
-    "mode_state": "State模式",
-    "mode_country": "国家模式",
-    "mode_continent": "大洲模式",
-    "tool_brush": "画笔工具",
-    "tool_eraser": "橡皮擦",
-    "tool_fill": "填充工具",
-    "tool_transform": "变换工具",
-    "tool_pan": "平移工具",
-    "delete": "删除",
-    "zoom_fit": "适应窗口",
+    "undo": "shortcut_undo",
+    "redo": "shortcut_redo",
+    "save": "shortcut_save",
+    "open": "shortcut_open",
+    "new": "shortcut_new",
+    "export": "shortcut_export",
+    "mode_land": "shortcut_mode_land",
+    "mode_province": "shortcut_mode_province",
+    "mode_terrain": "shortcut_mode_terrain",
+    "mode_height": "shortcut_mode_height",
+    "mode_river": "shortcut_mode_river",
+    "mode_state": "shortcut_mode_state",
+    "mode_country": "shortcut_mode_country",
+    "mode_continent": "shortcut_mode_continent",
+    "tool_brush": "shortcut_tool_brush",
+    "tool_eraser": "shortcut_tool_eraser",
+    "tool_fill": "shortcut_tool_fill",
+    "tool_transform": "shortcut_tool_transform",
+    "tool_pan": "shortcut_tool_pan",
+    "delete": "shortcut_delete",
+    "zoom_fit": "shortcut_zoom_fit",
 }
 
 
@@ -125,14 +127,14 @@ class ShortcutManager:
 def show_shortcut_dialog(parent: QWidget, shortcut_mgr: ShortcutManager) -> None:
     """弹出快捷键设置对话框，允许编辑并保存。"""
     dlg = QDialog(parent)
-    dlg.setWindowTitle("快捷键设置")
+    dlg.setWindowTitle(tr("shortcut_dlg_title"))
     dlg.resize(480, 520)
 
     layout = QVBoxLayout(dlg)
 
     table = QTableWidget()
     table.setColumnCount(3)
-    table.setHorizontalHeaderLabels(["功能", "当前快捷键", "新快捷键"])
+    table.setHorizontalHeaderLabels([tr("shortcut_col_function"), tr("shortcut_col_current"), tr("shortcut_col_new")])
     table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
     table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
     table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
@@ -147,7 +149,7 @@ def show_shortcut_dialog(parent: QWidget, shortcut_mgr: ShortcutManager) -> None
 
     for row, name in enumerate(names):
         # 功能名
-        label_text = _LABELS.get(name, name)
+        label_text = tr(_LABELS.get(name, name))
         label_item = QTableWidgetItem(label_text)
         label_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
         table.setItem(row, 0, label_item)

@@ -87,10 +87,11 @@ class WelcomePage(QWidget):
     open_project_requested = pyqtSignal()
     open_recent_requested = pyqtSignal(str)         # path
     import_mod_requested = pyqtSignal()              # 导入MOD地图
+    language_changed = pyqtSignal(str)               # "zh" / "en"
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
-        self.setStyleSheet(f"background: {_BG};")
+        self.setStyleSheet(f"WelcomePage {{ background: {_BG}; }}")
         self._init_ui()
 
     _CARD_WIDTH = 280
@@ -129,6 +130,36 @@ class WelcomePage(QWidget):
         version.setStyleSheet(f"color: {_DIM}; font-size: 14px; background: transparent;")
         version.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left.addWidget(version)
+
+        # 语言切换
+        lang_row = QHBoxLayout()
+        lang_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        from ui.i18n import get_language
+        cur = get_language()
+
+        def _lang_btn(text: str, lang: str) -> QPushButton:
+            active = (lang == cur)
+            btn = QPushButton(text)
+            btn.setStyleSheet(f"""
+                QPushButton {{
+                    background: {_ACCENT if active else 'transparent'};
+                    border: 1px solid {_ACCENT if active else _BORDER};
+                    color: {'white' if active else _DIM};
+                    padding: 4px 12px;
+                    font-size: 13px;
+                    border-radius: 4px;
+                    min-width: 60px;
+                }}
+                QPushButton:hover {{
+                    border-color: {_ACCENT};
+                }}
+            """)
+            btn.clicked.connect(lambda: self._switch_lang(lang))
+            return btn
+
+        lang_row.addWidget(_lang_btn("中文", "zh"))
+        lang_row.addWidget(_lang_btn("English", "en"))
+        left.addLayout(lang_row)
 
         left.addSpacing(24)
 
@@ -281,6 +312,57 @@ class WelcomePage(QWidget):
         from views.guide_dialog import GuideDialog
         dlg = GuideDialog(self)
         dlg.exec_()
+
+    def _switch_lang(self, lang: str) -> None:
+        from ui.i18n import set_language, get_language
+        if lang == get_language():
+            return
+        set_language(lang)
+        # 保存语言设置到 json
+        import json, os as _os
+        config_path = _os.path.join(_os.path.expanduser("~"), ".hoi4_map_maker.json")
+        config = {}
+        if _os.path.exists(config_path):
+            try:
+                with open(config_path, "r") as f:
+                    config = json.load(f)
+            except Exception:
+                pass
+        config["language"] = lang
+        with open(config_path, "w") as f:
+            json.dump(config, f)
+        self.language_changed.emit(lang)
+
+    def retranslateUi(self) -> None:
+        """语言切换后重建整个欢迎页。"""
+        # 删除旧 layout 和所有子 widget
+        old_layout = self.layout()
+        if old_layout:
+            from PyQt5 import sip
+            while old_layout.count():
+                item = old_layout.takeAt(0)
+                w = item.widget()
+                if w:
+                    w.setParent(None)
+                    w.deleteLater()
+                sub = item.layout()
+                if sub:
+                    self._clear_layout(sub)
+            sip.delete(old_layout)
+        self._init_ui()
+
+    @staticmethod
+    def _clear_layout(layout) -> None:
+        """递归清除 layout 下的所有 widget 和子 layout。"""
+        while layout.count():
+            item = layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.setParent(None)
+                w.deleteLater()
+            sub = item.layout()
+            if sub:
+                WelcomePage._clear_layout(sub)
 
     def _on_recent_clicked(self, item: QListWidgetItem) -> None:
         path = item.data(Qt.ItemDataRole.UserRole)

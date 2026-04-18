@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
 )
 
 from domain.managers.colormap_settings import ColormapSettings, ColormapColor
+from ui.i18n import tr
 
 
 class ColormapDialog(QDialog):
@@ -23,7 +24,7 @@ class ColormapDialog(QDialog):
     def __init__(self, settings: ColormapSettings, parent=None) -> None:
         super().__init__(parent)
         self._settings = settings
-        self.setWindowTitle("战略总览贴图颜色")
+        self.setWindowTitle(tr("cm_dlg_title"))
         self.setMinimumSize(360, 360)
 
         self._build_ui()
@@ -33,28 +34,24 @@ class ColormapDialog(QDialog):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
-        tip = QLabel(
-            "缩到战略视角时显示的全图色调.\n"
-            "默认是地球感土褐+靛蓝, 改成任何颜色让你的架空世界更独特.\n"
-            "(只影响极远视角的总览, 近景仍用地形画刷)"
-        )
+        tip = QLabel(tr("cm_dlg_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(tip)
 
         # 三个色块行
         self._land_swatch = self._make_color_row(
-            root, "陆地", self._settings.land, self._on_pick_land
+            root, tr("cm_dlg_land"), self._settings.land, self._on_pick_land
         )
         self._sea_swatch = self._make_color_row(
-            root, "海洋", self._settings.sea, self._on_pick_sea
+            root, tr("cm_dlg_sea"), self._settings.sea, self._on_pick_sea
         )
         self._lake_swatch = self._make_color_row(
-            root, "湖泊", self._settings.lake, self._on_pick_lake
+            root, tr("cm_dlg_lake"), self._settings.lake, self._on_pick_lake
         )
 
         # 重置按钮
-        reset_btn = QPushButton("恢复默认")
+        reset_btn = QPushButton(tr("cm_dlg_reset_default"))
         reset_btn.clicked.connect(self._on_reset)
         root.addWidget(reset_btn)
 
@@ -63,9 +60,9 @@ class ColormapDialog(QDialog):
         # 底部按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        ok_btn = QPushButton("保存")
+        ok_btn = QPushButton(tr("cm_dlg_save"))
         ok_btn.clicked.connect(self.accept)
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(tr("cm_dlg_cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)
@@ -97,7 +94,7 @@ class ColormapDialog(QDialog):
 
     def _pick_color(self, current: ColormapColor) -> ColormapColor | None:
         qc = QColor(current.r, current.g, current.b)
-        new_qc = QColorDialog.getColor(qc, self, "选择颜色")
+        new_qc = QColorDialog.getColor(qc, self, tr("cm_dlg_pick_color"))
         if new_qc.isValid():
             return ColormapColor(new_qc.red(), new_qc.green(), new_qc.blue())
         return None

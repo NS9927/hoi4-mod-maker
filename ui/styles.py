@@ -422,6 +422,17 @@ QMessageBox {
 }
 QInputDialog {
     background-color: #252535;
+    color: #e0e0f0;
+}
+QInputDialog QPushButton {
+    color: #e0e0f0;
+    background: #3a3a5a;
+    border: 1px solid #6c6cf0;
+    border-radius: 4px;
+    padding: 4px 16px;
+}
+QInputDialog QPushButton:hover {
+    background: #4a4a7a;
 }
 
 /* 工具提示 */

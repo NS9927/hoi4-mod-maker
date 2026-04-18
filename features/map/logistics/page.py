@@ -82,7 +82,7 @@ class LogisticsPage(QWidget):
         lay.addWidget(adj_box)
 
         # ── 铁路 + 补给 ──
-        tool_box = _make_section("铁路 / 补给")
+        tool_box = _make_section(tr("logistics_rail_supply_section"))
         tool_lay = tool_box.layout()
 
         self._logi_rail_status = QLabel(tr("logistics_rail_count", 0))
@@ -93,7 +93,7 @@ class LogisticsPage(QWidget):
         self._logi_sup_status.setStyleSheet(_DIM_LABEL_STYLE)
         tool_lay.addWidget(self._logi_sup_status)
 
-        lbl = QLabel("选择工具后点击省份:")
+        lbl = QLabel(tr("logistics_click_province_hint"))
         lbl.setStyleSheet(_DIM_LABEL_STYLE)
         tool_lay.addWidget(lbl)
 
@@ -103,7 +103,7 @@ class LogisticsPage(QWidget):
         # 铁路色块行
         rail_row = QHBoxLayout()
         rail_row.setSpacing(4)
-        rail_lbl = QLabel("铁路")
+        rail_lbl = QLabel(tr("logistics_rail_label"))
         rail_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
         rail_lbl.setFixedWidth(30)
         rail_row.addWidget(rail_lbl)
@@ -123,10 +123,10 @@ class LogisticsPage(QWidget):
             hex_color = _RAIL_COLORS[level]
             if level == 0:
                 btn.setText("×")
-                btn.setToolTip("擦除铁路")
+                btn.setToolTip(tr("logistics_rail_erase_tip"))
             else:
                 btn.setText(str(level))
-                btn.setToolTip(f"铁路等级 {level}")
+                btn.setToolTip(tr("logistics_rail_level_tip", level))
             btn.setStyleSheet(_btn_base.format(bg=hex_color))
             self._tool_btn_group.addButton(btn, level)
             rail_row.addWidget(btn)
@@ -136,7 +136,7 @@ class LogisticsPage(QWidget):
         # 补给图标行
         sup_row = QHBoxLayout()
         sup_row.setSpacing(4)
-        sup_lbl = QLabel("补给")
+        sup_lbl = QLabel(tr("logistics_supply_label"))
         sup_lbl.setStyleSheet("color: #aaa; font-size: 11px;")
         sup_lbl.setFixedWidth(30)
         sup_row.addWidget(sup_lbl)
@@ -144,7 +144,7 @@ class LogisticsPage(QWidget):
         sup_btn = QPushButton("◆+")
         sup_btn.setCheckable(True)
         sup_btn.setFixedSize(34, 34)
-        sup_btn.setToolTip("放置补给节点")
+        sup_btn.setToolTip(tr("logistics_supply_place_tip"))
         sup_btn.setStyleSheet(
             "QPushButton { background: #2CA02C; color: white;"
             " font-weight: bold; font-size: 13px;"
@@ -158,7 +158,7 @@ class LogisticsPage(QWidget):
         sup_erase_btn = QPushButton("◆×")
         sup_erase_btn.setCheckable(True)
         sup_erase_btn.setFixedSize(34, 34)
-        sup_erase_btn.setToolTip("删除补给节点")
+        sup_erase_btn.setToolTip(tr("logistics_supply_erase_tip"))
         sup_erase_btn.setStyleSheet(
             "QPushButton { background: #555; color: #ccc;"
             " font-weight: bold; font-size: 13px;"

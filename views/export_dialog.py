@@ -45,7 +45,8 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
     # 1. 陆地 / 省份
     if province_count == 0:
         items.append(CheckItem(
-            "省份", "missing", "没有省份数据，请先画地图并生成省份", False))
+            tr("export_check_provinces"), "missing",
+            tr("export_check_no_provinces"), False))
         # 没有省份后续检查无意义
         return items
 
@@ -55,7 +56,8 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
     land_pixels = int(np.sum(flat_tm == TILE_LAND))
     if land_pixels == 0:
         items.append(CheckItem(
-            "陆地", "missing", "没有陆地像素，请先在 Land 模式画地图", False))
+            tr("export_check_land"), "missing",
+            tr("export_check_no_land"), False))
         return items
 
     # 检查 ID 连续性（合并省份后可能有空洞）
@@ -64,21 +66,23 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
     gap_ids = expected_ids - existing_ids
     if gap_ids:
         items.append(CheckItem(
-            "省份", "warning",
-            f"共 {len(existing_ids)} 个省份，但 ID 有 {len(gap_ids)} 个空洞"
-            f"（被吞并的省份需要用切割或增量生成补回来，否则导出后 HOI4 属性会错位）",
+            tr("export_check_provinces"), "warning",
+            tr("export_check_province_gaps").format(
+                total=len(existing_ids), gaps=len(gap_ids)),
             False, len(existing_ids)))
     else:
         items.append(CheckItem(
-            "省份", "ok", f"共 {province_count} 个省份", False, province_count))
+            tr("export_check_provinces"), "ok",
+            tr("export_check_province_ok").format(count=province_count),
+            False, province_count))
 
     # 2. State
     state_mgr = project.state_mgr
     state_count = len(state_mgr.states) if state_mgr.states else 0
     if state_count == 0:
         items.append(CheckItem(
-            "State (州)", "missing",
-            "没有 State — 每个陆地省份必须属于一个 State，否则崩溃",
+            tr("export_check_state"), "missing",
+            tr("export_check_no_state"),
             True))
     else:
         # 检查孤儿省份
@@ -95,20 +99,23 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
         orphans = land_pids - assigned
         if orphans:
             items.append(CheckItem(
-                "State (州)", "warning",
-                f"有 {state_count} 个 State，但 {len(orphans)} 个陆地省份未分配（导出时自动领养）",
+                tr("export_check_state"), "warning",
+                tr("export_check_state_orphans").format(
+                    count=state_count, orphans=len(orphans)),
                 True, state_count))
         else:
             items.append(CheckItem(
-                "State (州)", "ok", f"共 {state_count} 个 State", False, state_count))
+                tr("export_check_state"), "ok",
+                tr("export_check_state_ok").format(count=state_count),
+                False, state_count))
 
     # 3. 国家
     country_mgr = project.country_mgr
     country_count = len(country_mgr.countries) if country_mgr.countries else 0
     if country_count == 0:
         items.append(CheckItem(
-            "国家", "missing",
-            "没有国家 — 至少需要一个国家，否则无法进入游戏",
+            tr("export_check_country"), "missing",
+            tr("export_check_no_country"),
             True))
     else:
         # 检查无主 State
@@ -118,58 +125,67 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
                 unowned.append(sid)
         if unowned:
             items.append(CheckItem(
-                "国家", "warning",
-                f"有 {country_count} 个国家，但 {len(unowned)} 个 State 未分配所有者",
+                tr("export_check_country"), "warning",
+                tr("export_check_country_unowned").format(
+                    count=country_count, unowned=len(unowned)),
                 True, country_count))
         else:
             items.append(CheckItem(
-                "国家", "ok", f"共 {country_count} 个国家", False, country_count))
+                tr("export_check_country"), "ok",
+                tr("export_check_country_ok").format(count=country_count),
+                False, country_count))
 
     # 4. 战略区域
     sr_mgr = project.strategic_region_mgr
     sr_count = sr_mgr.count() if sr_mgr else 0
     if sr_count == 0:
         items.append(CheckItem(
-            "战略区域", "missing",
-            "没有战略区域 — 每个省份必须属于一个战略区域，否则崩溃",
+            tr("export_check_strategic_region"), "missing",
+            tr("export_check_no_strategic_region"),
             True))
     else:
         items.append(CheckItem(
-            "战略区域", "ok", f"共 {sr_count} 个战略区域", False, sr_count))
+            tr("export_check_strategic_region"), "ok",
+            tr("export_check_strategic_region_ok").format(count=sr_count),
+            False, sr_count))
 
     # 5. 大陆
     cont_mgr = project.continent_mgr
     cont_count = cont_mgr.count() if cont_mgr else 0
     if cont_count == 0:
         items.append(CheckItem(
-            "大陆", "missing",
-            "没有大陆定义 — 导出时使用默认大陆",
+            tr("export_check_continent"), "missing",
+            tr("export_check_no_continent"),
             True))
     else:
         items.append(CheckItem(
-            "大陆", "ok", f"共 {cont_count} 个大陆", False, cont_count))
+            tr("export_check_continent"), "ok",
+            tr("export_check_continent_ok").format(count=cont_count),
+            False, cont_count))
 
     # 6. 地形
     ter = canvas.terrain_map
     if ter is None or int(ter.max()) == 0:
         items.append(CheckItem(
-            "地形", "missing",
-            "没有地形数据 — 导出时自动从 tile_map 生成",
+            tr("export_check_terrain"), "missing",
+            tr("export_check_no_terrain"),
             True))
     else:
         items.append(CheckItem(
-            "地形", "ok", "地形数据已设置", False))
+            tr("export_check_terrain"), "ok",
+            tr("export_check_terrain_ok"), False))
 
     # 7. 高度
     hm = canvas.height_map
     if hm is None or int(hm.max()) == int(hm.min()):
         items.append(CheckItem(
-            "高度图", "missing",
-            "没有高度数据 — 导出时自动生成默认高度",
+            tr("export_check_heightmap"), "missing",
+            tr("export_check_no_heightmap"),
             True))
     else:
         items.append(CheckItem(
-            "高度图", "ok", "高度数据已设置", False))
+            tr("export_check_heightmap"), "ok",
+            tr("export_check_heightmap_ok"), False))
 
     # 8. 美术资产（仅当有导入资产时显示）
     asset_total = len(getattr(project, "assets", {}) or {})
@@ -178,14 +194,14 @@ def check_project_readiness(project, canvas) -> list[CheckItem]:
         dirty_count = project.dirty_asset_count()
         if dirty_count == 0:
             items.append(CheckItem(
-                "美术资产", "ok",
-                f"共 {asset_total} 个导入的原始资产全部保留（导出不会覆盖）",
+                tr("export_check_assets"), "ok",
+                tr("export_check_assets_all_clean").format(total=asset_total),
                 False, asset_total))
         else:
             items.append(CheckItem(
-                "美术资产", "warning",
-                f"共 {asset_total} 个导入资产：{clean_count} 个保留、{dirty_count} 个将重新生成\n"
-                f"（因为相关地图数据被编辑过）",
+                tr("export_check_assets"), "warning",
+                tr("export_check_assets_dirty").format(
+                    total=asset_total, clean=clean_count, dirty=dirty_count),
                 False, asset_total))
 
     return items
@@ -200,19 +216,19 @@ def auto_complete_project(project, canvas) -> list[str]:
     tm = canvas.tile_map
     province_count = int(pm.max())
     if province_count == 0:
-        return ["错误：没有省份数据，无法补全"]
+        return [tr("export_auto_no_provinces")]
 
     # 1. 自动生成 State
     state_mgr = project.state_mgr
     if not state_mgr.states:
         state_mgr.auto_split(pm, tm, per_state=15)
-        log.append(f"自动生成 {len(state_mgr.states)} 个 State（每组约15省份）")
+        log.append(tr("export_auto_gen_states").format(count=len(state_mgr.states)))
 
     # 2. 自动创建国家
     country_mgr = project.country_mgr
     if not country_mgr.countries:
         country_mgr.create_country("AAA", name="Default Nation", color=(100, 100, 200))
-        log.append("自动创建默认国家 AAA")
+        log.append(tr("export_auto_create_country"))
 
     # 3. 分配无主 State 给第一个国家
     first_tag = next(iter(country_mgr.countries))
@@ -226,7 +242,8 @@ def auto_complete_project(project, canvas) -> list[str]:
             state = state_mgr.get_state(sid)
             if state:
                 state.owner_tag = first_tag
-        log.append(f"将 {len(unowned)} 个无主 State 分配给 {first_tag}")
+        log.append(tr("export_auto_assign_states").format(
+            count=len(unowned), tag=first_tag))
 
     # 4. 设首都
     for tag, country in country_mgr.countries.items():
@@ -236,19 +253,20 @@ def auto_complete_project(project, canvas) -> list[str]:
                 first_state = state_mgr.get_state(owned_states[0])
                 if first_state and first_state.provinces:
                     country.capital = first_state.provinces[0]
-                    log.append(f"国家 {tag} 自动设首都为省份 {country.capital}")
+                    log.append(tr("export_auto_set_capital").format(
+                        tag=tag, pid=country.capital))
 
     # 5. 自动生成战略区域
     sr_mgr = project.strategic_region_mgr
     if sr_mgr.count() == 0:
         sr_mgr.auto_generate(pm, tm, state_mgr=state_mgr)
-        log.append(f"自动生成 {sr_mgr.count()} 个战略区域")
+        log.append(tr("export_auto_gen_sr").format(count=sr_mgr.count()))
 
     # 6. 大陆（至少有一个默认的）
     cont_mgr = project.continent_mgr
     if cont_mgr.count() == 0:
         cont_mgr.add_continent("default_continent")
-        log.append("自动创建默认大陆 default_continent")
+        log.append(tr("export_auto_create_continent"))
 
     return log
 
@@ -273,7 +291,7 @@ class ExportWorker(QThread):
 
     def run(self) -> None:
         try:
-            self.progress.emit("正在执行导出前检查和修复...")
+            self.progress.emit(tr("export_worker_pre_check"))
             from services.export_service import export_mod
             report = export_mod(
                 self.output_dir,
@@ -308,7 +326,7 @@ class ExportDialog(QDialog):
         self.canvas = canvas
         self._worker: ExportWorker | None = None
 
-        self.setWindowTitle("导出 MOD")
+        self.setWindowTitle(tr("export_dlg_title"))
         self.setMinimumWidth(560)
         self.setMinimumHeight(420)
         self._build_ui()
@@ -321,28 +339,28 @@ class ExportDialog(QDialog):
         layout.setSpacing(10)
 
         # 标题
-        title = QLabel("导出前检查")
+        title = QLabel(tr("export_pre_check_title"))
         title.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(title)
 
         # 检查结果区域
-        self._check_group = QGroupBox("项目完成度")
+        self._check_group = QGroupBox(tr("export_project_readiness"))
         self._check_layout = QVBoxLayout(self._check_group)
         layout.addWidget(self._check_group)
 
         # 导出范围选择
-        scope_group = QGroupBox("导出范围")
+        scope_group = QGroupBox(tr("export_scope"))
         scope_layout = QVBoxLayout(scope_group)
         self._scope_checks = {}
         scope_items = [
-            ("map", "地图文件 (BMP/CSV/positions/buildings)", True),
-            ("states", "States (history/states/)", True),
-            ("countries", "国家 (country_tags/countries/history)", True),
-            ("strategic_regions", "战略区域 (strategicregions/weatherpositions)", True),
-            ("localisation", "本地化 (localisation/)", True),
-            ("supply", "补给系统 (supply_nodes/railways/supply_areas)", True),
-            ("gfx", "图形资源 (国旗/肖像)", True),
-            ("replace_path", "replace_path + descriptor.mod", True),
+            ("map", tr("export_scope_map"), True),
+            ("states", tr("export_scope_states"), True),
+            ("countries", tr("export_scope_countries"), True),
+            ("strategic_regions", tr("export_scope_strategic_regions"), True),
+            ("localisation", tr("export_scope_localisation"), True),
+            ("supply", tr("export_scope_supply"), True),
+            ("gfx", tr("export_scope_gfx"), True),
+            ("replace_path", tr("export_scope_replace_path"), True),
         ]
         for key, label, default in scope_items:
             cb = QCheckBox(label)
@@ -352,7 +370,7 @@ class ExportDialog(QDialog):
         layout.addWidget(scope_group)
 
         # 日志区域（初始隐藏）
-        self._log_box = QGroupBox("操作日志")
+        self._log_box = QGroupBox(tr("export_log"))
         log_layout = QVBoxLayout(self._log_box)
         self._log_text = QTextEdit()
         self._log_text.setReadOnly(True)
@@ -375,7 +393,7 @@ class ExportDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._btn_auto = QPushButton("自动补全并导出")
+        self._btn_auto = QPushButton(tr("export_btn_auto"))
         self._btn_auto.setStyleSheet(
             "QPushButton { background: #6c6cf0; color: white; padding: 8px 20px;"
             " border-radius: 4px; font-weight: bold; }"
@@ -385,7 +403,7 @@ class ExportDialog(QDialog):
         self._btn_auto.clicked.connect(self._on_auto_export)
         btn_layout.addWidget(self._btn_auto)
 
-        self._btn_export_direct = QPushButton("直接导出（不补全）")
+        self._btn_export_direct = QPushButton(tr("export_btn_direct"))
         self._btn_export_direct.setStyleSheet(
             "QPushButton { background: #22c55e; color: white; padding: 8px 20px;"
             " border-radius: 4px; font-weight: bold; }"
@@ -395,7 +413,7 @@ class ExportDialog(QDialog):
         self._btn_export_direct.clicked.connect(self._on_direct_export)
         btn_layout.addWidget(self._btn_export_direct)
 
-        self._btn_cancel = QPushButton("取消")
+        self._btn_cancel = QPushButton(tr("btn_cancel"))
         self._btn_cancel.setStyleSheet(
             "QPushButton { padding: 8px 16px; border-radius: 4px; }"
         )
@@ -444,7 +462,7 @@ class ExportDialog(QDialog):
             # 名称 + 详情
             text = f"<b>{item.name}</b> — {item.detail}"
             if item.can_auto and item.status != "ok":
-                text += ' <span style="color: #6c6cf0;">[可自动补全]</span>'
+                text += f' <span style="color: #6c6cf0;">[{tr("export_can_auto")}]</span>'
             info = QLabel(text)
             info.setWordWrap(True)
             info.setTextFormat(Qt.RichText)
@@ -461,7 +479,7 @@ class ExportDialog(QDialog):
 
         # 没有缺失项 → 隐藏"自动补全"按钮
         if not has_missing:
-            self._btn_auto.setText("导出")
+            self._btn_auto.setText(tr("export_btn_export"))
             self._btn_export_direct.setVisible(False)
 
     # ── 导出动作 ──
@@ -472,7 +490,8 @@ class ExportDialog(QDialog):
         log = auto_complete_project(self.project, self.canvas)
         if log:
             self._log_box.setVisible(True)
-            self._log_text.setPlainText("\n".join(f"[补全] {l}" for l in log))
+            self._log_text.setPlainText("\n".join(
+                f"[{tr('export_log_prefix')}] {l}" for l in log))
 
         # 刷新检查
         self._run_check()
@@ -485,11 +504,10 @@ class ExportDialog(QDialog):
         # 警告
         missing = [i for i in self._items if i.status == "missing"]
         if missing:
-            names = "、".join(i.name for i in missing)
+            names = tr("export_separator").join(i.name for i in missing)
             reply = QMessageBox.warning(
-                self, "确认",
-                f"以下数据缺失：{names}\n\n"
-                "缺失的数据会导致 HOI4 加载崩溃。确定要跳过补全直接导出吗？",
+                self, tr("dlg_confirm"),
+                tr("export_confirm_skip").format(names=names),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
@@ -500,7 +518,7 @@ class ExportDialog(QDialog):
     def _do_export(self) -> None:
         """选择目录 → 启动后台导出。"""
         output_dir = QFileDialog.getExistingDirectory(
-            self, "选择导出目录", DEFAULT_MOD_OUTPUT_PATH)
+            self, tr("export_choose_dir"), DEFAULT_MOD_OUTPUT_PATH)
         if not output_dir:
             return
 
@@ -510,7 +528,7 @@ class ExportDialog(QDialog):
         self._btn_cancel.setEnabled(False)
         self._progress_bar.setVisible(True)
         self._progress_label.setVisible(True)
-        self._progress_label.setText("正在导出...")
+        self._progress_label.setText(tr("export_exporting"))
 
         self._output_dir = output_dir
         scope = {k: cb.isChecked() for k, cb in self._scope_checks.items()}
@@ -533,33 +551,39 @@ class ExportDialog(QDialog):
         verify_errors, verify_warnings = ModVerifier.verify_quiet(self._output_dir)
 
         # 构建结果文本
-        lines = [f"MOD 导出成功！\n路径: {self._output_dir}\n"]
+        lines = [tr("export_result_success").format(path=self._output_dir)]
         if report.stats:
-            lines.append("── 统计 ──")
-            labels = {"provinces": "省份", "states": "State",
-                      "countries": "国家", "files": "文件"}
+            lines.append(tr("export_result_stats_header"))
+            stat_labels = {
+                "provinces": tr("export_stat_provinces"),
+                "states": tr("export_stat_states"),
+                "countries": tr("export_stat_countries"),
+                "files": tr("export_stat_files"),
+            }
             for k, v in report.stats.items():
-                lines.append(f"  {labels.get(k, k)}: {v}")
+                lines.append(f"  {stat_labels.get(k, k)}: {v}")
         if report.fixed:
-            lines.append("\n── 自动修复 ──")
+            lines.append(tr("export_result_fixed_header"))
             for f in report.fixed:
-                lines.append(f"  [已修复] {f}")
+                lines.append(f"  [{tr('export_result_fixed_tag')}] {f}")
         if report.warnings:
-            lines.append("\n── 导出警告 ──")
+            lines.append(tr("export_result_warnings_header"))
             for w in report.warnings:
-                lines.append(f"  [警告] {w}")
+                lines.append(f"  [{tr('export_result_warning_tag')}] {w}")
 
         # 追加验证结果
         if not verify_errors and not verify_warnings:
-            lines.append("\n── MOD 验证 ──")
-            lines.append("  ✅ 所有检查通过，可以进游戏了！")
+            lines.append(tr("export_verify_header"))
+            lines.append(tr("export_verify_all_pass"))
         else:
             if verify_errors:
-                lines.append(f"\n── MOD 验证：{len(verify_errors)} 个错误（可能导致崩溃）──")
+                lines.append(tr("export_verify_errors_header").format(
+                    count=len(verify_errors)))
                 for e in verify_errors:
                     lines.append(f"  ❌ {e}")
             if verify_warnings:
-                lines.append(f"\n── MOD 验证：{len(verify_warnings)} 个警告 ──")
+                lines.append(tr("export_verify_warnings_header").format(
+                    count=len(verify_warnings)))
                 for w in verify_warnings:
                     lines.append(f"  ⚠ {w}")
 
@@ -621,4 +645,4 @@ class ExportDialog(QDialog):
         self._btn_export_direct.setEnabled(True)
         self._btn_cancel.setEnabled(True)
 
-        QMessageBox.critical(self, "导出失败", error_msg)
+        QMessageBox.critical(self, tr("export_failed_title"), error_msg)

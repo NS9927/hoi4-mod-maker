@@ -20,13 +20,15 @@ from PyQt5.QtWidgets import (
     QScrollArea, QWidget, QGridLayout, QFrame,
 )
 
+from ui.i18n import tr
+
 
 # 允许的省份级建筑类型 + 等级上限
 # 参考 common/buildings/00_buildings.txt
 _PROVINCE_BUILDINGS = [
-    ("bunker", "陆防", 5),
-    ("coastal_bunker", "海防", 5),
-    ("naval_base", "海军基地", 10),
+    ("bunker", "prov_bld_bunker", 5),
+    ("coastal_bunker", "prov_bld_coastal", 5),
+    ("naval_base", "prov_bld_naval", 10),
 ]
 
 
@@ -37,7 +39,7 @@ class ProvinceBuildingsDialog(QDialog):
         super().__init__(parent)
         self._state = state
         self._land_pids = list(land_province_ids)
-        self.setWindowTitle(f"省份建筑 — {state.name} (ID {state.id})")
+        self.setWindowTitle(tr("prov_bld_title_fmt", state.name, state.id))
         self.setMinimumSize(440, 480)
 
         # 用来收集每行的 spinbox 引用: {(pid, building): spin}
@@ -50,10 +52,7 @@ class ProvinceBuildingsDialog(QDialog):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(8)
 
-        tip = QLabel(
-            "为 state 内每个陆地省份单独配置防御建筑.\n"
-            "0 = 不建. bunker 适用所有陆地, coastal_bunker 和 naval_base 应只给沿海省份."
-        )
+        tip = QLabel(tr("prov_bld_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(tip)
@@ -70,9 +69,9 @@ class ProvinceBuildingsDialog(QDialog):
         grid.setVerticalSpacing(6)
 
         # 表头
-        grid.addWidget(QLabel("<b>省份 ID</b>"), 0, 0)
+        grid.addWidget(QLabel(f"<b>{tr('prov_bld_province_id')}</b>"), 0, 0)
         for i, (_, display, _max) in enumerate(_PROVINCE_BUILDINGS):
-            grid.addWidget(QLabel(f"<b>{display}</b>"), 0, i + 1)
+            grid.addWidget(QLabel(f"<b>{tr(display)}</b>"), 0, i + 1)
 
         # 每个 land 省份一行
         for row, pid in enumerate(self._land_pids, start=1):
@@ -93,9 +92,9 @@ class ProvinceBuildingsDialog(QDialog):
         # 底部按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        ok_btn = QPushButton("保存")
+        ok_btn = QPushButton(tr("prov_bld_save"))
         ok_btn.clicked.connect(self._on_accept)
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(tr("prov_bld_cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)

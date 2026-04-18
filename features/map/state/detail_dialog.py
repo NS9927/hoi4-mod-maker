@@ -18,12 +18,15 @@ from PyQt5.QtWidgets import (
     QPushButton, QGroupBox, QListWidget, QInputDialog, QTabWidget, QWidget,
 )
 
+from ui.i18n import tr
+
 
 # HOI4 战略资源
 RESOURCE_NAMES = ["oil", "aluminium", "rubber", "tungsten", "steel", "chromium"]
 RESOURCE_LABELS = {
-    "oil": "石油", "aluminium": "铝", "rubber": "橡胶",
-    "tungsten": "钨", "steel": "钢", "chromium": "铬",
+    "oil": "state_dlg_res_oil", "aluminium": "state_dlg_res_aluminium",
+    "rubber": "state_dlg_res_rubber", "tungsten": "state_dlg_res_tungsten",
+    "steel": "state_dlg_res_steel", "chromium": "state_dlg_res_chromium",
 }
 
 # HOI4 state 级建筑 (value 0 = 不写)
@@ -43,19 +46,19 @@ STATE_BUILDINGS = [
     "supply_node",
 ]
 BUILDING_LABELS = {
-    "infrastructure": "基础设施 (0-5)",
-    "arms_factory": "军工厂",
-    "industrial_complex": "民用工厂",
-    "dockyard": "船坞",
-    "air_base": "空军基地 (0-10)",
-    "anti_air_building": "防空 (0-5)",
-    "radar_station": "雷达站 (0-4)",
-    "synthetic_refinery": "合成炼油厂",
-    "fuel_silo": "燃料储存",
-    "nuclear_reactor": "核反应堆 (0-3)",
-    "rocket_site": "火箭发射井 (0-10)",
-    "mass_transit": "大众运输 (0-3)",
-    "supply_node": "补给节点 (0-1)",
+    "infrastructure": "state_dlg_bld_infrastructure",
+    "arms_factory": "state_dlg_bld_arms_factory",
+    "industrial_complex": "state_dlg_bld_industrial_complex",
+    "dockyard": "state_dlg_bld_dockyard",
+    "air_base": "state_dlg_bld_air_base",
+    "anti_air_building": "state_dlg_bld_anti_air",
+    "radar_station": "state_dlg_bld_radar",
+    "synthetic_refinery": "state_dlg_bld_synthetic",
+    "fuel_silo": "state_dlg_bld_fuel_silo",
+    "nuclear_reactor": "state_dlg_bld_nuclear",
+    "rocket_site": "state_dlg_bld_rocket",
+    "mass_transit": "state_dlg_bld_mass_transit",
+    "supply_node": "state_dlg_bld_supply_node",
 }
 BUILDING_MAX = {
     "infrastructure": 5,
@@ -77,7 +80,7 @@ class StateDetailDialog(QDialog):
         super().__init__(parent)
         self._state = state
         self._country_tags = country_tags
-        self.setWindowTitle(f"State 详情 — {state.name} (ID {state.id})")
+        self.setWindowTitle(tr("state_dlg_title_fmt", state.name, state.id))
         self.setMinimumSize(500, 540)
 
         self._build_ui()
@@ -91,17 +94,17 @@ class StateDetailDialog(QDialog):
         tabs = QTabWidget()
         root.addWidget(tabs, 1)
 
-        tabs.addTab(self._build_basic_tab(), "基础")
-        tabs.addTab(self._build_resources_tab(), "资源")
-        tabs.addTab(self._build_buildings_tab(), "建筑")
-        tabs.addTab(self._build_cores_tab(), "核心 / 宣称")
+        tabs.addTab(self._build_basic_tab(), tr("state_dlg_tab_basic"))
+        tabs.addTab(self._build_resources_tab(), tr("state_dlg_tab_resources"))
+        tabs.addTab(self._build_buildings_tab(), tr("state_dlg_tab_buildings"))
+        tabs.addTab(self._build_cores_tab(), tr("state_dlg_tab_cores"))
 
         # 底部按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        ok_btn = QPushButton("保存")
+        ok_btn = QPushButton(tr("state_dlg_save"))
         ok_btn.clicked.connect(self._on_accept)
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(tr("state_dlg_cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)
@@ -112,27 +115,27 @@ class StateDetailDialog(QDialog):
         lay = QFormLayout(w)
 
         self._name_edit = QLineEdit()
-        lay.addRow("名字:", self._name_edit)
+        lay.addRow(tr("state_dlg_name_label"), self._name_edit)
 
         self._manpower_spin = QSpinBox()
         self._manpower_spin.setRange(0, 100_000_000)
         self._manpower_spin.setSingleStep(10000)
-        lay.addRow("人口:", self._manpower_spin)
+        lay.addRow(tr("state_dlg_manpower_label"), self._manpower_spin)
 
-        self._impassable_check = QCheckBox("不可通行 (impassable)")
+        self._impassable_check = QCheckBox(tr("state_dlg_impassable"))
         lay.addRow("", self._impassable_check)
 
         self._controller_combo = QComboBox()
-        self._controller_combo.addItem("(同 owner)", "")
+        self._controller_combo.addItem(tr("state_dlg_controller_same"), "")
         for tag in self._country_tags:
             self._controller_combo.addItem(tag, tag)
-        lay.addRow("初始控制者:", self._controller_combo)
+        lay.addRow(tr("state_dlg_controller_label"), self._controller_combo)
 
         self._supplies_spin = QDoubleSpinBox()
         self._supplies_spin.setRange(0.0, 100.0)
         self._supplies_spin.setSingleStep(0.5)
         self._supplies_spin.setDecimals(2)
-        lay.addRow("本地补给加成:", self._supplies_spin)
+        lay.addRow(tr("state_dlg_supplies_label"), self._supplies_spin)
 
         return w
 
@@ -141,11 +144,11 @@ class StateDetailDialog(QDialog):
         lay = QGridLayout(w)
         lay.setColumnStretch(0, 0)
         lay.setColumnStretch(1, 1)
-        lay.addWidget(QLabel("<b>6 种战略资源, 0 表示不写</b>"), 0, 0, 1, 2)
+        lay.addWidget(QLabel(f"<b>{tr('state_dlg_resources_hint')}</b>"), 0, 0, 1, 2)
 
         self._resource_spins: dict[str, QSpinBox] = {}
         for i, key in enumerate(RESOURCE_NAMES):
-            lay.addWidget(QLabel(f"{RESOURCE_LABELS[key]} ({key}):"), i + 1, 0)
+            lay.addWidget(QLabel(f"{tr(RESOURCE_LABELS[key])} ({key}):"), i + 1, 0)
             spin = QSpinBox()
             spin.setRange(0, 10000)
             lay.addWidget(spin, i + 1, 1)
@@ -158,14 +161,14 @@ class StateDetailDialog(QDialog):
         lay = QGridLayout(w)
         lay.addWidget(
             QLabel(
-                "<b>State 级建筑等级</b><br>"
-                "<span style='color:#888'>0 = 按 state_category 默认值; 其他值会覆盖默认</span>"
+                f"<b>{tr('state_dlg_buildings_hint')}</b><br>"
+                f"<span style='color:#888'>{tr('state_dlg_buildings_sub')}</span>"
             ),
             0, 0, 1, 2,
         )
         self._building_spins: dict[str, QSpinBox] = {}
         for i, key in enumerate(STATE_BUILDINGS):
-            lay.addWidget(QLabel(BUILDING_LABELS.get(key, key) + ":"), i + 1, 0)
+            lay.addWidget(QLabel(tr(BUILDING_LABELS.get(key, key)) + ":"), i + 1, 0)
             spin = QSpinBox()
             spin.setRange(0, BUILDING_MAX.get(key, 30))
             lay.addWidget(spin, i + 1, 1)
@@ -174,7 +177,7 @@ class StateDetailDialog(QDialog):
         # 省份级建筑入口
         last_row = len(STATE_BUILDINGS) + 1
         lay.addWidget(QLabel(""), last_row, 0)  # 空行
-        prov_btn = QPushButton("编辑省份级建筑 (bunker / 海防 / 海军基地)...")
+        prov_btn = QPushButton(tr("state_dlg_edit_prov_buildings"))
         prov_btn.clicked.connect(self._on_edit_province_buildings)
         lay.addWidget(prov_btn, last_row + 1, 0, 1, 2)
         lay.setRowStretch(last_row + 2, 1)
@@ -195,14 +198,14 @@ class StateDetailDialog(QDialog):
         lay = QVBoxLayout(w)
 
         # 额外核心
-        cores_box = QGroupBox("额外核心 (owner 自动是核心, 这里填其他国家)")
+        cores_box = QGroupBox(tr("state_dlg_cores_group"))
         cores_lay = QVBoxLayout(cores_box)
         self._cores_list = QListWidget()
         cores_lay.addWidget(self._cores_list)
         row = QHBoxLayout()
-        add_core_btn = QPushButton("添加...")
+        add_core_btn = QPushButton(tr("state_dlg_add"))
         add_core_btn.clicked.connect(self._on_add_core)
-        del_core_btn = QPushButton("删除选中")
+        del_core_btn = QPushButton(tr("state_dlg_delete_selected"))
         del_core_btn.clicked.connect(self._on_del_core)
         row.addWidget(add_core_btn)
         row.addWidget(del_core_btn)
@@ -210,14 +213,14 @@ class StateDetailDialog(QDialog):
         lay.addWidget(cores_box)
 
         # 宣称
-        claims_box = QGroupBox("宣称 (add_claim_by)")
+        claims_box = QGroupBox(tr("state_dlg_claims_group"))
         claims_lay = QVBoxLayout(claims_box)
         self._claims_list = QListWidget()
         claims_lay.addWidget(self._claims_list)
         row2 = QHBoxLayout()
-        add_claim_btn = QPushButton("添加...")
+        add_claim_btn = QPushButton(tr("state_dlg_add"))
         add_claim_btn.clicked.connect(self._on_add_claim)
-        del_claim_btn = QPushButton("删除选中")
+        del_claim_btn = QPushButton(tr("state_dlg_delete_selected"))
         del_claim_btn.clicked.connect(self._on_del_claim)
         row2.addWidget(add_claim_btn)
         row2.addWidget(del_claim_btn)
@@ -290,14 +293,14 @@ class StateDetailDialog(QDialog):
     def _ask_tag(self, title: str) -> str:
         if self._country_tags:
             tag, ok = QInputDialog.getItem(
-                self, title, "选择国家 TAG:", self._country_tags, 0, True
+                self, title, tr("state_dlg_select_tag"), self._country_tags, 0, True
             )
         else:
-            tag, ok = QInputDialog.getText(self, title, "输入国家 TAG (3 字母):")
+            tag, ok = QInputDialog.getText(self, title, tr("state_dlg_input_tag"))
         return tag.strip().upper() if ok else ""
 
     def _on_add_core(self) -> None:
-        tag = self._ask_tag("添加核心")
+        tag = self._ask_tag(tr("state_dlg_add_core_title"))
         if not tag:
             return
         # 去重
@@ -312,7 +315,7 @@ class StateDetailDialog(QDialog):
             self._cores_list.takeItem(row)
 
     def _on_add_claim(self) -> None:
-        tag = self._ask_tag("添加宣称")
+        tag = self._ask_tag(tr("state_dlg_add_claim_title"))
         if not tag:
             return
         existing = [self._claims_list.item(i).text() for i in range(self._claims_list.count())]

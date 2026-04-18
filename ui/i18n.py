@@ -2,8 +2,16 @@
 国际化支持 — 中英文切换
 """
 
-# 当前语言
-_current_lang = "zh"
+# 当前语言（启动时从 QSettings 读取）
+def _load_saved_language() -> str:
+    try:
+        from PyQt5.QtCore import QSettings
+        s = QSettings("HOI4MapMaker", "Settings")
+        return s.value("language", "zh")
+    except Exception:
+        return "zh"
+
+_current_lang = _load_saved_language()
 
 # 翻译字典
 _translations: dict[str, dict[str, str]] = {
@@ -917,14 +925,511 @@ _translations: dict[str, dict[str, str]] = {
     "export_done_all_pass":      {"zh": "导出成功，验证全部通过！", "en": "Export succeeded, all checks passed!"},
     "export_done_has_errors":    {"zh": "导出成功，但验证发现问题（进游戏可能崩溃）", "en": "Export succeeded, but verification found issues (may crash in game)"},
     "export_result_close":       {"zh": "关闭", "en": "Close"},
+
+    # === 崩溃处理 ===
+    "crash_title":    {"zh": "软件崩溃", "en": "Application Crashed"},
+    "crash_message":  {"zh": "发生未处理的异常:\n\n{}", "en": "Unhandled exception:\n\n{}"},
+    "crash_log_saved": {"zh": "完整信息已保存到:\n{}", "en": "Full details saved to:\n{}"},
+
+    # === 导出对话框 ===
+    # 检查项名称
+    "export_check_provinces": {"zh": "省份", "en": "Provinces"},
+    "export_check_land": {"zh": "陆地", "en": "Land"},
+    "export_check_state": {"zh": "State (州)", "en": "State"},
+    "export_check_country": {"zh": "国家", "en": "Country"},
+    "export_check_strategic_region": {"zh": "战略区域", "en": "Strategic Region"},
+    "export_check_continent": {"zh": "大陆", "en": "Continent"},
+    "export_check_terrain": {"zh": "地形", "en": "Terrain"},
+    "export_check_heightmap": {"zh": "高度图", "en": "Heightmap"},
+    "export_check_assets": {"zh": "美术资产", "en": "Art Assets"},
+
+    # 检查项详情 — 缺失
+    "export_check_no_provinces": {"zh": "没有省份数据，请先画地图并生成省份", "en": "No province data. Please draw the map and generate provinces first"},
+    "export_check_no_land": {"zh": "没有陆地像素，请先在 Land 模式画地图", "en": "No land pixels. Please draw the map in Land mode first"},
+    "export_check_no_state": {"zh": "没有 State — 每个陆地省份必须属于一个 State，否则崩溃", "en": "No states — every land province must belong to a state, or the game will crash"},
+    "export_check_no_country": {"zh": "没有国家 — 至少需要一个国家，否则无法进入游戏", "en": "No countries — at least one country is needed to enter the game"},
+    "export_check_no_strategic_region": {"zh": "没有战略区域 — 每个省份必须属于一个战略区域，否则崩溃", "en": "No strategic regions — every province must belong to a strategic region, or the game will crash"},
+    "export_check_no_continent": {"zh": "没有大陆定义 — 导出时使用默认大陆", "en": "No continent defined — default continent will be used on export"},
+    "export_check_no_terrain": {"zh": "没有地形数据 — 导出时自动从 tile_map 生成", "en": "No terrain data — will be auto-generated from tile_map on export"},
+    "export_check_no_heightmap": {"zh": "没有高度数据 — 导出时自动生成默认高度", "en": "No height data — default heightmap will be auto-generated on export"},
+
+    # 检查项详情 — 正常
+    "export_check_province_ok": {"zh": "共 {count} 个省份", "en": "{count} provinces total"},
+    "export_check_state_ok": {"zh": "共 {count} 个 State", "en": "{count} states total"},
+    "export_check_country_ok": {"zh": "共 {count} 个国家", "en": "{count} countries total"},
+    "export_check_strategic_region_ok": {"zh": "共 {count} 个战略区域", "en": "{count} strategic regions total"},
+    "export_check_continent_ok": {"zh": "共 {count} 个大陆", "en": "{count} continents total"},
+    "export_check_terrain_ok": {"zh": "地形数据已设置", "en": "Terrain data is set"},
+    "export_check_heightmap_ok": {"zh": "高度数据已设置", "en": "Height data is set"},
+
+    # 检查项详情 — 警告
+    "export_check_province_gaps": {"zh": "共 {total} 个省份，但 ID 有 {gaps} 个空洞（被吞并的省份需要用切割或增量生成补回来，否则导出后 HOI4 属性会错位）", "en": "{total} provinces total, but {gaps} ID gaps found (merged provinces need to be re-split or incrementally regenerated, otherwise HOI4 attributes will be misaligned)"},
+    "export_check_state_orphans": {"zh": "有 {count} 个 State，但 {orphans} 个陆地省份未分配（导出时自动领养）", "en": "{count} states, but {orphans} land provinces unassigned (will be auto-adopted on export)"},
+    "export_check_country_unowned": {"zh": "有 {count} 个国家，但 {unowned} 个 State 未分配所有者", "en": "{count} countries, but {unowned} states have no owner"},
+    "export_check_assets_all_clean": {"zh": "共 {total} 个导入的原始资产全部保留（导出不会覆盖）", "en": "All {total} imported assets preserved (export will not overwrite)"},
+    "export_check_assets_dirty": {"zh": "共 {total} 个导入资产：{clean} 个保留、{dirty} 个将重新生成\n（因为相关地图数据被编辑过）", "en": "{total} imported assets: {clean} preserved, {dirty} will be regenerated\n(related map data was edited)"},
+
+    # 自动补全日志
+    "export_auto_no_provinces": {"zh": "错误：没有省份数据，无法补全", "en": "Error: no province data, cannot auto-complete"},
+    "export_auto_gen_states": {"zh": "自动生成 {count} 个 State（每组约15省份）", "en": "Auto-generated {count} states (~15 provinces each)"},
+    "export_auto_create_country": {"zh": "自动创建默认国家 AAA", "en": "Auto-created default country AAA"},
+    "export_auto_assign_states": {"zh": "将 {count} 个无主 State 分配给 {tag}", "en": "Assigned {count} unowned states to {tag}"},
+    "export_auto_set_capital": {"zh": "国家 {tag} 自动设首都为省份 {pid}", "en": "Country {tag} auto-set capital to province {pid}"},
+    "export_auto_gen_sr": {"zh": "自动生成 {count} 个战略区域", "en": "Auto-generated {count} strategic regions"},
+    "export_auto_create_continent": {"zh": "自动创建默认大陆 default_continent", "en": "Auto-created default continent 'default_continent'"},
+
+    # 导出工作线程
+    "export_worker_pre_check": {"zh": "正在执行导出前检查和修复...", "en": "Running pre-export checks and fixes..."},
+
+    # 对话框 UI
+    "export_dlg_title": {"zh": "导出 MOD", "en": "Export MOD"},
+    "export_pre_check_title": {"zh": "导出前检查", "en": "Pre-Export Check"},
+    "export_project_readiness": {"zh": "项目完成度", "en": "Project Readiness"},
+    "export_scope": {"zh": "导出范围", "en": "Export Scope"},
+    "export_scope_map": {"zh": "地图文件 (BMP/CSV/positions/buildings)", "en": "Map files (BMP/CSV/positions/buildings)"},
+    "export_scope_states": {"zh": "States (history/states/)", "en": "States (history/states/)"},
+    "export_scope_countries": {"zh": "国家 (country_tags/countries/history)", "en": "Countries (country_tags/countries/history)"},
+    "export_scope_strategic_regions": {"zh": "战略区域 (strategicregions/weatherpositions)", "en": "Strategic regions (strategicregions/weatherpositions)"},
+    "export_scope_localisation": {"zh": "本地化 (localisation/)", "en": "Localisation (localisation/)"},
+    "export_scope_supply": {"zh": "补给系统 (supply_nodes/railways/supply_areas)", "en": "Supply system (supply_nodes/railways/supply_areas)"},
+    "export_scope_gfx": {"zh": "图形资源 (国旗/肖像)", "en": "Graphics (flags/portraits)"},
+    "export_scope_replace_path": {"zh": "replace_path + descriptor.mod", "en": "replace_path + descriptor.mod"},
+    "export_log": {"zh": "操作日志", "en": "Operation Log"},
+    "export_btn_auto": {"zh": "自动补全并导出", "en": "Auto-Complete & Export"},
+    "export_btn_direct": {"zh": "直接导出（不补全）", "en": "Export Directly (No Auto-Complete)"},
+    "export_btn_export": {"zh": "导出", "en": "Export"},
+    "export_can_auto": {"zh": "可自动补全", "en": "can be auto-completed"},
+    "export_log_prefix": {"zh": "补全", "en": "Auto"},
+    "export_separator": {"zh": "、", "en": ", "},
+    "export_confirm_skip": {"zh": "以下数据缺失：{names}\n\n缺失的数据会导致 HOI4 加载崩溃。确定要跳过补全直接导出吗？", "en": "The following data is missing: {names}\n\nMissing data will cause HOI4 to crash on load. Are you sure you want to skip auto-complete and export anyway?"},
+    "export_choose_dir": {"zh": "选择导出目录", "en": "Choose Export Directory"},
+    "export_exporting": {"zh": "正在导出...", "en": "Exporting..."},
+    "export_failed_title": {"zh": "导出失败", "en": "Export Failed"},
+
+    # 导出结果
+    "export_result_success": {"zh": "MOD 导出成功！\n路径: {path}\n", "en": "MOD exported successfully!\nPath: {path}\n"},
+    "export_result_stats_header": {"zh": "── 统计 ──", "en": "── Statistics ──"},
+    "export_stat_provinces": {"zh": "省份", "en": "Provinces"},
+    "export_stat_states": {"zh": "State", "en": "States"},
+    "export_stat_countries": {"zh": "国家", "en": "Countries"},
+    "export_stat_files": {"zh": "文件", "en": "Files"},
+    "export_result_fixed_header": {"zh": "\n── 自动修复 ──", "en": "\n── Auto-Fixed ──"},
+    "export_result_fixed_tag": {"zh": "已修复", "en": "Fixed"},
+    "export_result_warnings_header": {"zh": "\n── 导出警告 ──", "en": "\n── Export Warnings ──"},
+    "export_result_warning_tag": {"zh": "警告", "en": "Warning"},
+    "export_verify_header": {"zh": "\n── MOD 验证 ──", "en": "\n── MOD Verification ──"},
+    "export_verify_all_pass": {"zh": "  ✅ 所有检查通过，可以进游戏了！", "en": "  ✅ All checks passed. Ready to play!"},
+    "export_verify_errors_header": {"zh": "\n── MOD 验证：{count} 个错误（可能导致崩溃）──", "en": "\n── MOD Verification: {count} errors (may cause crash) ──"},
+    "export_verify_warnings_header": {"zh": "\n── MOD 验证：{count} 个警告 ──", "en": "\n── MOD Verification: {count} warnings ──"},
+
+    # === 后勤页面 (logistics/page.py) ===
+    "logistics_rail_supply_section": {"zh": "铁路 / 补给", "en": "Railway / Supply"},
+    "logistics_click_province_hint": {"zh": "选择工具后点击省份:", "en": "Select a tool then click a province:"},
+    "logistics_rail_label": {"zh": "铁路", "en": "Rail"},
+    "logistics_rail_erase_tip": {"zh": "擦除铁路", "en": "Erase railway"},
+    "logistics_rail_level_tip": {"zh": "铁路等级 {0}", "en": "Railway level {0}"},
+    "logistics_supply_label": {"zh": "补给", "en": "Supply"},
+    "logistics_supply_place_tip": {"zh": "放置补给节点", "en": "Place supply node"},
+    "logistics_supply_erase_tip": {"zh": "删除补给节点", "en": "Remove supply node"},
+
+    # === 战略区域页面 (strategic_region/page.py) ===
+    "sr_tip": {"zh": "在列表选中一个区域，然后点击地图省份分配。\n白色边界线 = State 边界。", "en": "Select a region from the list, then click map provinces to assign.\nWhite borders = State boundaries."},
+    "sr_assign_mode_label": {"zh": "分配模式（点省份加入选中区域）", "en": "Assign mode (click province to add to selected region)"},
+
+    # === 州页面 (state/page.py) ===
+    "state_assign_mode_label": {"zh": "✏ 分配模式（点省份加入选中州）", "en": "✏ Assign mode (click province to add to selected state)"},
+    "state_assign_hint": {"zh": "💡 默认点击地图 = 查看州信息。勾选上面开关才能分配省份。", "en": "💡 Default click = view state info. Enable the toggle above to assign provinces."},
+    "state_vp_hint": {"zh": "双击地图省份 = 设置胜利点(VP)", "en": "Double-click a province = set Victory Point (VP)"},
+
+    # === 文件操作 (main_window_file_ops.py) ===
+    "file_ops_new_confirm": {"zh": "新建项目将清除当前数据，是否继续？", "en": "Creating a new project will clear current data. Continue?"},
+    "file_ops_map_size_title": {"zh": "选择地图尺寸", "en": "Select Map Size"},
+    "file_ops_map_size_prompt": {"zh": "选择新项目的地图尺寸：", "en": "Choose a map size for the new project:"},
+    "file_ops_new_created": {"zh": "新项目已创建 ({0}×{1})", "en": "New project created ({0}×{1})"},
+    "file_ops_save_title": {"zh": "保存项目", "en": "Save Project"},
+    "file_ops_open_title": {"zh": "打开项目", "en": "Open Project"},
+    "file_ops_proj_filter": {"zh": "HOI4 项目 (*.hoi4proj);;All Files (*)", "en": "HOI4 Project (*.hoi4proj);;All Files (*)"},
+    "file_ops_saved": {"zh": "项目已保存: {0}", "en": "Project saved: {0}"},
+    "file_ops_save_fail": {"zh": "保存失败", "en": "Save Failed"},
+    "file_ops_loaded": {"zh": "项目已加载: {0}", "en": "Project loaded: {0}"},
+    "file_ops_loaded_gaps": {"zh": "项目已加载: {0} | ⚠ 项目自带 {1} 个省份 ID 空洞", "en": "Project loaded: {0} | ⚠ {1} province ID gaps found"},
+    "file_ops_load_fail": {"zh": "加载失败", "en": "Load Failed"},
+    "file_ops_vanilla_loaded": {"zh": "原版地图参考已加载: {0}", "en": "Vanilla map reference loaded: {0}"},
+    "file_ops_vanilla_not_found": {"zh": "未找到原版地图文件\n检查路径: {0}", "en": "Vanilla map files not found\nCheck path: {0}"},
+    "file_ops_ref_loaded": {"zh": "参考图已加载: {0}", "en": "Reference image loaded: {0}"},
+    "file_ops_ref_fail": {"zh": "无法加载图片", "en": "Failed to load image"},
+    "file_ops_landmask_title": {"zh": "选择陆海源图", "en": "Select Land/Sea Source Image"},
+    "file_ops_threshold_title": {"zh": "陆海阈值", "en": "Land/Sea Threshold"},
+    "file_ops_threshold_prompt": {"zh": "灰度阈值 (0-255)\n>= 阈值为陆地，< 阈值为海洋\n建议：高度图用 1；卫星图用 90 左右", "en": "Grayscale threshold (0-255)\n>= threshold = land, < threshold = sea\nSuggested: 1 for heightmaps; ~90 for satellite images"},
+    "file_ops_invert_title": {"zh": "反转?", "en": "Invert?"},
+    "file_ops_invert_prompt": {"zh": "勾选 Yes 表示：暗色为陆地、亮色为海洋（默认 No）", "en": "Select Yes to invert: dark = land, bright = sea (default No)"},
+    "file_ops_img_read_fail": {"zh": "读取图片失败：{0}", "en": "Failed to read image: {0}"},
+    "file_ops_landmask_done": {"zh": "陆海导入完成 — 陆地 {0}% / 海洋 {1}%", "en": "Land/sea import done — land {0}% / sea {1}%"},
+    "file_ops_import_confirm": {"zh": "导入将替换当前地图数据，是否继续？", "en": "Import will replace current map data. Continue?"},
+    "file_ops_select_mod_dir": {"zh": "选择 HOI4 MOD 或原版目录", "en": "Select HOI4 MOD or Vanilla Directory"},
+    "file_ops_missing_files": {"zh": "目录缺少必需文件:\n", "en": "Directory is missing required files:\n"},
+    "file_ops_import_fail": {"zh": "导入失败：{0}", "en": "Import failed: {0}"},
+    "file_ops_mod_imported": {"zh": "MOD地图已导入 ({0}×{1}, {2} 省份, {3} 州, {4} 战略区域, {5} 美术资产)", "en": "MOD map imported ({0}×{1}, {2} provinces, {3} states, {4} strategic regions, {5} art assets)"},
+    "file_ops_import_warnings": {"zh": "注意:\n", "en": "Warnings:\n"},
+    "file_ops_import_done": {"zh": "导入完成", "en": "Import Complete"},
+    "file_ops_test_dialog_title": {"zh": "渐进式测试导出", "en": "Progressive Test Export"},
+    "file_ops_test_select_level": {"zh": "选择测试级别（从低到高，逐级排查崩溃原因）:", "en": "Select test level (low to high, debug crashes step by step):"},
+    "file_ops_test_lv1_title": {"zh": "Lv1: 最小完整MOD（1国家）", "en": "Lv1: Minimal MOD (1 country)"},
+    "file_ops_test_lv1_desc": {"zh": "地图 + State + 1国家(AAA) + 补给 + 战略区域 + replace_path\n最小可运行配置，测试基础文件格式是否正确", "en": "Map + State + 1 country (AAA) + supply + strategic regions + replace_path\nMinimal runnable config, test basic file format"},
+    "file_ops_test_lv2_title": {"zh": "Lv2: +2个国家 +bookmark", "en": "Lv2: +2 countries +bookmark"},
+    "file_ops_test_lv2_desc": {"zh": "在Lv1基础上加: 第2个国家(BBB) + bookmark选择界面\n测试多国家和bookmark", "en": "Lv1 + 2nd country (BBB) + bookmark selection\nTest multi-country and bookmark"},
+    "file_ops_test_lv3_title": {"zh": "Lv3: +意识形态 +State类别", "en": "Lv3: +ideology +state categories"},
+    "file_ops_test_lv3_desc": {"zh": "在Lv2基础上加: ideologies, state_category 定义文件\n测试自定义意识形态/State类别", "en": "Lv2 + ideologies, state_category definitions\nTest custom ideologies/state categories"},
+    "file_ops_test_lv4_title": {"zh": "Lv4: +更多replace_path", "en": "Lv4: +more replace_path"},
+    "file_ops_test_lv4_desc": {"zh": "在Lv3基础上加: 更多replace_path（清空原版国策/事件等）\n完整TC MOD", "en": "Lv3 + more replace_path (clear vanilla focus/events etc.)\nFull TC MOD"},
+    "file_ops_test_output_dir": {"zh": "选择测试导出目录", "en": "Select Test Export Directory"},
+    "file_ops_test_generating": {"zh": "正在生成 Lv{0} 测试MOD...", "en": "Generating Lv{0} test MOD..."},
+    "file_ops_test_export_title": {"zh": "测试导出", "en": "Test Export"},
+    "file_ops_test_export_ok": {"zh": "Lv{0} 测试MOD已导出到:\n{1}\n\n{2}\n\n启动游戏测试是否正常加载。\n如果崩溃，降低级别重试；如果能进，升高级别继续。", "en": "Lv{0} test MOD exported to:\n{1}\n\n{2}\n\nLaunch the game to test.\nIf it crashes, try a lower level; if it works, go higher."},
+    "file_ops_export_fail": {"zh": "导出失败", "en": "Export Failed"},
+
+    # === 战略区域对话框 ===
+    "sr_dlg_title": {"zh": "战略区域编辑器", "en": "Strategic Region Editor"},
+    "sr_dlg_auto_generate": {"zh": "自动生成 (按 State 分组)", "en": "Auto Generate (Group by State)"},
+    "sr_dlg_new_region": {"zh": "新建空 Region", "en": "New Empty Region"},
+    "sr_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "sr_dlg_name_label": {"zh": "名字:", "en": "Name:"},
+    "sr_dlg_weather_label": {"zh": "天气预设:", "en": "Weather Preset:"},
+    "sr_dlg_province_count": {"zh": "省份: 0", "en": "Provinces: 0"},
+    "sr_dlg_start_pick": {"zh": "开始拾取省份", "en": "Start Picking Provinces"},
+    "sr_dlg_stop_pick": {"zh": "停止拾取", "en": "Stop Picking"},
+    "sr_dlg_close": {"zh": "关闭", "en": "Close"},
+    "sr_dlg_err_no_provinces": {"zh": "需要先生成省份", "en": "Provinces must be generated first"},
+    "sr_dlg_auto_confirm": {"zh": "将按当前 State 分组自动生成战略区域，替换已有区域。继续？", "en": "Auto-generate strategic regions grouped by State, replacing existing ones. Continue?"},
+    "sr_dlg_err_select_region": {"zh": "请先选中一个 Region", "en": "Please select a Region first"},
+    "sr_dlg_region_list": {"zh": "区域列表", "en": "Region List"},
+    "sr_dlg_naval_none": {"zh": "(无)", "en": "(None)"},
+    "sr_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+    "sr_dlg_province_count_fmt": {"zh": "省份: {0}", "en": "Provinces: {0}"},
+    "sr_dlg_generated_fmt": {"zh": "已生成 {0} 个区域", "en": "Generated {0} regions"},
+    "sr_dlg_pick_status_fmt": {"zh": "点击主画布省份 → 加入 Region #{0}", "en": "Click province on canvas → add to Region #{0}"},
+    "sr_dlg_assigned_fmt": {"zh": "已指派省份 {0} → Region #{1}", "en": "Assigned province {0} → Region #{1}"},
+
+    # === 邻接关系对话框 ===
+    "adj_dlg_title": {"zh": "相邻关系编辑器", "en": "Adjacency Editor"},
+    "adj_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "adj_dlg_from_placeholder": {"zh": "省份 ID", "en": "Province ID"},
+    "adj_dlg_to_placeholder": {"zh": "省份 ID", "en": "Province ID"},
+    "adj_dlg_type_sea": {"zh": "海峡/运河 (sea)", "en": "Strait/Canal (sea)"},
+    "adj_dlg_type_impassable": {"zh": "不可通行 (impassable)", "en": "Impassable"},
+    "adj_dlg_through_placeholder": {"zh": "途经海省 ID (sea 类型)", "en": "Through sea province ID (sea type)"},
+    "adj_dlg_comment_placeholder": {"zh": "备注 (可选)", "en": "Comment (optional)"},
+    "adj_dlg_clear_fields": {"zh": "清空字段", "en": "Clear Fields"},
+    "adj_dlg_save": {"zh": "保存", "en": "Save"},
+    "adj_dlg_err_invalid_id": {"zh": "起点/终点必须是整数省份 ID", "en": "From/To must be integer province IDs"},
+    "adj_dlg_tip": {"zh": "海峡 (sea): 跨海连接两个省 (必须指定 through 海省)\n不可通行 (impassable): 阻塞两省的直接相邻\n使用流程: 填字段 → 拾取省份 → 保存", "en": "Strait (sea): cross-sea connection between two provinces (must specify through sea province)\nImpassable: blocks direct adjacency between two provinces\nWorkflow: fill fields → pick provinces → save"},
+    "adj_dlg_edit_group": {"zh": "新建 / 编辑", "en": "New / Edit"},
+    "adj_dlg_pick_from_canvas": {"zh": "从画布拾取", "en": "Pick from Canvas"},
+    "adj_dlg_from_label": {"zh": "起点省份:", "en": "From Province:"},
+    "adj_dlg_to_label": {"zh": "终点省份:", "en": "To Province:"},
+    "adj_dlg_type_label": {"zh": "类型:", "en": "Type:"},
+    "adj_dlg_through_label": {"zh": "途经省份:", "en": "Through Province:"},
+    "adj_dlg_comment_label": {"zh": "备注:", "en": "Comment:"},
+    "adj_dlg_saved_fmt": {"zh": "已保存: {0} → {1} ({2}){3}", "en": "Saved: {0} → {1} ({2}){3}"},
+    "adj_dlg_pick_status_fmt": {"zh": "拾取模式: 点击主画布省份填入 {0}", "en": "Pick mode: click province on canvas to fill {0}"},
+    "adj_dlg_filled_fmt": {"zh": "已填入 {0} = {1}", "en": "Filled {0} = {1}"},
+
+    # === 大陆对话框 ===
+    "cont_dlg_title": {"zh": "大陆编辑器", "en": "Continent Editor"},
+    "cont_dlg_add": {"zh": "添加", "en": "Add"},
+    "cont_dlg_rename": {"zh": "重命名", "en": "Rename"},
+    "cont_dlg_delete": {"zh": "删除", "en": "Delete"},
+    "cont_dlg_start_assign": {"zh": "开始指派省份", "en": "Start Assigning Provinces"},
+    "cont_dlg_stop_assign": {"zh": "停止指派", "en": "Stop Assigning"},
+    "cont_dlg_err_min_one": {"zh": "必须至少保留 1 个大陆", "en": "Must keep at least 1 continent"},
+    "cont_dlg_err_select": {"zh": "请先选中一个大陆", "en": "Please select a continent first"},
+    "cont_dlg_tip": {"zh": "用法：\n1. 添加大陆（每个 MOD 至少 1 个）\n2. 选中大陆后点『开始指派』\n3. 在主画布点击陆地省份 → 该省份归入该大陆\n4. 再次点击按钮结束指派", "en": "Usage:\n1. Add continents (at least 1 per MOD)\n2. Select a continent and click 'Start Assigning'\n3. Click land provinces on canvas → assigned to that continent\n4. Click the button again to stop"},
+    "cont_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+    "cont_dlg_add_title": {"zh": "添加大陆", "en": "Add Continent"},
+    "cont_dlg_add_prompt": {"zh": "大陆名 (英文, 不含空格):", "en": "Continent name (English, no spaces):"},
+    "cont_dlg_rename_title": {"zh": "重命名大陆", "en": "Rename Continent"},
+    "cont_dlg_rename_prompt": {"zh": "新名字:", "en": "New name:"},
+    "cont_dlg_delete_title": {"zh": "删除大陆", "en": "Delete Continent"},
+    "cont_dlg_delete_confirm_fmt": {"zh": "删除「{0}」? 指向它的省份会改回首个大陆.", "en": "Delete \"{0}\"? Provinces assigned to it will revert to the first continent."},
+    "cont_dlg_assigning_fmt": {"zh": "正在指派到：{0} — 点击主画布省份", "en": "Assigning to: {0} — click provinces on canvas"},
+    "cont_dlg_assigned_fmt": {"zh": "已指派省份 {0} → {1}", "en": "Assigned province {0} → {1}"},
+
+    # === 邻接规则对话框 ===
+    "rule_dlg_list_label": {"zh": "规则列表", "en": "Rule List"},
+    "rule_dlg_new": {"zh": "新建...", "en": "New..."},
+    "rule_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "rule_dlg_name_label": {"zh": "名字:", "en": "Name:"},
+    "rule_dlg_name_placeholder": {"zh": "如 SUEZ_CANAL", "en": "e.g. SUEZ_CANAL"},
+    "rule_dlg_pick_add": {"zh": "从画布拾取添加", "en": "Pick from Canvas"},
+    "rule_dlg_manual_add": {"zh": "手填省份 ID", "en": "Enter Province ID"},
+    "rule_dlg_remove_selected": {"zh": "删除选中", "en": "Remove Selected"},
+    "rule_dlg_icon_placeholder": {"zh": "省份 ID, -1 = 不设", "en": "Province ID, -1 = none"},
+    "rule_dlg_pick_icon": {"zh": "从画布拾取", "en": "Pick from Canvas"},
+    "rule_dlg_close": {"zh": "关闭", "en": "Close"},
+    "rule_dlg_err_name_exists": {"zh": "规则名 {0} 已存在", "en": "Rule name {0} already exists"},
+    "rule_dlg_err_icon_int": {"zh": "icon 必须是整数省份 ID", "en": "Icon must be an integer province ID"},
+    "rule_dlg_status_select": {"zh": "先选中或新建一个规则", "en": "Select or create a rule first"},
+    "rule_dlg_status_pick_province": {"zh": "点击主画布省份 → 加入 required_provinces", "en": "Click province on canvas → add to required_provinces"},
+    "rule_dlg_status_pick_icon": {"zh": "点击主画布海省 → 设为 icon", "en": "Click sea province on canvas → set as icon"},
+    "rule_dlg_title": {"zh": "Adjacency Rules 编辑器", "en": "Adjacency Rules Editor"},
+    "rule_dlg_tip": {"zh": "通行表: 4 种关系 × 4 种通行类型. 勾上=允许通过.\nrequired_provinces: 控制者必须同时控制这些省份才有效.\nicon: 海军视图里图标显示在哪个海省.", "en": "Pass table: 4 relations × 4 pass types. Check = allow passage.\nrequired_provinces: controller must hold these provinces for the rule to apply.\nicon: which sea province shows the icon in naval view."},
+    "rule_dlg_pass_group": {"zh": "通行权限", "en": "Passage Permissions"},
+    "rule_dlg_pass_army": {"zh": "陆军", "en": "Army"},
+    "rule_dlg_pass_navy": {"zh": "海军", "en": "Navy"},
+    "rule_dlg_pass_submarine": {"zh": "潜艇", "en": "Submarine"},
+    "rule_dlg_pass_trade": {"zh": "贸易", "en": "Trade"},
+    "rule_dlg_rel_contested": {"zh": "争夺中", "en": "Contested"},
+    "rule_dlg_rel_enemy": {"zh": "敌国", "en": "Enemy"},
+    "rule_dlg_rel_friend": {"zh": "盟友", "en": "Friend"},
+    "rule_dlg_rel_neutral": {"zh": "中立", "en": "Neutral"},
+    "rule_dlg_icon_label": {"zh": "Icon 海省:", "en": "Icon Sea Province:"},
+    "rule_dlg_loaded_fmt": {"zh": "已加载 {0}", "en": "Loaded {0}"},
+    "rule_dlg_new_title": {"zh": "新建规则", "en": "New Rule"},
+    "rule_dlg_new_prompt": {"zh": "规则名 (英文大写, 如 SUEZ_CANAL):", "en": "Rule name (UPPER_CASE, e.g. SUEZ_CANAL):"},
+    "rule_dlg_delete_title": {"zh": "删除", "en": "Delete"},
+    "rule_dlg_delete_confirm_fmt": {"zh": "删除规则 {0}?", "en": "Delete rule {0}?"},
+    "rule_dlg_add_province_title": {"zh": "添加省份", "en": "Add Province"},
+    "rule_dlg_add_province_prompt": {"zh": "省份 ID:", "en": "Province ID:"},
+    "rule_dlg_added_req_fmt": {"zh": "加入 required: {0}", "en": "Added to required: {0}"},
+    "rule_dlg_icon_set_fmt": {"zh": "icon 设为 {0}", "en": "Icon set to {0}"},
+
+    # === 地图配置对话框 ===
+    "dm_dlg_title": {"zh": "地图配置 (default.map)", "en": "Map Config (default.map)"},
+    "dm_dlg_add_index": {"zh": "添加索引", "en": "Add Index"},
+    "dm_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "dm_dlg_reset_default": {"zh": "恢复默认", "en": "Reset to Default"},
+    "dm_dlg_save": {"zh": "保存", "en": "Save"},
+    "dm_dlg_cancel": {"zh": "取消", "en": "Cancel"},
+    "dm_dlg_tip": {"zh": "default.map 是 HOI4 引擎的地图加载配置.\n大部分字段是文件名 (vanilla 标准, 不可改).\n可调的是树木调色板索引和河流上限.", "en": "default.map is the HOI4 engine map loading config.\nMost fields are file names (vanilla standard, not editable).\nAdjustable: tree palette indices and river max level."},
+    "dm_dlg_prov_count_fmt": {"zh": "{0} (自动)", "en": "{0} (auto)"},
+    "dm_dlg_prov_count_label": {"zh": "总省份数:", "en": "Total Provinces:"},
+    "dm_dlg_river_max_label": {"zh": "河流最大等级:", "en": "Max River Level:"},
+    "dm_dlg_tree_label": {"zh": "树木调色板索引", "en": "Tree Palette Indices"},
+    "dm_dlg_tree_desc": {"zh": "(trees.bmp 这些 palette ID 算树):", "en": "(these palette IDs in trees.bmp count as trees):"},
+    "dm_dlg_add_title": {"zh": "添加索引", "en": "Add Index"},
+    "dm_dlg_add_prompt": {"zh": "Palette 索引 (1-13):", "en": "Palette index (1-13):"},
+
+    # === 颜色贴图对话框 ===
+    "cm_dlg_title": {"zh": "战略总览贴图颜色", "en": "Strategic Overview Map Colors"},
+    "cm_dlg_reset_default": {"zh": "恢复默认", "en": "Reset to Default"},
+    "cm_dlg_save": {"zh": "保存", "en": "Save"},
+    "cm_dlg_cancel": {"zh": "取消", "en": "Cancel"},
+    "cm_dlg_tip": {"zh": "缩到战略视角时显示的全图色调.\n默认是地球感土褐+靛蓝, 改成任何颜色让你的架空世界更独特.\n(只影响极远视角的总览, 近景仍用地形画刷)", "en": "Color tones shown at strategic zoom level.\nDefault is earth-like brown + indigo. Change to any color for your alternate world.\n(Only affects far zoom overview; close-up still uses terrain brushes)"},
+    "cm_dlg_land": {"zh": "陆地", "en": "Land"},
+    "cm_dlg_sea": {"zh": "海洋", "en": "Sea"},
+    "cm_dlg_lake": {"zh": "湖泊", "en": "Lake"},
+    "cm_dlg_pick_color": {"zh": "选择颜色", "en": "Pick Color"},
+
+    # === 新大陆画笔页面 ===
+    "new_land_size_label": {"zh": "大小", "en": "Size"},
+    "new_land_pixel_count": {"zh": "已画: 0 像素", "en": "Painted: 0 pixels"},
+    "new_land_pixel_count_fmt": {"zh": "已画: {0} 像素", "en": "Painted: {0} pixels"},
+    "new_land_generate": {"zh": "生成省份", "en": "Generate Provinces"},
+    "new_land_generate_tip": {"zh": "为新画的陆地区域生成省份", "en": "Generate provinces for newly painted land"},
+    "new_land_clear": {"zh": "清空画笔", "en": "Clear Brush"},
+    "new_land_clear_tip": {"zh": "清空已画的新陆地记录（不删除已画的陆地）", "en": "Clear painted land records (does not delete the land)"},
+
+    # === 铁路对话框 ===
+    "rail_dlg_title": {"zh": "铁路列表", "en": "Railway List"},
+    "rail_dlg_hint": {"zh": "所有已画的铁路. 新建请用侧边栏的『启用铁路画笔』.", "en": "All drawn railways. Use sidebar 'Enable Railway Brush' to create new ones."},
+    "rail_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "rail_dlg_clear_all": {"zh": "清空所有", "en": "Clear All"},
+    "rail_dlg_close": {"zh": "关闭", "en": "Close"},
+    "rail_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+
+    # === State 详情对话框 ===
+    "state_dlg_save": {"zh": "保存", "en": "Save"},
+    "state_dlg_cancel": {"zh": "取消", "en": "Cancel"},
+    "state_dlg_edit_prov_buildings": {"zh": "编辑省份级建筑 (bunker / 海防 / 海军基地)...", "en": "Edit Province Buildings (bunker / coastal / naval base)..."},
+    "state_dlg_add": {"zh": "添加...", "en": "Add..."},
+    "state_dlg_delete_selected": {"zh": "删除选中", "en": "Delete Selected"},
+    "state_dlg_title_fmt": {"zh": "State 详情 — {0} (ID {1})", "en": "State Details — {0} (ID {1})"},
+    "state_dlg_tab_basic": {"zh": "基础", "en": "Basic"},
+    "state_dlg_tab_resources": {"zh": "资源", "en": "Resources"},
+    "state_dlg_tab_buildings": {"zh": "建筑", "en": "Buildings"},
+    "state_dlg_tab_cores": {"zh": "核心 / 宣称", "en": "Cores / Claims"},
+    "state_dlg_name_label": {"zh": "名字:", "en": "Name:"},
+    "state_dlg_manpower_label": {"zh": "人口:", "en": "Manpower:"},
+    "state_dlg_impassable": {"zh": "不可通行 (impassable)", "en": "Impassable"},
+    "state_dlg_controller_same": {"zh": "(同 owner)", "en": "(same as owner)"},
+    "state_dlg_controller_label": {"zh": "初始控制者:", "en": "Initial Controller:"},
+    "state_dlg_supplies_label": {"zh": "本地补给加成:", "en": "Local Supply Bonus:"},
+    "state_dlg_resources_hint": {"zh": "6 种战略资源, 0 表示不写", "en": "6 strategic resources, 0 = omit"},
+    "state_dlg_buildings_hint": {"zh": "State 级建筑等级", "en": "State-level Building Levels"},
+    "state_dlg_buildings_sub": {"zh": "0 = 按 state_category 默认值; 其他值会覆盖默认", "en": "0 = use state_category default; other values override"},
+    "state_dlg_cores_group": {"zh": "额外核心 (owner 自动是核心, 这里填其他国家)", "en": "Extra Cores (owner is auto-core, add other countries here)"},
+    "state_dlg_claims_group": {"zh": "宣称 (add_claim_by)", "en": "Claims (add_claim_by)"},
+    "state_dlg_select_tag": {"zh": "选择国家 TAG:", "en": "Select Country TAG:"},
+    "state_dlg_input_tag": {"zh": "输入国家 TAG (3 字母):", "en": "Enter Country TAG (3 letters):"},
+    "state_dlg_add_core_title": {"zh": "添加核心", "en": "Add Core"},
+    "state_dlg_add_claim_title": {"zh": "添加宣称", "en": "Add Claim"},
+    "state_dlg_res_oil": {"zh": "石油", "en": "Oil"},
+    "state_dlg_res_aluminium": {"zh": "铝", "en": "Aluminium"},
+    "state_dlg_res_rubber": {"zh": "橡胶", "en": "Rubber"},
+    "state_dlg_res_tungsten": {"zh": "钨", "en": "Tungsten"},
+    "state_dlg_res_steel": {"zh": "钢", "en": "Steel"},
+    "state_dlg_res_chromium": {"zh": "铬", "en": "Chromium"},
+    "state_dlg_bld_infrastructure": {"zh": "基础设施 (0-5)", "en": "Infrastructure (0-5)"},
+    "state_dlg_bld_arms_factory": {"zh": "军工厂", "en": "Arms Factory"},
+    "state_dlg_bld_industrial_complex": {"zh": "民用工厂", "en": "Industrial Complex"},
+    "state_dlg_bld_dockyard": {"zh": "船坞", "en": "Dockyard"},
+    "state_dlg_bld_air_base": {"zh": "空军基地 (0-10)", "en": "Air Base (0-10)"},
+    "state_dlg_bld_anti_air": {"zh": "防空 (0-5)", "en": "Anti-Air (0-5)"},
+    "state_dlg_bld_radar": {"zh": "雷达站 (0-4)", "en": "Radar Station (0-4)"},
+    "state_dlg_bld_synthetic": {"zh": "合成炼油厂", "en": "Synthetic Refinery"},
+    "state_dlg_bld_fuel_silo": {"zh": "燃料储存", "en": "Fuel Silo"},
+    "state_dlg_bld_nuclear": {"zh": "核反应堆 (0-3)", "en": "Nuclear Reactor (0-3)"},
+    "state_dlg_bld_rocket": {"zh": "火箭发射井 (0-10)", "en": "Rocket Site (0-10)"},
+    "state_dlg_bld_mass_transit": {"zh": "大众运输 (0-3)", "en": "Mass Transit (0-3)"},
+    "state_dlg_bld_supply_node": {"zh": "补给节点 (0-1)", "en": "Supply Node (0-1)"},
+
+    # === 省份建筑对话框 ===
+    "prov_bld_save": {"zh": "保存", "en": "Save"},
+    "prov_bld_cancel": {"zh": "取消", "en": "Cancel"},
+    "prov_bld_title_fmt": {"zh": "省份建筑 — {0} (ID {1})", "en": "Province Buildings — {0} (ID {1})"},
+    "prov_bld_tip": {"zh": "为 state 内每个陆地省份单独配置防御建筑.\n0 = 不建. bunker 适用所有陆地, coastal_bunker 和 naval_base 应只给沿海省份.", "en": "Configure defensive buildings for each land province in this state.\n0 = none. Bunker applies to all land; coastal_bunker and naval_base should only be set for coastal provinces."},
+    "prov_bld_province_id": {"zh": "省份 ID", "en": "Province ID"},
+    "prov_bld_bunker": {"zh": "陆防", "en": "Bunker"},
+    "prov_bld_coastal": {"zh": "海防", "en": "Coastal"},
+    "prov_bld_naval": {"zh": "海军基地", "en": "Naval Base"},
+
+    # === 状态栏信息 ===
+    "status_no_new_land": {"zh": "没有画新陆地，先用画笔画。", "en": "No new land painted. Draw with the brush first."},
+    "status_new_land_cleared": {"zh": "新大陆画笔已清空。", "en": "New land brush cleared."},
+
+    # === 新大陆画笔页面 (补充) ===
+    "new_land_hint": {"zh": "用画笔在海洋上画新陆地，画完后点「生成省份」。\n只为画的区域生成省份，旧大陆不受影响。", "en": "Paint new land on ocean with the brush, then click 'Generate Provinces'.\nOnly the painted area gets new provinces; existing land is unaffected."},
+    "new_land_section_brush": {"zh": "画笔大小", "en": "Brush Size"},
+    "new_land_section_status": {"zh": "状态", "en": "Status"},
+    "new_land_section_actions": {"zh": "操作", "en": "Actions"},
+    "new_land_pixel_painted_fmt": {"zh": "已画: {0} 像素", "en": "Painted: {0} pixels"},
+
+    # === 快捷键对话框 ===
+    "shortcut_dlg_title": {"zh": "快捷键设置", "en": "Shortcut Settings"},
+    "shortcut_col_function": {"zh": "功能", "en": "Function"},
+    "shortcut_col_current": {"zh": "当前快捷键", "en": "Current Shortcut"},
+    "shortcut_col_new": {"zh": "新快捷键", "en": "New Shortcut"},
+    "shortcut_undo": {"zh": "撤销", "en": "Undo"},
+    "shortcut_redo": {"zh": "重做", "en": "Redo"},
+    "shortcut_save": {"zh": "保存项目", "en": "Save Project"},
+    "shortcut_open": {"zh": "打开项目", "en": "Open Project"},
+    "shortcut_new": {"zh": "新建项目", "en": "New Project"},
+    "shortcut_export": {"zh": "导出MOD", "en": "Export MOD"},
+    "shortcut_mode_land": {"zh": "大陆模式", "en": "Land Mode"},
+    "shortcut_mode_province": {"zh": "省份模式", "en": "Province Mode"},
+    "shortcut_mode_terrain": {"zh": "地形模式", "en": "Terrain Mode"},
+    "shortcut_mode_height": {"zh": "高度模式", "en": "Height Mode"},
+    "shortcut_mode_river": {"zh": "河流模式", "en": "River Mode"},
+    "shortcut_mode_state": {"zh": "State模式", "en": "State Mode"},
+    "shortcut_mode_country": {"zh": "国家模式", "en": "Country Mode"},
+    "shortcut_mode_continent": {"zh": "大洲模式", "en": "Continent Mode"},
+    "shortcut_tool_brush": {"zh": "画笔工具", "en": "Brush Tool"},
+    "shortcut_tool_eraser": {"zh": "橡皮擦", "en": "Eraser"},
+    "shortcut_tool_fill": {"zh": "填充工具", "en": "Fill Tool"},
+    "shortcut_tool_transform": {"zh": "变换工具", "en": "Transform Tool"},
+    "shortcut_tool_pan": {"zh": "平移工具", "en": "Pan Tool"},
+    "shortcut_delete": {"zh": "删除", "en": "Delete"},
+    "shortcut_zoom_fit": {"zh": "适应窗口", "en": "Fit to Window"},
+
+    # === 胜利点对话框 ===
+    "dlg_vp_title_fmt": {"zh": "胜利点 — 省份 {0}", "en": "Victory Point — Province {0}"},
+    "dlg_vp_prompt": {"zh": "VP 值 (0=删除):", "en": "VP Value (0=remove):"},
+
+    # === 剩余硬编码 — 战略区域对话框 ===
+    "sr_dlg_region_list": {"zh": "区域列表", "en": "Region List"},
+    "sr_dlg_naval_terrain": {"zh": "Naval terrain:", "en": "Naval terrain:"},
+    "sr_dlg_naval_none": {"zh": "(无)", "en": "(none)"},
+    "sr_dlg_province_count_fmt": {"zh": "省份: {0}", "en": "Provinces: {0}"},
+    "sr_dlg_generated_fmt": {"zh": "已生成 {0} 个区域", "en": "Generated {0} regions"},
+    "sr_dlg_pick_status_fmt": {"zh": "点击主画布省份 → 加入 Region #{0}", "en": "Click province on canvas → add to Region #{0}"},
+    "sr_dlg_assigned_fmt": {"zh": "已指派省份 {0} → Region #{1}", "en": "Assigned province {0} → Region #{1}"},
+    "sr_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+
+    # === 剩余硬编码 — 邻接对话框 ===
+    "adj_dlg_tip": {"zh": "海峡 (sea): 跨海连接两个省 (必须指定 through 海省)\n不可通行 (impassable): 阻塞两省的直接相邻\n使用流程: 填字段 → 拾取省份 → 保存", "en": "Strait (sea): Cross-sea connection between two provinces (must specify through sea province)\nImpassable: Block direct adjacency between two provinces\nWorkflow: Fill fields → Pick provinces → Save"},
+    "adj_dlg_edit_group": {"zh": "新建 / 编辑", "en": "New / Edit"},
+    "adj_dlg_pick_from_canvas": {"zh": "从画布拾取", "en": "Pick from Canvas"},
+    "adj_dlg_from_label": {"zh": "起点省份:", "en": "From Province:"},
+    "adj_dlg_to_label": {"zh": "终点省份:", "en": "To Province:"},
+    "adj_dlg_type_label": {"zh": "类型:", "en": "Type:"},
+    "adj_dlg_through_label": {"zh": "途经省份:", "en": "Through Province:"},
+    "adj_dlg_comment_label": {"zh": "备注:", "en": "Comment:"},
+    "adj_dlg_saved_fmt": {"zh": "已保存: {0} → {1} ({2}){3}", "en": "Saved: {0} → {1} ({2}){3}"},
+    "adj_dlg_pick_status_fmt": {"zh": "拾取模式: 点击主画布省份填入 {0}", "en": "Pick mode: Click province on canvas to fill {0}"},
+    "adj_dlg_filled_fmt": {"zh": "已填入 {0} = {1}", "en": "Filled {0} = {1}"},
+
+    # === 剩余硬编码 — 大陆对话框 ===
+    "cont_dlg_tip": {"zh": "用法：\n1. 添加大陆（每个 MOD 至少 1 个）\n2. 选中大陆后点『开始指派』\n3. 在主画布点击陆地省份 → 该省份归入该大陆\n4. 再次点击按钮结束指派", "en": "Usage:\n1. Add continents (at least 1 per MOD)\n2. Select a continent, click 'Start Assigning'\n3. Click land provinces on canvas → assign to continent\n4. Click button again to stop"},
+    "cont_dlg_add_title": {"zh": "添加大陆", "en": "Add Continent"},
+    "cont_dlg_add_prompt": {"zh": "大陆名 (英文, 不含空格):", "en": "Continent name (English, no spaces):"},
+    "cont_dlg_rename_title": {"zh": "重命名大陆", "en": "Rename Continent"},
+    "cont_dlg_rename_prompt": {"zh": "新名字:", "en": "New name:"},
+    "cont_dlg_delete_title": {"zh": "删除大陆", "en": "Delete Continent"},
+    "cont_dlg_delete_confirm_fmt": {"zh": "删除「{0}」? 指向它的省份会改回首个大陆.", "en": "Delete '{0}'? Provinces assigned to it will be moved to the first continent."},
+    "cont_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+    "cont_dlg_assigning_fmt": {"zh": "正在指派到：{0} — 点击主画布省份", "en": "Assigning to: {0} — click provinces on canvas"},
+    "cont_dlg_assigned_fmt": {"zh": "已指派省份 {0} → {1}", "en": "Assigned province {0} → {1}"},
+
+    # === 剩余硬编码 — 规则对话框 ===
+    "rule_dlg_title": {"zh": "Adjacency Rules 编辑器", "en": "Adjacency Rules Editor"},
+    "rule_dlg_tip": {"zh": "通行表: 4 种关系 × 4 种通行类型. 勾上=允许通过.\nrequired_provinces: 控制者必须同时控制这些省份才有效.\nicon: 海军视图里图标显示在哪个海省.", "en": "Pass table: 4 relations × 4 pass types. Checked = allow passage.\nrequired_provinces: Controller must hold these provinces for the rule to apply.\nicon: Province where the icon appears in naval view."},
+    "rule_dlg_pass_group": {"zh": "通行权限", "en": "Pass Permissions"},
+    "rule_dlg_icon_label": {"zh": "Icon 海省:", "en": "Icon Sea Province:"},
+    "rule_dlg_new_title": {"zh": "新建规则", "en": "New Rule"},
+    "rule_dlg_new_prompt": {"zh": "规则名 (英文大写, 如 SUEZ_CANAL):", "en": "Rule name (uppercase, e.g. SUEZ_CANAL):"},
+    "rule_dlg_delete_title": {"zh": "删除", "en": "Delete"},
+    "rule_dlg_delete_confirm_fmt": {"zh": "删除规则 {0}?", "en": "Delete rule {0}?"},
+    "rule_dlg_add_province_title": {"zh": "添加省份", "en": "Add Province"},
+    "rule_dlg_add_province_prompt": {"zh": "省份 ID:", "en": "Province ID:"},
+    "rule_dlg_loaded_fmt": {"zh": "已加载 {0}", "en": "Loaded {0}"},
+    "rule_dlg_added_req_fmt": {"zh": "加入 required: {0}", "en": "Added to required: {0}"},
+    "rule_dlg_icon_set_fmt": {"zh": "icon 设为 {0}", "en": "Icon set to {0}"},
+    "rule_dlg_rel_contested": {"zh": "争夺中", "en": "Contested"},
+    "rule_dlg_rel_enemy": {"zh": "敌国", "en": "Enemy"},
+    "rule_dlg_rel_friend": {"zh": "盟友", "en": "Friend"},
+    "rule_dlg_rel_neutral": {"zh": "中立", "en": "Neutral"},
+    "rule_dlg_pass_army": {"zh": "陆军", "en": "Army"},
+    "rule_dlg_pass_navy": {"zh": "海军", "en": "Navy"},
+    "rule_dlg_pass_submarine": {"zh": "潜艇", "en": "Submarine"},
+    "rule_dlg_pass_trade": {"zh": "贸易", "en": "Trade"},
+
+    # === 剩余硬编码 — 地图配置对话框 ===
+    "dm_dlg_tip": {"zh": "default.map 是 HOI4 引擎的地图加载配置.\n大部分字段是文件名 (vanilla 标准, 不可改).\n可调的是树木调色板索引和河流上限.", "en": "default.map is the HOI4 engine map loading config.\nMost fields are file names (vanilla standard, not editable).\nAdjustable: tree palette indices and river max level."},
+    "dm_dlg_prov_count_fmt": {"zh": "{0} (自动)", "en": "{0} (auto)"},
+    "dm_dlg_prov_count_label": {"zh": "总省份数:", "en": "Total Provinces:"},
+    "dm_dlg_river_max_label": {"zh": "河流最大等级:", "en": "River Max Level:"},
+    "dm_dlg_tree_label": {"zh": "树木调色板索引", "en": "Tree Palette Indices"},
+    "dm_dlg_tree_desc": {"zh": "(trees.bmp 这些 palette ID 算树):", "en": "(these palette IDs in trees.bmp count as trees):"},
+    "dm_dlg_add_title": {"zh": "添加索引", "en": "Add Index"},
+    "dm_dlg_add_prompt": {"zh": "Palette 索引 (1-13):", "en": "Palette index (1-13):"},
+
+    # === 剩余硬编码 — 颜色贴图对话框 ===
+    "cm_dlg_tip": {"zh": "缩到战略视角时显示的全图色调.\n默认是地球感土褐+靛蓝, 改成任何颜色让你的架空世界更独特.\n(只影响极远视角的总览, 近景仍用地形画刷)", "en": "Color tint shown at strategic zoom level.\nDefault is earth-tone brown + indigo. Change to make your world unique.\n(Only affects far zoom overview, close-up still uses terrain brushes)"},
+    "cm_dlg_land": {"zh": "陆地", "en": "Land"},
+    "cm_dlg_sea": {"zh": "海洋", "en": "Sea"},
+    "cm_dlg_lake": {"zh": "湖泊", "en": "Lake"},
+    "cm_dlg_pick_color": {"zh": "选择颜色", "en": "Pick Color"},
+
+    # === 剩余硬编码 — 铁路对话框 (补充) ===
+    "rail_dlg_list_item_fmt": {"zh": "{0} 省", "en": "{0} prov"},
+
+    # === 通用 ===
+    "dlg_error": {"zh": "错误", "en": "Error"},
+    "dlg_auto_generate": {"zh": "自动生成", "en": "Auto Generate"},
 }
 
 
 def set_language(lang: str) -> None:
-    """设置当前语言 ('zh' 或 'en')"""
+    """设置当前语言 ('zh' 或 'en')，同时保存到配置。"""
     global _current_lang
     if lang in ("zh", "en"):
         _current_lang = lang
+        try:
+            from PyQt5.QtCore import QSettings
+            s = QSettings("HOI4MapMaker", "Settings")
+            s.setValue("language", lang)
+        except Exception:
+            pass
 
 
 def get_language() -> str:

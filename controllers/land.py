@@ -35,6 +35,11 @@ class LandController(BaseController):
         h, w = project.map_data.tile_map.shape
         self.new_land_mask: np.ndarray = np.zeros((h, w), dtype=bool)
 
+    def reset_mask_size(self) -> None:
+        """地图尺寸变化后重置 mask。"""
+        h, w = self.project.map_data.tile_map.shape
+        self.new_land_mask = np.zeros((h, w), dtype=bool)
+
     def activate(self) -> None:
         """进入大陆模式，默认画笔工具。有省份时提醒。"""
         self.current_tool = "brush"

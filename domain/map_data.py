@@ -27,11 +27,14 @@ class MapData:
     """地图全部图层 + 高级查询接口。"""
 
     def __init__(self) -> None:
-        self.tile_map = np.full((MAP_HEIGHT, MAP_WIDTH), TILE_SEA, dtype=np.uint8)
-        self.province_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.int32)
-        self.terrain_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.uint8)
-        self.height_map = np.full((MAP_HEIGHT, MAP_WIDTH), 40, dtype=np.uint8)
-        self.river_map = np.full((MAP_HEIGHT, MAP_WIDTH), 255, dtype=np.uint8)  # 255=白色背景，0=源头！
+        # 运行时读取当前尺寸（set_map_size 可能已修改）
+        import data.constants as _c
+        h, w = _c.MAP_HEIGHT, _c.MAP_WIDTH
+        self.tile_map = np.full((h, w), TILE_SEA, dtype=np.uint8)
+        self.province_map = np.zeros((h, w), dtype=np.int32)
+        self.terrain_map = np.zeros((h, w), dtype=np.uint8)
+        self.height_map = np.full((h, w), 40, dtype=np.uint8)
+        self.river_map = np.full((h, w), 255, dtype=np.uint8)  # 255=白色背景，0=源头！
         self.density_map: np.ndarray | None = None  # (H,W) float32 0~1, None=均匀
         # 省份生成时的 tile_map 快照，用于检测"新画的陆地"
         self.tile_snapshot: np.ndarray | None = None

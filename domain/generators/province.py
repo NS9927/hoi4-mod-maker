@@ -63,7 +63,8 @@ def generate_provinces(
     # 撒种子并分配 — 按连通区域分别处理，防止省份跨海
     from scipy.ndimage import label as _label
 
-    province_map = np.zeros((MAP_HEIGHT, MAP_WIDTH), dtype=np.int32)
+    h, w = tile_map.shape
+    province_map = np.zeros((h, w), dtype=np.int32)
     next_id = 1
 
     tile_types = [
@@ -94,7 +95,7 @@ def generate_provinces(
             region_count = min(region_count, n_pixels)
 
             # 检查是否跨 wrap 边界
-            crosses_wrap = (pixel_xs.min() == 0 and pixel_xs.max() >= MAP_WIDTH - 1)
+            crosses_wrap = (pixel_xs.min() == 0 and pixel_xs.max() >= w - 1)
 
             # 泊松盘采样种子（支持密度图）
             seed_ys, seed_xs = _poisson_disk_sample(
@@ -108,7 +109,7 @@ def generate_provinces(
                 if crosses_wrap:
                     seed_coords = np.column_stack([
                         np.tile(seed_ys, 3),
-                        np.concatenate([seed_xs, seed_xs - MAP_WIDTH, seed_xs + MAP_WIDTH]),
+                        np.concatenate([seed_xs, seed_xs - w, seed_xs + w]),
                     ])
                     tree = KDTree(seed_coords)
                     pixel_coords = np.column_stack([pixel_ys, pixel_xs])

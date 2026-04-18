@@ -36,11 +36,11 @@ def _show_crash_dialog(exc_type, exc_value, exc_tb) -> None:
     try:
         log_path = _write_crash_log(tb_text)
     except Exception:
-        log_path = "(无法写入 log 文件)"
+        log_path = "(Failed to write log file)"
 
     # 打印到终端 (如果有)
     print("=" * 60, file=sys.stderr)
-    print("崩溃:", file=sys.stderr)
+    print("CRASH:", file=sys.stderr)
     print(tb_text, file=sys.stderr)
     print(f"Log: {log_path}", file=sys.stderr)
     print("=" * 60, file=sys.stderr)
@@ -57,9 +57,10 @@ def _show_crash_dialog(exc_type, exc_value, exc_tb) -> None:
 
         box = QMessageBox()
         box.setIcon(QMessageBox.Icon.Critical)
-        box.setWindowTitle("软件崩溃")
-        box.setText(f"发生未处理的异常:\n\n{last_line}")
-        box.setInformativeText(f"完整信息已保存到:\n{log_path}")
+        from ui.i18n import tr
+        box.setWindowTitle(tr("crash_title"))
+        box.setText(tr("crash_message").format(last_line))
+        box.setInformativeText(tr("crash_log_saved").format(log_path))
         box.setDetailedText(tb_text)
         box.setStandardButtons(QMessageBox.StandardButton.Ok)
         box.exec_()

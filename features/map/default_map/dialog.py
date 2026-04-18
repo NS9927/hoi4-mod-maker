@@ -16,6 +16,7 @@ from PyQt5.QtWidgets import (
 )
 
 from domain.managers.default_map_settings import DefaultMapSettings
+from ui.i18n import tr
 
 
 class DefaultMapDialog(QDialog):
@@ -30,7 +31,7 @@ class DefaultMapDialog(QDialog):
         super().__init__(parent)
         self._settings = settings
         self._province_count = province_count
-        self.setWindowTitle("地图配置 (default.map)")
+        self.setWindowTitle(tr("dm_dlg_title"))
         self.setMinimumSize(380, 420)
 
         self._build_ui()
@@ -41,11 +42,7 @@ class DefaultMapDialog(QDialog):
         root.setContentsMargins(12, 12, 12, 12)
         root.setSpacing(10)
 
-        tip = QLabel(
-            "default.map 是 HOI4 引擎的地图加载配置.\n"
-            "大部分字段是文件名 (vanilla 标准, 不可改).\n"
-            "可调的是树木调色板索引和河流上限."
-        )
+        tip = QLabel(tr("dm_dlg_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(tip)
@@ -54,19 +51,19 @@ class DefaultMapDialog(QDialog):
         form.setSpacing(8)
 
         # 省份数 (只读)
-        prov_lbl = QLabel(f"{self._province_count} (自动)")
-        form.addRow("总省份数:", prov_lbl)
+        prov_lbl = QLabel(tr("dm_dlg_prov_count_fmt", self._province_count))
+        form.addRow(tr("dm_dlg_prov_count_label"), prov_lbl)
 
         # 河流最大等级
         self._river_max = QSpinBox()
         self._river_max.setRange(1, 10)
         self._river_max.setValue(self._settings.river_max_level)
-        form.addRow("河流最大等级:", self._river_max)
+        form.addRow(tr("dm_dlg_river_max_label"), self._river_max)
 
         root.addLayout(form)
 
         # 树木调色板索引 (列表 + 增删)
-        tree_lbl = QLabel("<b>树木调色板索引</b> (trees.bmp 这些 palette ID 算树):")
+        tree_lbl = QLabel(f"<b>{tr('dm_dlg_tree_label')}</b> {tr('dm_dlg_tree_desc')}")
         tree_lbl.setStyleSheet("color: #ccc;")
         root.addWidget(tree_lbl)
 
@@ -75,11 +72,11 @@ class DefaultMapDialog(QDialog):
         root.addWidget(self._tree_list)
 
         tree_btn_row = QHBoxLayout()
-        add_btn = QPushButton("添加索引")
+        add_btn = QPushButton(tr("dm_dlg_add_index"))
         add_btn.clicked.connect(self._on_add_tree_index)
-        del_btn = QPushButton("删除选中")
+        del_btn = QPushButton(tr("dm_dlg_delete_selected"))
         del_btn.clicked.connect(self._on_del_tree_index)
-        reset_btn = QPushButton("恢复默认")
+        reset_btn = QPushButton(tr("dm_dlg_reset_default"))
         reset_btn.clicked.connect(self._on_reset_tree_indices)
         tree_btn_row.addWidget(add_btn)
         tree_btn_row.addWidget(del_btn)
@@ -92,9 +89,9 @@ class DefaultMapDialog(QDialog):
         # 底部按钮
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
-        ok_btn = QPushButton("保存")
+        ok_btn = QPushButton(tr("dm_dlg_save"))
         ok_btn.clicked.connect(self._on_accept)
-        cancel_btn = QPushButton("取消")
+        cancel_btn = QPushButton(tr("dm_dlg_cancel"))
         cancel_btn.clicked.connect(self.reject)
         btn_row.addWidget(ok_btn)
         btn_row.addWidget(cancel_btn)
@@ -107,7 +104,7 @@ class DefaultMapDialog(QDialog):
 
     def _on_add_tree_index(self) -> None:
         v, ok = QInputDialog.getInt(
-            self, "添加索引", "Palette 索引 (1-13):",
+            self, tr("dm_dlg_add_title"), tr("dm_dlg_add_prompt"),
             value=4, min=1, max=13,
         )
         if ok and v not in self._settings.tree_palette_indices:

@@ -136,6 +136,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._welcome_page.open_project_requested.connect(self._on_open_project)
         self._welcome_page.open_recent_requested.connect(self._on_welcome_open_recent)
         self._welcome_page.import_mod_requested.connect(self._on_welcome_import_mod)
+        self._welcome_page.language_changed.connect(self._on_language_changed)
         self._stack.addWidget(self._welcome_page)
 
         # 编辑器布局：左侧固定宽度工具面板 + 右侧画布
@@ -466,8 +467,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         cur_vp = state.victory_points.get(pid, 0) if state else 0
 
         value, ok = QInputDialog.getInt(
-            self, f"胜利点 — 省份 {pid}",
-            f"VP 值 (0=删除):",
+            self, tr("dlg_vp_title_fmt", pid),
+            tr("dlg_vp_prompt"),
             cur_vp if cur_vp > 0 else 1, 0, 50, 1,
         )
         if ok:
@@ -783,6 +784,10 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
     def _show_editor(self) -> None:
         self._stack.setCurrentWidget(self._editor)
         QTimer.singleShot(100, self._canvas.fit_in_view)
+
+    def _on_language_changed(self, lang: str) -> None:
+        """语言切换后刷新整个 UI。"""
+        self._retranslate_ui()
 
     def _on_welcome_new(self, width: int, height: int) -> None:
         self._on_new_project()

@@ -22,21 +22,8 @@ from PyQt5.QtWidgets import (
 from domain.managers.adjacency_rule import (
     AdjacencyRuleManager, AdjacencyRule, ALL_PASS_TYPES, ALL_RELATIONS,
 )
+from ui.i18n import tr
 
-
-# 中文显示
-_REL_LABELS = {
-    "contested": "争夺中",
-    "enemy": "敌国",
-    "friend": "盟友",
-    "neutral": "中立",
-}
-_PASS_LABELS = {
-    "army": "陆军",
-    "navy": "海军",
-    "submarine": "潜艇",
-    "trade": "贸易",
-}
 
 
 class AdjacencyRuleDialog(QDialog):
@@ -52,7 +39,7 @@ class AdjacencyRuleDialog(QDialog):
         self._mgr = rule_mgr
         self._current_rule: AdjacencyRule | None = None
         self._pick_target: str | None = None
-        self.setWindowTitle("Adjacency Rules 编辑器")
+        self.setWindowTitle(tr("rule_dlg_title"))
         self.setMinimumSize(640, 540)
         self.setWindowFlags(self.windowFlags() | Qt.Tool)
 
@@ -68,7 +55,7 @@ class AdjacencyRuleDialog(QDialog):
 
         # ── 左: 列表 ──
         left = QVBoxLayout()
-        left_label = QLabel("规则列表")
+        left_label = QLabel(tr("rule_dlg_list_label"))
         left_label.setStyleSheet("color: #ccc; font-weight: bold;")
         left.addWidget(left_label)
 
@@ -76,10 +63,10 @@ class AdjacencyRuleDialog(QDialog):
         self._list.itemClicked.connect(self._on_select_rule)
         left.addWidget(self._list, 1)
 
-        new_btn = QPushButton("新建...")
+        new_btn = QPushButton(tr("rule_dlg_new"))
         new_btn.clicked.connect(self._on_new)
         left.addWidget(new_btn)
-        del_btn = QPushButton("删除选中")
+        del_btn = QPushButton(tr("rule_dlg_delete_selected"))
         del_btn.clicked.connect(self._on_delete)
         left.addWidget(del_btn)
 
@@ -88,40 +75,36 @@ class AdjacencyRuleDialog(QDialog):
         # ── 右: 详情 ──
         right = QVBoxLayout()
 
-        tip = QLabel(
-            "通行表: 4 种关系 × 4 种通行类型. 勾上=允许通过.\n"
-            "required_provinces: 控制者必须同时控制这些省份才有效.\n"
-            "icon: 海军视图里图标显示在哪个海省."
-        )
+        tip = QLabel(tr("rule_dlg_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #888; font-size: 11px;")
         right.addWidget(tip)
 
         # name
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel("名字:"))
+        name_row.addWidget(QLabel(tr("rule_dlg_name_label")))
         self._name_edit = QLineEdit()
-        self._name_edit.setPlaceholderText("如 SUEZ_CANAL")
+        self._name_edit.setPlaceholderText(tr("rule_dlg_name_placeholder"))
         self._name_edit.editingFinished.connect(self._on_name_changed)
         name_row.addWidget(self._name_edit)
         right.addLayout(name_row)
 
         # 通行表 (4×4 checkbox)
-        table_box = QGroupBox("通行权限")
+        table_box = QGroupBox(tr("rule_dlg_pass_group"))
         grid = QGridLayout(table_box)
         grid.setSpacing(6)
 
         # 表头: 列 = 通行类型
         grid.addWidget(QLabel(""), 0, 0)
         for j, p in enumerate(ALL_PASS_TYPES):
-            lbl = QLabel(f"<b>{_PASS_LABELS[p]}</b>")
+            lbl = QLabel(f"<b>{tr('rule_dlg_pass_' + p)}</b>")
             lbl.setAlignment(Qt.AlignCenter)
             grid.addWidget(lbl, 0, j + 1)
 
         # 行 = 关系
         self._checks: dict[tuple[str, str], QCheckBox] = {}
         for i, rel in enumerate(ALL_RELATIONS):
-            grid.addWidget(QLabel(_REL_LABELS[rel] + ":"), i + 1, 0)
+            grid.addWidget(QLabel(tr("rule_dlg_rel_" + rel) + ":"), i + 1, 0)
             for j, p in enumerate(ALL_PASS_TYPES):
                 cb = QCheckBox()
                 cb.toggled.connect(
@@ -138,13 +121,13 @@ class AdjacencyRuleDialog(QDialog):
         self._req_list.setMaximumHeight(80)
         req_lay.addWidget(self._req_list)
         req_btns = QHBoxLayout()
-        req_pick_btn = QPushButton("从画布拾取添加")
+        req_pick_btn = QPushButton(tr("rule_dlg_pick_add"))
         req_pick_btn.clicked.connect(self._start_pick_required)
         req_btns.addWidget(req_pick_btn)
-        req_input_btn = QPushButton("手填省份 ID")
+        req_input_btn = QPushButton(tr("rule_dlg_manual_add"))
         req_input_btn.clicked.connect(self._on_add_required_manually)
         req_btns.addWidget(req_input_btn)
-        req_del_btn = QPushButton("删除选中")
+        req_del_btn = QPushButton(tr("rule_dlg_remove_selected"))
         req_del_btn.clicked.connect(self._on_remove_required)
         req_btns.addWidget(req_del_btn)
         req_lay.addLayout(req_btns)
@@ -152,12 +135,12 @@ class AdjacencyRuleDialog(QDialog):
 
         # icon
         icon_row = QHBoxLayout()
-        icon_row.addWidget(QLabel("Icon 海省:"))
+        icon_row.addWidget(QLabel(tr("rule_dlg_icon_label")))
         self._icon_edit = QLineEdit()
-        self._icon_edit.setPlaceholderText("省份 ID, -1 = 不设")
+        self._icon_edit.setPlaceholderText(tr("rule_dlg_icon_placeholder"))
         self._icon_edit.editingFinished.connect(self._on_icon_changed)
         icon_row.addWidget(self._icon_edit)
-        icon_pick_btn = QPushButton("从画布拾取")
+        icon_pick_btn = QPushButton(tr("rule_dlg_pick_icon"))
         icon_pick_btn.clicked.connect(self._start_pick_icon)
         icon_row.addWidget(icon_pick_btn)
         right.addLayout(icon_row)
@@ -170,7 +153,7 @@ class AdjacencyRuleDialog(QDialog):
         right.addStretch(1)
 
         # 底部关闭
-        close_btn = QPushButton("关闭")
+        close_btn = QPushButton(tr("rule_dlg_close"))
         close_btn.clicked.connect(self.accept)
         right.addWidget(close_btn)
 
@@ -217,19 +200,19 @@ class AdjacencyRuleDialog(QDialog):
         self._icon_edit.setText(str(r.icon_province) if r.icon_province > 0 else "")
         self._icon_edit.blockSignals(False)
 
-        self._status.setText(f"已加载 {r.name}")
+        self._status.setText(tr("rule_dlg_loaded_fmt", r.name))
 
     # ─────────── 增删 ───────────
 
     def _on_new(self) -> None:
-        name, ok = QInputDialog.getText(self, "新建规则", "规则名 (英文大写, 如 SUEZ_CANAL):")
+        name, ok = QInputDialog.getText(self, tr("rule_dlg_new_title"), tr("rule_dlg_new_prompt"))
         if not ok:
             return
         name = name.strip()
         if not name:
             return
         if self._mgr.get(name) is not None:
-            QMessageBox.warning(self, "错误", f"规则名 {name} 已存在")
+            QMessageBox.warning(self, tr("dlg_error"), tr("rule_dlg_err_name_exists", name))
             return
         self._mgr.add(AdjacencyRule(name=name))
         self._refresh_list()
@@ -244,7 +227,7 @@ class AdjacencyRuleDialog(QDialog):
         if self._current_rule is None:
             return
         ret = QMessageBox.question(
-            self, "删除", f"删除规则 {self._current_rule.name}?",
+            self, tr("rule_dlg_delete_title"), tr("rule_dlg_delete_confirm_fmt", self._current_rule.name),
         )
         if ret != QMessageBox.Yes:
             return
@@ -262,7 +245,7 @@ class AdjacencyRuleDialog(QDialog):
         if not new_name or new_name == self._current_rule.name:
             return
         if self._mgr.get(new_name) is not None:
-            QMessageBox.warning(self, "错误", f"规则名 {new_name} 已存在")
+            QMessageBox.warning(self, tr("dlg_error"), tr("rule_dlg_err_name_exists", new_name))
             self._name_edit.setText(self._current_rule.name)
             return
         # 重命名 = 删旧加新
@@ -287,12 +270,12 @@ class AdjacencyRuleDialog(QDialog):
         try:
             self._current_rule.icon_province = int(text)
         except ValueError:
-            QMessageBox.warning(self, "错误", "icon 必须是整数省份 ID")
+            QMessageBox.warning(self, tr("dlg_error"), tr("rule_dlg_err_icon_int"))
 
     def _on_add_required_manually(self) -> None:
         if self._current_rule is None:
             return
-        v, ok = QInputDialog.getInt(self, "添加省份", "省份 ID:", value=1, min=1, max=999999)
+        v, ok = QInputDialog.getInt(self, tr("rule_dlg_add_province_title"), tr("rule_dlg_add_province_prompt"), value=1, min=1, max=999999)
         if ok:
             self._current_rule.required_provinces.append(v)
             self._req_list.addItem(QListWidgetItem(str(v)))
@@ -309,18 +292,18 @@ class AdjacencyRuleDialog(QDialog):
 
     def _start_pick_required(self) -> None:
         if self._current_rule is None:
-            self._status.setText("先选中或新建一个规则")
+            self._status.setText(tr("rule_dlg_status_select"))
             return
         self._pick_target = "required_add"
-        self._status.setText("点击主画布省份 → 加入 required_provinces")
+        self._status.setText(tr("rule_dlg_status_pick_province"))
         self.pick_mode_changed.emit(True, "rule_required")
 
     def _start_pick_icon(self) -> None:
         if self._current_rule is None:
-            self._status.setText("先选中或新建一个规则")
+            self._status.setText(tr("rule_dlg_status_select"))
             return
         self._pick_target = "icon"
-        self._status.setText("点击主画布海省 → 设为 icon")
+        self._status.setText(tr("rule_dlg_status_pick_icon"))
         self.pick_mode_changed.emit(True, "rule_icon")
 
     def receive_picked_province(self, pid: int) -> None:
@@ -329,11 +312,11 @@ class AdjacencyRuleDialog(QDialog):
         if self._pick_target == "required_add":
             self._current_rule.required_provinces.append(pid)
             self._req_list.addItem(QListWidgetItem(str(pid)))
-            self._status.setText(f"加入 required: {pid}")
+            self._status.setText(tr("rule_dlg_added_req_fmt", pid))
         elif self._pick_target == "icon":
             self._current_rule.icon_province = pid
             self._icon_edit.setText(str(pid))
-            self._status.setText(f"icon 设为 {pid}")
+            self._status.setText(tr("rule_dlg_icon_set_fmt", pid))
         self._pick_target = None
         self.pick_mode_changed.emit(False, "")
 

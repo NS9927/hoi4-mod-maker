@@ -304,7 +304,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._country_color_rgb = None
         self._sr_color_rgb = None
         self._railway_color_rgb = None
+        self._provincial_terrain_color_rgb = None
         h, w = map_data.tile_map.shape[0], map_data.tile_map.shape[1]
+        self.new_land_mask = np.zeros((h, w), dtype=bool)
         self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
         self._scene.setSceneRect(0, 0, w, h)
 

@@ -80,7 +80,7 @@ class StatePage(QWidget):
         lay.addWidget(batch_box)
 
         # 分配模式开关
-        self._assign_chk = QCheckBox("✏ 分配模式（点省份加入选中州）")
+        self._assign_chk = QCheckBox(tr("state_assign_mode_label"))
         self._assign_chk.setChecked(False)
         self._assign_chk.setStyleSheet(
             f"QCheckBox {{ color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }}"
@@ -89,7 +89,7 @@ class StatePage(QWidget):
         self._assign_chk.toggled.connect(self.assign_mode_changed)
         lay.addWidget(self._assign_chk)
 
-        hint_view = QLabel("💡 默认点击地图 = 查看州信息。勾选上面开关才能分配省份。")
+        hint_view = QLabel(tr("state_assign_hint"))
         hint_view.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 2px;")
         hint_view.setWordWrap(True)
         lay.addWidget(hint_view)
@@ -151,7 +151,7 @@ class StatePage(QWidget):
         lay.addWidget(detail_btn)
 
         # 提示
-        hint = QLabel("双击地图省份 = 设置胜利点(VP)")
+        hint = QLabel(tr("state_vp_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)

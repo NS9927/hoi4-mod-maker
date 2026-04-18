@@ -23,6 +23,7 @@ from PyQt5.QtWidgets import (
 import numpy as np
 
 from domain.managers.adjacency import AdjacencyManager, AdjacencyEntry
+from ui.i18n import tr
 
 
 def _auto_strait_params(
@@ -94,7 +95,7 @@ class AdjacencyDialog(QDialog):
         self._province_map = province_map
         self._tile_map = tile_map
         self._pick_target: str | None = None  # 'from' / 'to' / 'through'
-        self.setWindowTitle("相邻关系编辑器")
+        self.setWindowTitle(tr("adj_dlg_title"))
         self.setMinimumSize(400, 520)
         self.setWindowFlags(self.windowFlags() | Qt.Tool)
 
@@ -108,11 +109,7 @@ class AdjacencyDialog(QDialog):
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(8)
 
-        tip = QLabel(
-            "海峡 (sea): 跨海连接两个省 (必须指定 through 海省)\n"
-            "不可通行 (impassable): 阻塞两省的直接相邻\n"
-            "使用流程: 填字段 → 拾取省份 → 保存"
-        )
+        tip = QLabel(tr("adj_dlg_tip"))
         tip.setWordWrap(True)
         tip.setStyleSheet("color: #888; font-size: 11px;")
         root.addWidget(tip)
@@ -123,55 +120,55 @@ class AdjacencyDialog(QDialog):
         self._list.itemClicked.connect(self._on_item_clicked)
         root.addWidget(self._list)
 
-        del_btn = QPushButton("删除选中")
+        del_btn = QPushButton(tr("adj_dlg_delete_selected"))
         del_btn.clicked.connect(self._on_delete)
         root.addWidget(del_btn)
 
         # 编辑区
-        edit_box = QGroupBox("新建 / 编辑")
+        edit_box = QGroupBox(tr("adj_dlg_edit_group"))
         form = QFormLayout(edit_box)
         form.setSpacing(6)
 
         # 起点
         from_row = QHBoxLayout()
         self._from_edit = QLineEdit()
-        self._from_edit.setPlaceholderText("省份 ID")
+        self._from_edit.setPlaceholderText(tr("adj_dlg_from_placeholder"))
         from_row.addWidget(self._from_edit)
-        from_pick = QPushButton("从画布拾取")
+        from_pick = QPushButton(tr("adj_dlg_pick_from_canvas"))
         from_pick.clicked.connect(lambda: self._start_pick("from"))
         from_row.addWidget(from_pick)
-        form.addRow("起点省份:", from_row)
+        form.addRow(tr("adj_dlg_from_label"), from_row)
 
         # 终点
         to_row = QHBoxLayout()
         self._to_edit = QLineEdit()
-        self._to_edit.setPlaceholderText("省份 ID")
+        self._to_edit.setPlaceholderText(tr("adj_dlg_to_placeholder"))
         to_row.addWidget(self._to_edit)
-        to_pick = QPushButton("从画布拾取")
+        to_pick = QPushButton(tr("adj_dlg_pick_from_canvas"))
         to_pick.clicked.connect(lambda: self._start_pick("to"))
         to_row.addWidget(to_pick)
-        form.addRow("终点省份:", to_row)
+        form.addRow(tr("adj_dlg_to_label"), to_row)
 
         # 类型
         self._type_combo = QComboBox()
-        self._type_combo.addItem("海峡/运河 (sea)", "sea")
-        self._type_combo.addItem("不可通行 (impassable)", "impassable")
-        form.addRow("类型:", self._type_combo)
+        self._type_combo.addItem(tr("adj_dlg_type_sea"), "sea")
+        self._type_combo.addItem(tr("adj_dlg_type_impassable"), "impassable")
+        form.addRow(tr("adj_dlg_type_label"), self._type_combo)
 
         # through (仅 sea)
         through_row = QHBoxLayout()
         self._through_edit = QLineEdit()
-        self._through_edit.setPlaceholderText("途经海省 ID (sea 类型)")
+        self._through_edit.setPlaceholderText(tr("adj_dlg_through_placeholder"))
         through_row.addWidget(self._through_edit)
-        through_pick = QPushButton("从画布拾取")
+        through_pick = QPushButton(tr("adj_dlg_pick_from_canvas"))
         through_pick.clicked.connect(lambda: self._start_pick("through"))
         through_row.addWidget(through_pick)
-        form.addRow("途经省份:", through_row)
+        form.addRow(tr("adj_dlg_through_label"), through_row)
 
         # comment
         self._comment_edit = QLineEdit()
-        self._comment_edit.setPlaceholderText("备注 (可选)")
-        form.addRow("备注:", self._comment_edit)
+        self._comment_edit.setPlaceholderText(tr("adj_dlg_comment_placeholder"))
+        form.addRow(tr("adj_dlg_comment_label"), self._comment_edit)
 
         root.addWidget(edit_box)
 
@@ -181,11 +178,11 @@ class AdjacencyDialog(QDialog):
         root.addWidget(self._status)
 
         btn_row = QHBoxLayout()
-        clear_btn = QPushButton("清空字段")
+        clear_btn = QPushButton(tr("adj_dlg_clear_fields"))
         clear_btn.clicked.connect(self._clear_form)
         btn_row.addWidget(clear_btn)
         btn_row.addStretch(1)
-        save_btn = QPushButton("保存")
+        save_btn = QPushButton(tr("adj_dlg_save"))
         save_btn.clicked.connect(self._on_save)
         btn_row.addWidget(save_btn)
         root.addLayout(btn_row)
@@ -241,7 +238,7 @@ class AdjacencyDialog(QDialog):
             from_id = int(self._from_edit.text().strip())
             to_id = int(self._to_edit.text().strip())
         except ValueError:
-            QMessageBox.warning(self, "错误", "起点/终点必须是整数省份 ID")
+            QMessageBox.warning(self, tr("dlg_error"), tr("adj_dlg_err_invalid_id"))
             return
         t = self._type_combo.currentData()
         through_text = self._through_edit.text().strip()
@@ -270,14 +267,14 @@ class AdjacencyDialog(QDialog):
         self._mgr.add(entry)
         self._refresh_list()
         coord_info = f" ({start_x},{start_y})→({stop_x},{stop_y})" if start_x >= 0 else ""
-        self._status.setText(f"已保存: {from_id} → {to_id} ({t}){coord_info}")
+        self._status.setText(tr("adj_dlg_saved_fmt", from_id, to_id, t, coord_info))
 
     # ─────────── 拾取模式 ───────────
 
     def _start_pick(self, target: str) -> None:
         """target ∈ {'from','to','through'}"""
         self._pick_target = target
-        self._status.setText(f"拾取模式: 点击主画布省份填入 {target}")
+        self._status.setText(tr("adj_dlg_pick_status_fmt", target))
         self.pick_mode_changed.emit(True, target)
 
     def receive_picked_province(self, pid: int) -> None:
@@ -288,7 +285,7 @@ class AdjacencyDialog(QDialog):
             self._to_edit.setText(str(pid))
         elif self._pick_target == "through":
             self._through_edit.setText(str(pid))
-        self._status.setText(f"已填入 {self._pick_target} = {pid}")
+        self._status.setText(tr("adj_dlg_filled_fmt", self._pick_target, pid))
         self._pick_target = None
         self.pick_mode_changed.emit(False, "")
 

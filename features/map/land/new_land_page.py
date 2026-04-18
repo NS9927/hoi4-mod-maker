@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
 )
 
 from data.constants import BRUSH_MIN, BRUSH_MAX, BRUSH_DEFAULT
+from ui.i18n import tr
 
 from ui.styles import (
     make_section as _make_section,
@@ -32,20 +33,17 @@ class NewLandPage(QWidget):
         lay.setSpacing(10)
 
         # 说明
-        hint = QLabel(
-            "用画笔在海洋上画新陆地，画完后点「生成省份」。\n"
-            "只为画的区域生成省份，旧大陆不受影响。"
-        )
+        hint = QLabel(tr("new_land_hint"))
         hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
         hint.setWordWrap(True)
         lay.addWidget(hint)
 
         # 画笔大小
-        brush_box = _make_section("画笔大小")
+        brush_box = _make_section(tr("new_land_section_brush"))
         self._brush_label = QLabel(f"{BRUSH_DEFAULT}px")
         self._brush_label.setStyleSheet(_DIM_LABEL_STYLE)
         row = QHBoxLayout()
-        lbl = QLabel("大小")
+        lbl = QLabel(tr("new_land_size_label"))
         lbl.setStyleSheet(_LABEL_STYLE)
         row.addWidget(lbl)
         row.addStretch()
@@ -61,24 +59,24 @@ class NewLandPage(QWidget):
         lay.addWidget(brush_box)
 
         # 已画像素
-        info_box = _make_section("状态")
-        self._pixel_label = QLabel("已画: 0 像素")
+        info_box = _make_section(tr("new_land_section_status"))
+        self._pixel_label = QLabel(tr("new_land_pixel_count"))
         self._pixel_label.setStyleSheet(_LABEL_STYLE)
         info_box.layout().addWidget(self._pixel_label)
         lay.addWidget(info_box)
 
         # 操作按钮
-        action_box = _make_section("操作")
+        action_box = _make_section(tr("new_land_section_actions"))
 
-        gen_btn = QPushButton("生成省份")
+        gen_btn = QPushButton(tr("new_land_generate"))
         gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        gen_btn.setToolTip("为新画的陆地区域生成省份")
+        gen_btn.setToolTip(tr("new_land_generate_tip"))
         gen_btn.clicked.connect(self.generate_requested.emit)
         action_box.layout().addWidget(gen_btn)
 
-        clear_btn = QPushButton("清空画笔")
+        clear_btn = QPushButton(tr("new_land_clear"))
         clear_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        clear_btn.setToolTip("清空已画的新陆地记录（不删除已画的陆地）")
+        clear_btn.setToolTip(tr("new_land_clear_tip"))
         clear_btn.clicked.connect(self.clear_mask_requested.emit)
         action_box.layout().addWidget(clear_btn)
 
@@ -91,4 +89,4 @@ class NewLandPage(QWidget):
 
     def update_pixel_count(self, count: int) -> None:
         """外部调用更新已画像素数。"""
-        self._pixel_label.setText(f"已画: {count} 像素")
+        self._pixel_label.setText(tr("new_land_pixel_painted_fmt", count))

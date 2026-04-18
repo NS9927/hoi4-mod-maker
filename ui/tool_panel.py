@@ -35,7 +35,7 @@ from ui.styles import (
 _NAV_MODES: list[tuple[str, str, str, list[tuple[str, str, str]], str]] = [
     ("map_draw", "🏖", "nav_map_draw", [
         ("land", "tab_land", "🟢"),
-        # ("density", "tab_density", "🟢"),  # 暂时关闭密度功能
+        ("density", "tab_density", "🟢"),
         ("new_land", "tab_new_land", "🟢"),
     ], "nav_tooltip_map_draw"),
     ("province", "🧩", "nav_province", [
@@ -132,6 +132,14 @@ class _IconModeBar(QWidget):
         # 默认选中第一个
         first = list(self._buttons.values())[0]
         first.setChecked(True)
+
+    def retranslateUi(self) -> None:
+        """语言切换后刷新按钮文字。"""
+        for nav_id, icon, label_key, _subs, tooltip_key in _NAV_MODES:
+            btn = self._buttons.get(nav_id)
+            if btn:
+                btn.setText(f"  {icon}  {tr(label_key)}")
+                btn.setToolTip(tr(tooltip_key))
 
 
 # ── 子模式标签栏 ─────────────────────────────────────────────
@@ -399,10 +407,10 @@ class ToolPanel(QWidget):
         sep.setStyleSheet(f"color: {_BORDER}; margin: 0;")
         root.addWidget(sep)
 
-        export_btn = QPushButton(tr("panel_export_btn"))
-        export_btn.setStyleSheet(_SUCCESS_BTN_STYLE)
-        export_btn.clicked.connect(self.export_requested.emit)
-        root.addWidget(export_btn)
+        self._export_btn = QPushButton(tr("panel_export_btn"))
+        self._export_btn.setStyleSheet(_SUCCESS_BTN_STYLE)
+        self._export_btn.clicked.connect(self.export_requested.emit)
+        root.addWidget(self._export_btn)
 
     def _create_pages(self) -> None:
         """实例化各 page 类, 加入 stack, 连接信号转发."""
@@ -733,6 +741,22 @@ class ToolPanel(QWidget):
     @property
     def _province_hint(self):
         return self._province_page._province_hint
+
+    # ── 语言切换 ──────────────────────────────────────────
+    def retranslateUi(self) -> None:
+        """语言切换后刷新导航栏/子标签/导出按钮文字。"""
+        self._icon_bar.retranslateUi()
+        # 刷新当前子标签栏
+        subs = self._nav_subs.get(self._current_nav, [])
+        self._sub_tabs.set_tabs(subs)
+        # 导出按钮
+        self._export_btn.setText(tr("panel_export_btn"))
+        # 模式提示条
+        self._hint_bar.on_mode_changed(
+            list(self._pages.keys())[self._stack.currentIndex()]
+            if self._stack.currentIndex() < len(self._pages)
+            else "land"
+        )
 
     # ── 槽函数 ────────────────────────────────────────────
     def _on_nav_changed(self, nav_id: str) -> None:

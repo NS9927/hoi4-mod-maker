@@ -130,7 +130,7 @@ class MainWindowFileOpsMixin:
     def _on_new_project(self) -> None:
         reply = QMessageBox.question(
             self, tr("dlg_confirm"),
-            "新建项目将清除当前数据，是否继续？",
+            tr("file_ops_new_confirm"),
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
@@ -144,7 +144,7 @@ class MainWindowFileOpsMixin:
                 break
 
         chosen, ok = QInputDialog.getItem(
-            self, "选择地图尺寸", "选择新项目的地图尺寸：",
+            self, tr("file_ops_map_size_title"), tr("file_ops_map_size_prompt"),
             presets, default_idx, False,
         )
         if not ok:
@@ -153,23 +153,35 @@ class MainWindowFileOpsMixin:
         new_w, new_h = MAP_SIZE_PRESETS[chosen]
         set_map_size(new_w, new_h)
 
-        self._canvas.tile_map = np.full((new_h, new_w), TILE_SEA, dtype=np.uint8)
-        self._canvas.province_map = np.zeros((new_h, new_w), dtype=np.int32)
-        self._canvas.terrain_map = np.zeros((new_h, new_w), dtype=np.uint8)
-        self._canvas.height_map = np.full((new_h, new_w), 40, dtype=np.uint8)
-        self._canvas.river_map = np.zeros((new_h, new_w), dtype=np.uint8)
+        from domain.map_data import MapData
+        md = MapData()
+        md.tile_map = np.full((new_h, new_w), TILE_SEA, dtype=np.uint8)
+        md.province_map = np.zeros((new_h, new_w), dtype=np.int32)
+        md.terrain_map = np.zeros((new_h, new_w), dtype=np.uint8)
+        md.height_map = np.full((new_h, new_w), 40, dtype=np.uint8)
+        md.river_map = np.zeros((new_h, new_w), dtype=np.uint8)
+        self._project.map_data = md
+        self._canvas.set_map_data(md)
+        self._canvas._scene.setSceneRect(0, 0, new_w, new_h)
+        # 重置 LandController 的 mask
+        land_ctrl = self._controllers.get("land")
+        if land_ctrl:
+            land_ctrl.reset_mask_size()
         self._project.state_mgr.clear()
         self._project.country_mgr.clear()
+        self._project.strategic_region_mgr.clear()
+        self._project.railway_mgr.clear()
+        self._project.supply_mgr.clear()
         self._cmd_history.clear()
         self._update_province_count()
         self._canvas.refresh_display()
-        self._status_info.setText(f"新项目已创建 ({new_w}×{new_h})")
+        self._status_info.setText(tr("file_ops_new_created", new_w, new_h))
         if hasattr(self, '_show_editor'):
             self._show_editor()
 
     def _on_save_project(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
-            self, "保存项目", "", "HOI4 项目 (*.hoi4proj);;All Files (*)"
+            self, tr("file_ops_save_title"), "", tr("file_ops_proj_filter")
         )
         if not path:
             return
@@ -184,16 +196,16 @@ class MainWindowFileOpsMixin:
                 adjacency_rule_mgr=self._project.adjacency_rule_mgr,
                 strategic_region_mgr=self._project.strategic_region_mgr,
             )
-            self._status_info.setText(f"项目已保存: {path}")
+            self._status_info.setText(tr("file_ops_saved", path))
             # 记录到最近项目
             from views.welcome_page import save_recent_project
             save_recent_project(path)
         except Exception as e:
-            QMessageBox.critical(self, "保存失败", str(e))
+            QMessageBox.critical(self, tr("file_ops_save_fail"), str(e))
 
     def _on_open_project(self) -> None:
         path, _ = QFileDialog.getOpenFileName(
-            self, "打开项目", "", "HOI4 项目 (*.hoi4proj);;All Files (*)"
+            self, tr("file_ops_open_title"), "", tr("file_ops_proj_filter")
         )
         if not path:
             return
@@ -227,17 +239,17 @@ class MainWindowFileOpsMixin:
             self._app._refresh_country_list()
             if gap_count > 0:
                 self._status_info.setText(
-                    f"项目已加载: {path} | ⚠ 项目自带 {gap_count} 个省份 ID 空洞"
+                    tr("file_ops_loaded_gaps", path, gap_count)
                 )
             else:
-                self._status_info.setText(f"项目已加载: {path}")
+                self._status_info.setText(tr("file_ops_loaded", path))
             # 记录到最近项目 + 切换到编辑器
             from views.welcome_page import save_recent_project
             save_recent_project(path)
             if hasattr(self, '_show_editor'):
                 self._show_editor()
         except Exception as e:
-            QMessageBox.critical(self, "加载失败", str(e))
+            QMessageBox.critical(self, tr("file_ops_load_fail"), str(e))
 
     # ═══════════════════════ 参考图/导入 ═══════════════════════
 
@@ -253,12 +265,12 @@ class MainWindowFileOpsMixin:
             if os.path.exists(path):
                 if self._canvas.load_vanilla_reference(path):
                     self._status_info.setText(
-                        f"原版地图参考已加载: {os.path.basename(path)}"
+                        tr("file_ops_vanilla_loaded", os.path.basename(path))
                     )
                     return
         QMessageBox.warning(
-            self, "错误",
-            f"未找到原版地图文件\n检查路径: {DEFAULT_HOI4_PATH}",
+            self, tr("dlg_error"),
+            tr("file_ops_vanilla_not_found", DEFAULT_HOI4_PATH),
         )
 
     def _on_import_image(self) -> None:
@@ -268,32 +280,31 @@ class MainWindowFileOpsMixin:
         )
         if file_path:
             if self._canvas.load_reference_image(file_path):
-                self._status_info.setText(f"参考图已加载: {file_path}")
+                self._status_info.setText(tr("file_ops_ref_loaded", file_path))
             else:
-                QMessageBox.warning(self, tr("dlg_error"), "无法加载图片")
+                QMessageBox.warning(self, tr("dlg_error"), tr("file_ops_ref_fail"))
 
     def _on_import_landmask(self) -> None:
         """从真实地图提取陆海"""
         from PIL import Image
 
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "选择陆海源图", "",
+            self, tr("file_ops_landmask_title"), "",
             "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff);;All Files (*)",
         )
         if not file_path:
             return
 
         threshold, ok = QInputDialog.getInt(
-            self, "陆海阈值",
-            "灰度阈值 (0-255)\n>= 阈值为陆地，< 阈值为海洋\n"
-            "建议：高度图用 1；卫星图用 90 左右",
+            self, tr("file_ops_threshold_title"),
+            tr("file_ops_threshold_prompt"),
             value=1, min=0, max=255,
         )
         if not ok:
             return
 
         invert_reply = QMessageBox.question(
-            self, "反转?", "勾选 Yes 表示：暗色为陆地、亮色为海洋（默认 No）",
+            self, tr("file_ops_invert_title"), tr("file_ops_invert_prompt"),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -306,7 +317,7 @@ class MainWindowFileOpsMixin:
             arr = np.array(img, dtype=np.uint8)
             land_mask = (arr < threshold) if invert else (arr >= threshold)
         except Exception as e:
-            QMessageBox.warning(self, tr("dlg_error"), f"读取图片失败：{e}")
+            QMessageBox.warning(self, tr("dlg_error"), tr("file_ops_img_read_fail", e))
             return
 
         # 通过 BrushStrokeCommand 记录快照（统一走 CommandHistory）
@@ -331,22 +342,23 @@ class MainWindowFileOpsMixin:
         from data.constants import MAP_WIDTH, MAP_HEIGHT
         land_n = int(land_mask.sum())
         total = MAP_WIDTH * MAP_HEIGHT
+        land_pct = f"{land_n/total*100:.1f}"
+        sea_pct = f"{(1-land_n/total)*100:.1f}"
         self._status_info.setText(
-            f"陆海导入完成 — 陆地 {land_n/total*100:.1f}%"
-            f" / 海洋 {(1-land_n/total)*100:.1f}%"
+            tr("file_ops_landmask_done", land_pct, sea_pct)
         )
 
     def _on_import_mod_map(self) -> None:
         """从 HOI4 mod/vanilla 目录导入地图图层"""
         reply = QMessageBox.question(
             self, tr("dlg_confirm"),
-            "导入将替换当前地图数据，是否继续？",
+            tr("file_ops_import_confirm"),
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
         mod_dir = QFileDialog.getExistingDirectory(
-            self, "选择 HOI4 MOD 或原版目录",
+            self, tr("file_ops_select_mod_dir"),
             "", QFileDialog.Option.ShowDirsOnly,
         )
         if not mod_dir:
@@ -358,14 +370,14 @@ class MainWindowFileOpsMixin:
         if missing:
             QMessageBox.warning(
                 self, tr("dlg_error"),
-                f"目录缺少必需文件:\n" + "\n".join(missing),
+                tr("file_ops_missing_files") + "\n".join(missing),
             )
             return
 
         try:
             result = import_mod_map(mod_dir)
         except Exception as e:
-            QMessageBox.warning(self, tr("dlg_error"), f"导入失败：{e}")
+            QMessageBox.warning(self, tr("dlg_error"), tr("file_ops_import_fail", e))
             return
 
         new_w, new_h = result["width"], result["height"]
@@ -419,33 +431,27 @@ class MainWindowFileOpsMixin:
         state_count = len(self._project.state_mgr.states)
         sr_count = self._project.strategic_region_mgr.count()
         asset_count = len(self._project.assets)
-        info_text = (f"MOD地图已导入 ({new_w}×{new_h}, {result['province_count']} 省份, "
-                     f"{state_count} 州, {sr_count} 战略区域, {asset_count} 美术资产)")
+        info_text = tr("file_ops_mod_imported", new_w, new_h,
+                       result['province_count'], state_count, sr_count, asset_count)
         self._status_info.setText(info_text)
 
         warnings_text = ""
         if result["warnings"]:
-            warnings_text = "\n\n注意:\n" + "\n".join(f"- {w}" for w in result["warnings"])
+            warnings_text = "\n\n" + tr("file_ops_import_warnings") + "\n".join(f"- {w}" for w in result["warnings"])
         QMessageBox.information(
-            self, "导入完成", info_text + warnings_text
+            self, tr("file_ops_import_done"), info_text + warnings_text
         )
 
     # ═══════════════════════ 测试导出 ═══════════════════════
 
-    TEST_LEVELS = [
-        ("Lv1: 最小完整MOD（1国家）",
-         "地图 + State + 1国家(AAA) + 补给 + 战略区域 + replace_path\n"
-         "最小可运行配置，测试基础文件格式是否正确"),
-        ("Lv2: +2个国家 +bookmark",
-         "在Lv1基础上加: 第2个国家(BBB) + bookmark选择界面\n"
-         "测试多国家和bookmark"),
-        ("Lv3: +意识形态 +State类别",
-         "在Lv2基础上加: ideologies, state_category 定义文件\n"
-         "测试自定义意识形态/State类别"),
-        ("Lv4: +更多replace_path",
-         "在Lv3基础上加: 更多replace_path（清空原版国策/事件等）\n"
-         "完整TC MOD"),
-    ]
+    @staticmethod
+    def _get_test_levels():
+        return [
+            (tr("file_ops_test_lv1_title"), tr("file_ops_test_lv1_desc")),
+            (tr("file_ops_test_lv2_title"), tr("file_ops_test_lv2_desc")),
+            (tr("file_ops_test_lv3_title"), tr("file_ops_test_lv3_desc")),
+            (tr("file_ops_test_lv4_title"), tr("file_ops_test_lv4_desc")),
+        ]
 
     def _on_test_export(self) -> None:
         from PyQt5.QtWidgets import (
@@ -454,16 +460,17 @@ class MainWindowFileOpsMixin:
         )
 
         dlg = QDialog(self)
-        dlg.setWindowTitle("渐进式测试导出")
+        dlg.setWindowTitle(tr("file_ops_test_dialog_title"))
         dlg.setMinimumWidth(500)
         layout = QVBoxLayout(dlg)
 
-        layout.addWidget(QLabel("选择测试级别（从低到高，逐级排查崩溃原因）:"))
+        layout.addWidget(QLabel(tr("file_ops_test_select_level")))
 
+        test_levels = self._get_test_levels()
         group = QGroupBox()
         group_layout = QVBoxLayout(group)
         radios = []
-        for i, (title, desc) in enumerate(self.TEST_LEVELS):
+        for i, (title, desc) in enumerate(test_levels):
             rb = QRadioButton(f"{title}\n    {desc}")
             rb.setStyleSheet("QRadioButton { padding: 6px 0; }")
             if i == 0:
@@ -489,28 +496,26 @@ class MainWindowFileOpsMixin:
                 break
 
         output_dir = QFileDialog.getExistingDirectory(
-            self, "选择测试导出目录", DEFAULT_MOD_OUTPUT_PATH,
+            self, tr("file_ops_test_output_dir"), DEFAULT_MOD_OUTPUT_PATH,
         )
         if not output_dir:
             return
 
-        self._status_info.setText(f"正在生成 Lv{level} 测试MOD...")
+        self._status_info.setText(tr("file_ops_test_generating", level))
         QApplication.processEvents()
 
         try:
             from export.test_exporter import export_test_mod
             export_test_mod(output_dir, level)
             QMessageBox.information(
-                self, "测试导出",
-                f"Lv{level} 测试MOD已导出到:\n{output_dir}\n\n"
-                f"{self.TEST_LEVELS[level-1][0]}\n\n"
-                "启动游戏测试是否正常加载。\n"
-                "如果崩溃，降低级别重试；如果能进，升高级别继续。"
+                self, tr("file_ops_test_export_title"),
+                tr("file_ops_test_export_ok", level, output_dir,
+                   test_levels[level-1][0]),
             )
         except Exception as e:
             import traceback
             QMessageBox.critical(
-                self, "导出失败", f"{e}\n\n{traceback.format_exc()}"
+                self, tr("file_ops_export_fail"), f"{e}\n\n{traceback.format_exc()}"
             )
         finally:
             self._status_info.setText(tr("status_ready"))
