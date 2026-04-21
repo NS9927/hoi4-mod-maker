@@ -289,6 +289,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.density_clear_requested.connect(self._on_density_clear)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
         tp.downgrade_mountain_requested.connect(self._on_downgrade_mountain)
+        tp.downgrade_lasso_mode_toggled.connect(self._on_downgrade_lasso_mode)
+        cv.downgrade_lasso_drawn.connect(self._on_downgrade_lasso_drawn)
         tp.terrain_brush_size_changed.connect(
             lambda s: setattr(self._controllers["terrain"], "brush_size", s)
         )

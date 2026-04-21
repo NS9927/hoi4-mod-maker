@@ -83,6 +83,7 @@ class TerrainPage(QWidget):
     terrain_soft_edge_changed = pyqtSignal(bool)
     auto_terrain_requested = pyqtSignal()
     downgrade_mountain_requested = pyqtSignal()
+    downgrade_lasso_mode_toggled = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -187,6 +188,14 @@ class TerrainPage(QWidget):
         self._downgrade_btn.setToolTip(tr("terrain_btn_downgrade_tip"))
         self._downgrade_btn.clicked.connect(self.downgrade_mountain_requested.emit)
         gl.addWidget(self._downgrade_btn)
+
+        # 选区降级按钮（套索选区）
+        self._downgrade_lasso_btn = QPushButton(tr("terrain_btn_downgrade_region"))
+        self._downgrade_lasso_btn.setCheckable(True)
+        self._downgrade_lasso_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._downgrade_lasso_btn.setToolTip(tr("terrain_btn_downgrade_region_tip"))
+        self._downgrade_lasso_btn.toggled.connect(self.downgrade_lasso_mode_toggled.emit)
+        gl.addWidget(self._downgrade_lasso_btn)
 
         outer.addWidget(gen_box)
 
@@ -337,6 +346,13 @@ class TerrainPage(QWidget):
     def _randomize_seed(self) -> None:
         import random
         self._seed_spin.setValue(random.randint(0, 99999))
+
+    def reset_downgrade_lasso_button(self) -> None:
+        """套索画完后外部调这个取消勾选。"""
+        if self._downgrade_lasso_btn.isChecked():
+            self._downgrade_lasso_btn.blockSignals(True)
+            self._downgrade_lasso_btn.setChecked(False)
+            self._downgrade_lasso_btn.blockSignals(False)
 
     def get_gen_config(self):
         """返回当前 UI 参数构建的 TerrainGenConfig。"""

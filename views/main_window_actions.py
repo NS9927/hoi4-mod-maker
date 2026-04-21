@@ -655,18 +655,16 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             tr("status_auto_terrain_done") + tr("status_auto_terrain_synced", len(new_dict))
         )
 
-    def _on_downgrade_mountain(self) -> None:
-        """一键把当前地形图+高度图+属性层的山脉同步降一级。"""
+    def _on_downgrade_mountain(self, mask=None) -> None:
+        """降级山脉 (全图或选区)。mask=None 时全图, 否则只在 mask 内。"""
         from commands.map.downgrade_mountain import DowngradeMountainCommand
         map_data = self._project.map_data
-        cmd = DowngradeMountainCommand(map_data)
+        cmd = DowngradeMountainCommand(map_data, mask=mask)
         self._cmd_history.execute(cmd)
-        # 视觉、高度图都变了，两边 canvas 数据都要更新
         self._canvas.terrain_map = map_data.terrain_map
         self._canvas.height_map = map_data.height_map
         self._canvas._full_render()
         self._project.mark_dirty()
-        # 地形 + 高度图都改了 → 相关 assets 都要重算
         self._project.mark_assets_dirty(
             "map/terrain/colormap_rgb_cityemissivemask_a.dds",
         )
@@ -674,6 +672,30 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             "map/terrain/world_normal.bin",
         )
         self._status_info.setText(tr("status_downgrade_done"))
+
+    def _on_downgrade_lasso_mode(self, enabled: bool) -> None:
+        """切换选区降级套索模式。"""
+        self._canvas._downgrade_lasso_mode = enabled
+        if enabled:
+            self._status_info.setText(tr("status_downgrade_lasso_mode"))
+        else:
+            self._canvas._refine_lasso_item.setVisible(False)
+
+    def _on_downgrade_lasso_drawn(self, points: list) -> None:
+        """套索画完 → 多边形转 mask → 调 _on_downgrade_mountain(mask)。"""
+        from PyQt5.QtWidgets import QMessageBox
+        map_data = self._project.map_data
+        h, w = map_data.terrain_map.shape
+        mask = _polygon_to_mask(points, h, w)
+        if mask.sum() < 400:
+            QMessageBox.information(
+                self, tr("terrain_btn_downgrade_region"),
+                tr("refine_dlg_area_too_small"),
+            )
+            self._tool_panel._terrain_page.reset_downgrade_lasso_button()
+            return
+        self._on_downgrade_mountain(mask=mask)
+        self._tool_panel._terrain_page.reset_downgrade_lasso_button()
 
     def _on_auto_height(self) -> None:
         from services.terrain_service import smart_auto_height

@@ -126,14 +126,22 @@ class InputMixin:
                 event.accept()
                 return
 
-            # 高度模式 + 局部精修套索：拖拽收集闭合多边形
+            # 高度/地形模式 + 套索（精修 or 选区降级）: 拖拽收集闭合多边形
+            # 两种模式共享同一套 drawing 代码, 只在 release 时走不同信号
+            _active_lasso = None
             if (self._display_mode == "height"
                     and getattr(self, '_refine_lasso_mode', False)
                     and getattr(self, '_height_brush_mode', 'off') == "off"):
+                _active_lasso = "refine"
+            elif (self._display_mode == "terrain"
+                    and getattr(self, '_downgrade_lasso_mode', False)):
+                _active_lasso = "downgrade"
+            if _active_lasso is not None:
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     self._is_drawing = True
                     self._refine_lasso_drawing = True
+                    self._active_lasso_kind = _active_lasso
                     self._refine_lasso_path = [(int(sy), int(sx))]
                     from PyQt5.QtGui import QPainterPath
                     path = QPainterPath()
@@ -491,9 +499,10 @@ class InputMixin:
                     event.accept()
                     return
 
-                # 局部精修套索释放 → 闭合多边形 → 发信号给 MainWindow
+                # 套索释放 → 闭合多边形 → 按 _active_lasso_kind 发对应信号
                 if getattr(self, '_refine_lasso_drawing', False):
                     self._refine_lasso_drawing = False
+                    kind = getattr(self, '_active_lasso_kind', 'refine')
                     path = getattr(self, '_refine_lasso_path', [])
                     # 闭合：把最后一点连回起点
                     if len(path) >= 3:
@@ -502,8 +511,12 @@ class InputMixin:
                         self._refine_lasso_item.setPath(current_path)
                     self._refine_lasso_item.setVisible(False)
                     if len(path) >= 3:
-                        self.refine_lasso_drawn.emit(path)
+                        if kind == "downgrade":
+                            self.downgrade_lasso_drawn.emit(path)
+                        else:
+                            self.refine_lasso_drawn.emit(path)
                     self._refine_lasso_path = []
+                    self._active_lasso_kind = None
                     self.stroke_ended.emit()
                     event.accept()
                     return
