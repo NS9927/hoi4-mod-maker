@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>UI 操作逻辑优化方案</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0e0e14; color: #c8c8e0; font-family: "Microsoft YaHei", sans-serif; padding: 24px; }
+h1 { color: #8080ff; font-size: 22px; text-align: center; margin-bottom: 8px; }
+.subtitle { color: #666; font-size: 13px; text-align: center; margin-bottom: 32px; }
+
+.page-pair {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 20px;
+  max-width: 1200px; margin: 0 auto 40px;
+}
+.page-card {
+  background: #1a1a24; border: 1px solid #2a2a3a; border-radius: 10px;
+  overflow: hidden;
+}
+.page-header {
+  padding: 10px 16px; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+}
+.header-before { background: #2a1818; color: #cc6666; }
+.header-after { background: #182a18; color: #66cc88; }
+.page-title {
+  padding: 12px 16px 8px; font-size: 16px; font-weight: 700; color: #e0e0f0;
+  border-bottom: 1px solid #2a2a3a;
+}
+
+/* Simulated panel controls */
+.sim { padding: 10px 14px; }
+.s-section {
+  background: #20202c; border: 1px solid #2a2a3c; border-radius: 6px;
+  margin-bottom: 8px; padding: 10px;
+}
+.s-title {
+  font-size: 10px; font-weight: 700; color: #5a5a78;
+  letter-spacing: 1px; text-transform: uppercase; margin-bottom: 8px;
+}
+.s-row { display: flex; gap: 4px; margin-bottom: 5px; flex-wrap: wrap; }
+.s-btn {
+  background: #282838; border: 1px solid #3a3a4e; border-radius: 5px;
+  color: #b0b0c8; padding: 6px 10px; font-size: 11px; text-align: center;
+  flex: 1; min-width: 60px;
+}
+.s-btn.active { background: #7070ee; color: white; border-color: #7070ee; }
+.s-btn.green { background: #22a050; color: white; border-color: #22a050; }
+.s-btn.accent { background: #6868dd; color: white; border-color: #6868dd; }
+.s-btn.full { flex: unset; width: 100%; }
+.s-label { font-size: 11px; color: #888; margin-bottom: 3px; }
+.s-value { font-size: 11px; color: #aaa; float: right; }
+.s-slider { width: 100%; height: 3px; background: #3a3a4e; border-radius: 2px; margin: 6px 0; }
+.s-hint { font-size: 10px; color: #555; margin-bottom: 6px; line-height: 1.4; }
+.s-info { font-size: 11px; color: #777; padding: 4px 8px; background: #1a1a22; border-radius: 4px; margin-bottom: 6px; }
+.s-divider { height: 1px; background: #2a2a3a; margin: 8px 0; }
+.s-list {
+  background: #1a1a22; border: 1px solid #2a2a3c; border-radius: 4px;
+  min-height: 50px; margin-bottom: 6px; padding: 4px;
+}
+.s-list-item { font-size: 11px; color: #aaa; padding: 3px 6px; }
+.s-list-item.sel { background: #6868dd; color: white; border-radius: 3px; }
+
+.s-removed { text-decoration: line-through; color: #884444; font-size: 10px; }
+.s-new { color: #66cc88; font-size: 10px; font-weight: 600; }
+.s-moved { color: #ddaa44; font-size: 10px; }
+
+.note-box {
+  background: #1a1a24; border: 1px solid #3a3a50; border-radius: 8px;
+  padding: 14px 18px; margin: 0 auto 30px; max-width: 1200px;
+  font-size: 12px; line-height: 1.6; color: #888;
+}
+.note-box b { color: #8080ff; }
+.note-box .tag-remove { color: #cc6666; }
+.note-box .tag-merge { color: #ddaa44; }
+.note-box .tag-move { color: #66aaff; }
+.note-box .tag-add { color: #66cc88; }
+
+.page-name { font-size: 14px; color: #8080ff; margin: 30px auto 10px; max-width: 1200px; font-weight: 700; }
+.change-note { font-size: 11px; color: #888; max-width: 1200px; margin: 0 auto 12px; }
+</style>
+</head>
+<body>
+
+<h1>UI 操作逻辑优化方案</h1>
+<p class="subtitle">左边 = 当前布局 / 右边 = 优化后布局 / 只改控件排列逻辑，不改样式</p>
+
+<div class="note-box">
+  <b>图例：</b>
+  <span class="tag-remove">红色删除线 = 去掉的重复控件</span> &nbsp;|&nbsp;
+  <span class="tag-merge">黄色 = 合并/移动的控件</span> &nbsp;|&nbsp;
+  <span class="tag-add">绿色 = 新增的逻辑</span> &nbsp;|&nbsp;
+  <span class="tag-move">蓝色 = 位置调整</span>
+</div>
+
+<!-- ═══════════════════ 1. LandPage ═══════════════════ -->
+<div class="page-name">1. 地图绘制 (LandPage) — 改动最大</div>
+<div class="change-note">问题：一键初始化藏在最底部；参考图两个区域重复；地块类型竖排占空间太多</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">地图绘制</div>
+    <div class="sim">
+      <div class="s-hint">在地图上绘制陆地、海洋和湖泊...</div>
+      <div class="s-section">
+        <div class="s-title">工具</div>
+        <div class="s-row">
+          <div class="s-btn active">画笔</div><div class="s-btn">橡皮</div><div class="s-btn">填充(F)</div>
+        </div>
+        <div class="s-row">
+          <div class="s-btn">变换</div><div class="s-btn">平移</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">画笔大小</div>
+        <div class="s-label">大小 <span class="s-value">30px</span></div>
+        <div class="s-slider"></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">地块类型</div>
+        <div class="s-btn full" style="margin-bottom:4px">🟢 陆地</div>
+        <div class="s-btn full" style="margin-bottom:4px">🔵 海洋</div>
+        <div class="s-btn full">🔷 湖泊</div>
+      </div>
+      <div class="s-btn full" style="margin-bottom:8px">平滑海岸线</div>
+      <div class="s-section">
+        <div class="s-title">省份生成</div>
+        <div class="s-btn accent full" style="margin-bottom:4px">生成省份</div>
+        <div class="s-label">省份数量 <span class="s-value">12000</span></div>
+        <div class="s-label">海洋密度 <span class="s-value">15%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-label">湖泊密度 <span class="s-value">30%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-btn full" style="margin-bottom:4px">验证地图</div>
+        <div class="s-btn green full">一键初始化</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">原版地图参考</div>
+        <div class="s-label">透明度 <span class="s-value">30%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-btn full">隐藏</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">自定义参考图</div>
+        <div class="s-label">透明度 <span class="s-value">40%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-label">缩放 <span class="s-value">100%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-btn full" style="margin-bottom:4px">铺满地图</div>
+        <div class="s-btn full">隐藏</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">地图绘制</div>
+    <div class="sim">
+      <div class="s-btn green full" style="margin-bottom:8px"><span class="s-new">MOVE UP</span> 一键初始化 (新手推荐)</div>
+      <div class="s-section">
+        <div class="s-title">工具</div>
+        <div class="s-row">
+          <div class="s-btn active">画笔</div><div class="s-btn">橡皮</div><div class="s-btn">填充(F)</div>
+          <div class="s-btn">变换</div><div class="s-btn">平移</div>
+        </div>
+        <div class="s-label">画笔大小 <span class="s-value">30px</span></div>
+        <div class="s-slider"></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">地块类型 <span class="s-moved">改横排</span></div>
+        <div class="s-row">
+          <div class="s-btn active">🟢 陆地</div><div class="s-btn">🔵 海洋</div><div class="s-btn">🔷 湖泊</div>
+        </div>
+      </div>
+      <div class="s-btn full" style="margin-bottom:8px">平滑海岸线</div>
+      <div class="s-section">
+        <div class="s-title">省份生成</div>
+        <div class="s-label">省份数量 <span class="s-value">12000</span></div>
+        <div class="s-label">海洋密度 <span class="s-value">15%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-label">湖泊密度 <span class="s-value">30%</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn accent">生成省份</div><div class="s-btn">验证</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title"><span class="s-moved">MERGE</span> 参考图</div>
+        <div class="s-label" style="color:#aaa">原版参考</div>
+        <div class="s-row">
+          <div class="s-btn" style="flex:2">透明度 30%</div><div class="s-btn">显隐</div>
+        </div>
+        <div class="s-divider"></div>
+        <div class="s-label" style="color:#aaa">自定义参考</div>
+        <div class="s-row">
+          <div class="s-btn" style="flex:2">透明度 40%</div><div class="s-btn">显隐</div>
+        </div>
+        <div class="s-row">
+          <div class="s-btn" style="flex:2">缩放 100%</div><div class="s-btn">铺满</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 2. HeightPage ═══════════════════ -->
+<div class="page-name">2. 高度图 (HeightPage) — 去重复</div>
+<div class="change-note">问题："智能生成"按钮出现两次；山脉区域平时不用但一直显示</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">高度图</div>
+    <div class="sim">
+      <div class="s-btn accent full" style="margin-bottom:4px; padding:12px">一键智能生成高度 (大按钮)</div>
+      <div class="s-hint">提示文字...</div>
+      <div class="s-hint">又一段提示文字...</div>
+      <div class="s-section">
+        <div class="s-title">自动生成</div>
+        <div class="s-btn accent full" style="margin-bottom:4px"><span class="s-removed">重复: 智能生成</span></div>
+        <div class="s-label">种子 <span class="s-value">42</span></div>
+        <div class="s-label">山峰高度 <span class="s-value">200</span></div>
+        <div class="s-slider"></div>
+        <div class="s-btn full">平滑</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">山脉画线</div>
+        <div class="s-hint">提示文字...</div>
+        <div class="s-btn accent full" style="margin-bottom:4px">开始画山脉</div>
+        <div class="s-label">峰值 <span class="s-value">220</span></div>
+        <div class="s-slider"></div>
+        <div class="s-label">衰减 <span class="s-value">80px</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn">取消</div><div class="s-btn green">确认</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">手动画笔</div>
+        <div class="s-hint">提示文字...</div>
+        <div class="s-label">高度值 <span class="s-value">120</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn">海底</div><div class="s-btn">海面</div><div class="s-btn">平地</div><div class="s-btn">丘陵</div><div class="s-btn">山地</div>
+        </div>
+      </div>
+      <div class="s-btn full" style="margin-bottom:4px">导入高度图</div>
+      <div class="s-section">
+        <div class="s-title">高度含义</div>
+        <div class="s-hint">参考说明文字...</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">高度图</div>
+    <div class="sim">
+      <div class="s-section">
+        <div class="s-title">自动生成</div>
+        <div class="s-btn accent full" style="margin-bottom:6px; padding:10px">一键智能生成高度</div>
+        <div class="s-label">种子 <span class="s-value">42 [随机]</span></div>
+        <div class="s-label">山峰高度 <span class="s-value">200</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn">平滑</div>
+          <div class="s-btn">导入高度图</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">山脉画线 <span class="s-new">可折叠</span></div>
+        <div class="s-btn accent full" style="margin-bottom:4px">开始画山脉</div>
+        <div class="s-label">峰值 <span class="s-value">220</span></div>
+        <div class="s-slider"></div>
+        <div class="s-label">衰减 <span class="s-value">80px</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn">取消</div><div class="s-btn green">确认</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">手动微调</div>
+        <div class="s-label">高度值 <span class="s-value">120</span></div>
+        <div class="s-slider"></div>
+        <div class="s-row">
+          <div class="s-btn">海底</div><div class="s-btn">海面</div><div class="s-btn">平地</div><div class="s-btn">丘陵</div><div class="s-btn">山地</div>
+        </div>
+      </div>
+      <div class="s-hint"><span class="s-removed">去掉: 重复的提示文字 + 高度含义区域(改为tooltip)</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 3. StatePage ═══════════════════ -->
+<div class="page-name">3. 州 (StatePage) — 操作顺序</div>
+<div class="change-note">问题：自动分组和批量建州容易混淆；列表太矮；属性区域位置不好</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">州</div>
+    <div class="sim">
+      <div class="s-btn accent full" style="margin-bottom:4px">自动分组</div>
+      <div class="s-label">每州省份数 <span class="s-value">15</span></div>
+      <div class="s-section">
+        <div class="s-title">批量建州</div>
+        <div class="s-btn accent full" style="margin-bottom:4px">框选省份建州</div>
+        <div class="s-btn green full">确认创建新州</div>
+      </div>
+      <div class="s-label" style="margin:6px 0">☐ 开始指派省份到州</div>
+      <div class="s-hint">提示: 选中一个州后点击...</div>
+      <div class="s-section">
+        <div class="s-title">州列表</div>
+        <div class="s-list" style="min-height:40px">
+          <div class="s-list-item sel">1. State 1</div>
+          <div class="s-list-item">2. State 2</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">选中州属性</div>
+        <div class="s-label">名称</div>
+        <div class="s-label">人口</div>
+        <div class="s-label">类别</div>
+      </div>
+      <div class="s-btn full" style="margin-bottom:4px">详情编辑</div>
+      <div class="s-hint">提示文字...</div>
+      <div class="s-hint">又一段提示...</div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">州</div>
+    <div class="sim">
+      <div class="s-section">
+        <div class="s-title">快速开始</div>
+        <div class="s-row">
+          <div class="s-btn accent" style="flex:2">自动分组</div>
+          <div class="s-btn" style="flex:1">每州: 15</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">手动编辑</div>
+        <div class="s-btn full" style="margin-bottom:4px"><span class="s-moved">改名</span> 拖拽分配省份到州</div>
+        <div class="s-row">
+          <div class="s-btn">框选建州</div>
+          <div class="s-btn green">确认建州</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">州列表 <span class="s-new">高度加大</span></div>
+        <div class="s-list" style="min-height:80px">
+          <div class="s-list-item sel">1. State 1 (25 provinces)</div>
+          <div class="s-list-item">2. State 2 (18 provinces)</div>
+          <div class="s-list-item">3. State 3 (12 provinces)</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">选中州属性</div>
+        <div class="s-label">名称 / 人口 / 类别</div>
+        <div class="s-row">
+          <div class="s-btn">详情编辑</div>
+          <div class="s-btn"><span class="s-new">NEW</span> 城市命名</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 4. StrategicRegionPage ═══════════════════ -->
+<div class="page-name">4. 战略区 (StrategicRegionPage) — 按钮太多</div>
+<div class="change-note">问题：顶部连续5个按钮，用户不知道该点哪个</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">战略区</div>
+    <div class="sim">
+      <div class="s-hint">提示: 战略区域省份分组+天气+海军地形...</div>
+      <div class="s-btn accent full" style="margin-bottom:4px">自动生成(按州分组)</div>
+      <div class="s-btn accent full" style="margin-bottom:4px">按纬度自动分配天气</div>
+      <div class="s-btn accent full" style="margin-bottom:4px">选择州 → 创建战略区域</div>
+      <div class="s-btn green full" style="margin-bottom:4px">确认创建战略区域</div>
+      <div class="s-label" style="margin:4px 0">☐ 开始拾取省份</div>
+      <div class="s-section">
+        <div class="s-list" style="min-height:50px">
+          <div class="s-list-item sel">1. Region 1</div>
+          <div class="s-list-item">2. Region 2</div>
+        </div>
+        <div class="s-row">
+          <div class="s-btn">新建空区域</div><div class="s-btn">删除</div>
+        </div>
+      </div>
+      <div class="s-label">名称</div>
+      <div class="s-label">天气</div>
+      <div class="s-label">Naval</div>
+      <div class="s-label">省份数: 0</div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">战略区</div>
+    <div class="sim">
+      <div class="s-section">
+        <div class="s-title">快速开始</div>
+        <div class="s-btn accent full" style="margin-bottom:4px">自动生成(按州分组)</div>
+        <div class="s-btn full">按纬度自动分配天气</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">手动编辑</div>
+        <div class="s-btn full" style="margin-bottom:4px">拖拽分配省份(陆地+海洋)</div>
+        <div class="s-row">
+          <div class="s-btn">从州创建</div>
+          <div class="s-btn green">确认</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">区域列表</div>
+        <div class="s-list" style="min-height:60px">
+          <div class="s-list-item sel">1. Region 1 (35 provs)</div>
+          <div class="s-list-item">2. Region 2 (28 provs)</div>
+        </div>
+        <div class="s-row">
+          <div class="s-btn">新建空区域</div><div class="s-btn" style="color:#cc6666">删除</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">选中区域属性</div>
+        <div class="s-label">名称 / 天气 / Naval</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 5. TerrainPage ═══════════════════ -->
+<div class="page-name">5. 地形 (TerrainPage) — 小改</div>
+<div class="change-note">问题：自动生成按钮重复（顶部大按钮 + 底部区域里的按钮）</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">地形</div>
+    <div class="sim">
+      <div class="s-btn accent full" style="margin-bottom:4px; padding:10px"><span class="s-removed">重复1</span> 自动生成地形 (大按钮)</div>
+      <div class="s-hint">提示...</div>
+      <div class="s-row">
+        <div class="s-btn active">按省份</div><div class="s-btn">画笔</div>
+      </div>
+      <div class="s-hint">提示文字...</div>
+      <div class="s-info">地形网格 (8组 × N个变体)...</div>
+      <div class="s-section">
+        <div class="s-title">自动生成</div>
+        <div class="s-label">种子 / 噪声 / 散布</div>
+        <div class="s-btn accent full"><span class="s-removed">重复2</span> 自动生成地形</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">地形</div>
+    <div class="sim">
+      <div class="s-section">
+        <div class="s-title">自动生成</div>
+        <div class="s-btn accent full" style="margin-bottom:4px">自动生成地形</div>
+        <div class="s-label">种子 / 噪声 / 散布</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">编辑模式</div>
+        <div class="s-row">
+          <div class="s-btn active">按省份</div><div class="s-btn">画笔</div>
+        </div>
+      </div>
+      <div class="s-info">地形网格 (保持不变)...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 6. ProvincePage ═══════════════════ -->
+<div class="page-name">6. 省份 (ProvincePage) — 小改</div>
+<div class="change-note">问题：省份信息占5行太多空间</div>
+<div class="page-pair">
+  <div class="page-card">
+    <div class="page-header header-before">CURRENT</div>
+    <div class="page-title">省份</div>
+    <div class="sim">
+      <div class="s-hint">提示文字...</div>
+      <div class="s-section">
+        <div class="s-title">省份信息</div>
+        <div class="s-label">ID <span class="s-value">—</span></div>
+        <div class="s-label">类型 <span class="s-value">—</span></div>
+        <div class="s-label">地形 <span class="s-value">—</span></div>
+        <div class="s-label">像素 <span class="s-value">—</span></div>
+        <div class="s-label">海岸 <span class="s-value">—</span></div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">工具</div>
+        <div class="s-btn full" style="margin-bottom:4px">合并</div>
+        <div class="s-btn full" style="margin-bottom:4px">扩张</div>
+        <div class="s-btn full">切割</div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">区域重生成</div>
+        <div class="s-btn full" style="margin-bottom:4px">框选区域</div>
+        <div class="s-btn accent full">执行重生成</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-card">
+    <div class="page-header header-after">PROPOSED</div>
+    <div class="page-title">省份</div>
+    <div class="sim">
+      <div class="s-info"><span class="s-moved">单行</span> ID: — | 陆地 | 平原 | 0px</div>
+      <div class="s-section">
+        <div class="s-title">工具</div>
+        <div class="s-row">
+          <div class="s-btn">合并</div><div class="s-btn">扩张</div><div class="s-btn">切割</div>
+        </div>
+      </div>
+      <div class="s-section">
+        <div class="s-title">区域重生成</div>
+        <div class="s-row">
+          <div class="s-btn">框选区域</div><div class="s-btn accent">执行重生成</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════ 不改的页面 ═══════════════════ -->
+<div class="page-name" style="color:#666;">其他页面 — 保持不变</div>
+<div class="note-box">
+  <b>以下页面控件逻辑合理，不做改动：</b><br>
+  - <b>河流</b>：3步引导清晰，已优化过默认选择和验证<br>
+  - <b>国家</b>：创建→列表→属性 流程OK<br>
+  - <b>大洲</b>：列表+拾取 简单够用<br>
+  - <b>后勤</b>：邻接+铁路+补给 结构合理<br>
+  - <b>密度图/颜色图/默认地图</b>：控件少，不需要调整<br>
+  - <b>新大陆</b>：画笔+生成+清除，够简单
+</div>
+
+<!-- ═══════════════════ 总结 ═══════════════════ -->
+<div class="note-box" style="border-color:#4a4a6a;">
+  <b style="font-size:14px;">总结：改 6 个页面，动 4 类操作</b><br><br>
+  1. <span class="tag-move">位置调整</span>：一键初始化提到顶部、生成参数和按钮合并<br>
+  2. <span class="tag-remove">去重复</span>：高度图/地形的重复生成按钮<br>
+  3. <span class="tag-merge">合并</span>：两个参考图区域合一、工具和画笔大小合一<br>
+  4. <span class="tag-add">精简</span>：省份信息改单行、地块类型改横排、按钮并排<br><br>
+  <b>不改的：</b>样式/颜色/字号/间距 — 纯逻辑调整，不动 styles.py
+</div>
+
+</body>
+</html>

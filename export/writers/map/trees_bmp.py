@@ -25,26 +25,27 @@ _TREES_H = MAP_HEIGHT // 4
 def write_trees_bmp(
     output_dir: str,
     tree_map: np.ndarray | None = None,
+    map_width: int | None = None,
+    map_height: int | None = None,
 ) -> None:
     """生成 map/trees.bmp.
 
-    tree_map: uint8 数组 (_TREES_H, _TREES_W), 每像素一个 palette 索引.
+    tree_map: uint8 数组 (H//4, W//4), 每像素一个 palette 索引.
               None → 全黑 (无树).
+    map_width/map_height: 实际地图尺寸, 用于 tree_map=None 时计算尺寸.
     """
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "trees.bmp")
 
-    h, w = _TREES_H, _TREES_W
-
     if tree_map is not None:
-        # 确保尺寸匹配
-        if tree_map.shape != (h, w):
-            # 降采样
-            tree_map = tree_map[::max(1, tree_map.shape[0] // h),
-                                ::max(1, tree_map.shape[1] // w)][:h, :w]
         data = tree_map.astype(np.uint8)
+        h, w = data.shape[:2]
     else:
+        mw = map_width if map_width else MAP_WIDTH
+        mh = map_height if map_height else MAP_HEIGHT
+        w = mw // 4
+        h = mh // 4
         data = np.zeros((h, w), dtype=np.uint8)
 
     # BMP row padding (each row must be multiple of 4 bytes)
@@ -92,17 +93,19 @@ def write_trees_bmp(
 def auto_generate_tree_map(terrain_map: np.ndarray) -> np.ndarray:
     """从 terrain_map 自动生成 tree_map (降采样到 trees 分辨率).
 
-    terrain_map: (MAP_HEIGHT, MAP_WIDTH) uint8, palette index.
-    返回: (_TREES_H, _TREES_W) uint8, trees palette index.
+    terrain_map: (H, W) uint8, palette index.
+    返回: (H//4, W//4) uint8, trees palette index.
     """
     from data.terrain_types import TERRAIN_PALETTE_INDEX
     from data.trees_palette import TERRAIN_TO_TREE_INDEX
 
-    h, w = _TREES_H, _TREES_W
+    full_h, full_w = terrain_map.shape[:2]
+    h = full_h // 4
+    w = full_w // 4
 
     # 降采样 terrain_map
-    step_y = max(1, MAP_HEIGHT // h)
-    step_x = max(1, MAP_WIDTH // w)
+    step_y = max(1, full_h // h)
+    step_x = max(1, full_w // w)
     small_terrain = terrain_map[::step_y, ::step_x][:h, :w]
 
     # 建反查表: terrain_palette_index → terrain_name

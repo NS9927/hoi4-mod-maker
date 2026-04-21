@@ -14,8 +14,10 @@ from domain.managers.strategic_region import PRESET_LABELS
 
 from ui.i18n import tr
 from ui.styles import (
+    make_section as _make_section,
     _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE,
     _LIST_STYLE, _COMBOBOX_STYLE, _LINEEDIT_STYLE,
+    _LABEL_STYLE, _SECONDARY_BTN_STYLE,
 )
 
 
@@ -50,81 +52,92 @@ class StrategicRegionPage(QWidget):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(6)
 
-        # 提示
-        tip = QLabel(tr("sr_tip"))
-        tip.setWordWrap(True)
-        tip.setStyleSheet(_DIM_LABEL_STYLE)
-        lay.addWidget(tip)
-
-        # 自动生成
+        # ── 快速开始 ──
+        quick_box = _make_section(tr("sr_quick_section"))
+        ql = quick_box.layout()
         auto_btn = QPushButton(tr("sr_auto_btn"))
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(lambda: self.strategic_region_auto_requested.emit())
-        lay.addWidget(auto_btn)
-
+        ql.addWidget(auto_btn)
         auto_weather_btn = QPushButton(tr("sr_auto_weather_btn"))
-        auto_weather_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        auto_weather_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         auto_weather_btn.clicked.connect(lambda: self.auto_weather_requested.emit())
-        lay.addWidget(auto_weather_btn)
+        ql.addWidget(auto_weather_btn)
+        lay.addWidget(quick_box)
 
-        # 从州创建
-        self._from_states_btn = QPushButton(tr("sr_from_states_btn"))
-        self._from_states_btn.setCheckable(True)
-        self._from_states_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._from_states_btn.setToolTip(tr("sr_from_states_tip"))
-        self._from_states_btn.toggled.connect(self.create_from_states_toggled.emit)
-        lay.addWidget(self._from_states_btn)
-
-        self._from_states_confirm_btn = QPushButton(tr("sr_from_states_confirm_btn"))
-        self._from_states_confirm_btn.setStyleSheet(
-            "QPushButton { background: #22c55e; color: white; padding: 6px;"
-            " border-radius: 4px; font-weight: bold; }"
-            "QPushButton:hover { background: #2ad66a; }"
-        )
-        self._from_states_confirm_btn.clicked.connect(self.create_from_states_confirmed.emit)
-        lay.addWidget(self._from_states_confirm_btn)
-
-        # 分配模式开关
-        self._assign_chk = QCheckBox(tr("sr_assign_mode_label"))
+        # ── 手动编辑 ──
+        edit_box = _make_section(tr("sr_edit_section"))
+        el = edit_box.layout()
+        self._assign_chk = QCheckBox(tr("sr_assign_drag_label"))
         self._assign_chk.setChecked(False)
         self._assign_chk.setStyleSheet(
             "QCheckBox { color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }"
             "QCheckBox:checked { color: #86efac; }"
         )
         self._assign_chk.toggled.connect(self.sr_assign_mode_changed.emit)
-        lay.addWidget(self._assign_chk)
+        el.addWidget(self._assign_chk)
 
-        # Region 列表（加大高度）
+        from_row = QHBoxLayout()
+        self._from_states_btn = QPushButton(tr("sr_from_states_btn_short"))
+        self._from_states_btn.setCheckable(True)
+        self._from_states_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        self._from_states_btn.setToolTip(tr("sr_from_states_tip"))
+        self._from_states_btn.toggled.connect(self.create_from_states_toggled.emit)
+        from_row.addWidget(self._from_states_btn)
+
+        self._from_states_confirm_btn = QPushButton(tr("sr_from_states_confirm_btn_short"))
+        self._from_states_confirm_btn.setStyleSheet(
+            "QPushButton { background: #22c55e; color: white; padding: 6px;"
+            " border-radius: 4px; font-weight: bold; }"
+            "QPushButton:hover { background: #2ad66a; }"
+        )
+        self._from_states_confirm_btn.clicked.connect(self.create_from_states_confirmed.emit)
+        from_row.addWidget(self._from_states_confirm_btn)
+        el.addLayout(from_row)
+        lay.addWidget(edit_box)
+
+        # ── 区域列表 ──
+        list_box = _make_section(tr("sr_list_section"))
+        ll = list_box.layout()
         self._sr_list = QListWidget()
         self._sr_list.setStyleSheet(_LIST_STYLE)
         self._sr_list.setMinimumHeight(180)
         self._sr_list.currentRowChanged.connect(
             lambda row: self.strategic_region_selected.emit(row)
         )
-        lay.addWidget(self._sr_list)
+        ll.addWidget(self._sr_list)
 
         btn_row = QHBoxLayout()
         new_btn = QPushButton(tr("sr_new_btn"))
         new_btn.clicked.connect(lambda: self.strategic_region_new_requested.emit())
         del_btn = QPushButton(tr("sr_delete_btn"))
+        del_btn.setStyleSheet("QPushButton { color: #cc6666; }")
         del_btn.clicked.connect(lambda: self.strategic_region_delete_requested.emit())
         btn_row.addWidget(new_btn)
         btn_row.addWidget(del_btn)
-        lay.addLayout(btn_row)
+        ll.addLayout(btn_row)
+        lay.addWidget(list_box)
 
-        # 编辑字段
+        # ── 选中区域属性 ──
+        prop_box = _make_section(tr("sr_props_section"))
+        pl = prop_box.layout()
+
         name_row = QHBoxLayout()
-        name_row.addWidget(QLabel(tr("sr_name_label")))
+        name_lbl = QLabel(tr("sr_name_label"))
+        name_lbl.setStyleSheet(_LABEL_STYLE)
+        name_row.addWidget(name_lbl)
         self._sr_name_edit = QLineEdit()
         self._sr_name_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._sr_name_edit.editingFinished.connect(
             lambda: self.strategic_region_name_changed.emit(self._sr_name_edit.text())
         )
         name_row.addWidget(self._sr_name_edit)
-        lay.addLayout(name_row)
+        pl.addLayout(name_row)
 
         weather_row = QHBoxLayout()
-        weather_row.addWidget(QLabel(tr("sr_weather_label")))
+        weather_lbl = QLabel(tr("sr_weather_label"))
+        weather_lbl.setStyleSheet(_LABEL_STYLE)
+        weather_row.addWidget(weather_lbl)
         self._sr_weather_combo = QComboBox()
         self._sr_weather_combo.setStyleSheet(_COMBOBOX_STYLE)
         for key, label in PRESET_LABELS.items():
@@ -135,10 +148,12 @@ class StrategicRegionPage(QWidget):
             )
         )
         weather_row.addWidget(self._sr_weather_combo)
-        lay.addLayout(weather_row)
+        pl.addLayout(weather_row)
 
         naval_row = QHBoxLayout()
-        naval_row.addWidget(QLabel(tr("sr_naval_label")))
+        naval_lbl = QLabel(tr("sr_naval_label"))
+        naval_lbl.setStyleSheet(_LABEL_STYLE)
+        naval_row.addWidget(naval_lbl)
         self._sr_naval_combo = QComboBox()
         self._sr_naval_combo.setStyleSheet(_COMBOBOX_STYLE)
         self._sr_naval_combo.addItem(tr("sr_naval_none"), "")
@@ -150,11 +165,12 @@ class StrategicRegionPage(QWidget):
             )
         )
         naval_row.addWidget(self._sr_naval_combo)
-        lay.addLayout(naval_row)
+        pl.addLayout(naval_row)
 
         self._sr_prov_count = QLabel(tr("sr_prov_count", 0))
         self._sr_prov_count.setStyleSheet(_DIM_LABEL_STYLE)
-        lay.addWidget(self._sr_prov_count)
+        pl.addWidget(self._sr_prov_count)
+        lay.addWidget(prop_box)
 
         # 保留 pick 按钮引用（兼容 main_window_actions 对 _sr_pick_btn 的访问）
         self._sr_pick_btn = QPushButton()

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>HOI4 Map Maker - UI Mockup Comparison</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #111; color: #e0e0f0; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; padding: 20px; }
+h1 { text-align: center; color: #8080ff; margin-bottom: 30px; font-size: 24px; }
+h2 { color: #7c7cff; margin: 30px 0 15px; font-size: 18px; border-bottom: 1px solid #3a3a4a; padding-bottom: 8px; }
+.compare { display: flex; gap: 40px; margin-bottom: 40px; }
+.version { flex: 1; }
+.version-title { text-align: center; padding: 8px; border-radius: 6px 6px 0 0; font-weight: bold; font-size: 14px; }
+.version-title.current { background: #4a2020; color: #ff8888; }
+.version-title.proposed { background: #204a20; color: #88ff88; }
+
+/* Simulate the panel */
+.panel {
+  background: #1e1e2e;
+  border: 1px solid #3a3a4a;
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+/* ===== CURRENT STYLE ===== */
+.cur-nav-btn {
+  display: block; width: 100%; border: none; background: transparent;
+  color: #b0b0c8; padding: 10px 12px; font-size: 13px; text-align: left;
+  cursor: pointer; border-left: 3px solid transparent;
+}
+.cur-nav-btn:hover { color: #f0f0ff; }
+.cur-nav-btn.active { border-left-color: #8080ff; background: rgba(108,108,240,0.15); color: #f0f0ff; }
+
+.cur-hint {
+  color: #b0b0c8; font-size: 12px; padding: 8px 8px; line-height: 1.5;
+}
+
+.cur-section {
+  background: #2a2a3a; border: 1px solid #4a4a5e; border-radius: 6px;
+  margin: 8px; padding: 10px; padding-top: 8px;
+}
+.cur-section-title {
+  color: #7c7cff; font-size: 15px; font-weight: 700; margin-bottom: 8px;
+}
+.cur-label { color: #f0f0ff; font-size: 15px; margin-bottom: 4px; }
+.cur-dim { color: #b0b0c8; font-size: 15px; }
+.cur-slider {
+  width: 100%; height: 4px; background: #4a4a5e; border-radius: 2px;
+  margin: 8px 0; appearance: none; -webkit-appearance: none;
+}
+.cur-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #f0f0ff;
+  padding: 7px 12px; font-size: 15px; border-radius: 5px; cursor: pointer;
+  width: 100%; margin-top: 6px;
+}
+.cur-btn-primary {
+  background: #8080ff; border: none; color: white; padding: 8px 14px;
+  font-size: 15px; font-weight: 600; border-radius: 5px; cursor: pointer;
+  width: 100%; margin-top: 6px;
+}
+.cur-tool-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #b0b0c8;
+  padding: 6px 4px; font-size: 15px; border-radius: 4px; cursor: pointer;
+  flex: 1; text-align: center;
+}
+.cur-tool-btn.active { background: #8080ff; color: white; border-color: #8080ff; }
+.cur-tool-row { display: flex; gap: 3px; margin-bottom: 8px; }
+
+/* ===== PROPOSED A: Compact ===== */
+.a-nav-btn {
+  display: block; width: 100%; border: none; background: transparent;
+  color: #b0b0c8; padding: 9px 14px; font-size: 13px; text-align: left;
+  cursor: pointer; border-left: 3px solid transparent; font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.a-nav-btn:hover { color: #f0f0ff; background: rgba(108,108,240,0.08); }
+.a-nav-btn.active { border-left-color: #8080ff; background: rgba(108,108,240,0.15); color: #f0f0ff; }
+
+.a-hint {
+  color: #888; font-size: 11px; padding: 6px 12px; line-height: 1.4;
+  border-bottom: 1px solid #2a2a3a; cursor: pointer;
+}
+.a-hint:hover { color: #b0b0c8; }
+.a-hint-collapsed {
+  color: #666; font-size: 11px; padding: 4px 12px; cursor: pointer;
+  border-bottom: 1px solid #2a2a3a;
+}
+
+.a-section {
+  background: #2a2a3a; border: 1px solid #3a3a50; border-radius: 6px;
+  margin: 6px 12px; padding: 10px 12px; padding-top: 8px;
+}
+.a-section-title {
+  color: #7c7cff; font-size: 12px; font-weight: 700; margin-bottom: 8px;
+  text-transform: uppercase; letter-spacing: 0.5px;
+}
+.a-label { color: #f0f0ff; font-size: 13px; margin-bottom: 4px; font-weight: 500; }
+.a-dim { color: #b0b0c8; font-size: 13px; }
+
+.a-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #f0f0ff;
+  padding: 7px 12px; font-size: 13px; font-weight: 600; border-radius: 5px;
+  cursor: pointer; width: 100%; margin-top: 6px;
+}
+.a-btn-primary {
+  background: #8080ff; border: none; color: white; padding: 8px 14px;
+  font-size: 13px; font-weight: 700; border-radius: 5px; cursor: pointer;
+  width: 100%; margin-top: 6px;
+}
+.a-tool-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #b0b0c8;
+  padding: 7px 4px; font-size: 13px; font-weight: 600; border-radius: 4px;
+  cursor: pointer; flex: 1; text-align: center;
+}
+.a-tool-btn.active { background: #8080ff; color: white; border-color: #8080ff; }
+.a-tool-row { display: flex; gap: 4px; margin-bottom: 8px; }
+
+/* ===== PROPOSED B: Spacious ===== */
+.b-nav-btn {
+  display: block; width: 100%; border: none; background: transparent;
+  color: #c0c0d8; padding: 11px 16px; font-size: 14px; text-align: left;
+  cursor: pointer; border-left: 3px solid transparent; font-weight: 700;
+}
+.b-nav-btn:hover { color: #f0f0ff; background: rgba(108,108,240,0.08); }
+.b-nav-btn.active { border-left-color: #8080ff; background: rgba(108,108,240,0.12); color: #f0f0ff; }
+.b-nav-sep { height: 1px; background: #2a2a3a; margin: 2px 12px; }
+
+.b-hint {
+  color: #777; font-size: 11px; padding: 4px 14px 6px; line-height: 1.4;
+  font-style: italic;
+}
+
+.b-section {
+  background: #252538; border: 1px solid #3a3a50; border-radius: 8px;
+  margin: 8px 14px; padding: 14px; padding-top: 10px;
+}
+.b-section-title {
+  color: #9090ff; font-size: 11px; font-weight: 700; margin-bottom: 10px;
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.b-label { color: #f0f0ff; font-size: 13px; margin-bottom: 4px; }
+.b-dim { color: #b0b0c8; font-size: 13px; }
+
+.b-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #f0f0ff;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; border-radius: 6px;
+  cursor: pointer; width: 100%; margin-top: 8px;
+}
+.b-btn-primary {
+  background: #7070ee; border: none; color: white; padding: 10px 14px;
+  font-size: 13px; font-weight: 700; border-radius: 6px; cursor: pointer;
+  width: 100%; margin-top: 8px;
+}
+.b-tool-btn {
+  background: #2a2a3a; border: 1px solid #4a4a5e; color: #b0b0c8;
+  padding: 8px 4px; font-size: 13px; font-weight: 600; border-radius: 5px;
+  cursor: pointer; flex: 1; text-align: center;
+}
+.b-tool-btn.active { background: #7070ee; color: white; border-color: #7070ee; }
+.b-tool-row { display: flex; gap: 5px; margin-bottom: 10px; }
+
+.note { background: #252535; border: 1px solid #3a3a4a; border-radius: 6px; padding: 12px 16px; margin: 15px 0; font-size: 13px; color: #b0b0c8; line-height: 1.6; }
+.note b { color: #8080ff; }
+.tag { display: inline-block; background: #3a3a5a; color: #c0c0e0; padding: 2px 8px; border-radius: 3px; font-size: 11px; margin: 2px; }
+</style>
+</head>
+<body>
+
+<h1>UI Mockup - 三方案对比</h1>
+
+<div class="note">
+  <b>说明：</b> 以下是编辑器面板的三个样式方案对比。<br>
+  <span class="tag">当前</span> 现有样式 &nbsp;
+  <span class="tag">方案 A</span> 紧凑型：缩小字号、加粗按钮、提示折叠 &nbsp;
+  <span class="tag">方案 B</span> 宽松型：更大间距、圆角、分隔线
+</div>
+
+<!-- ═══════ 导航栏对比 ═══════ -->
+<h2>1. 导航栏</h2>
+<div class="compare">
+  <div class="version">
+    <div class="version-title current">当前</div>
+    <div class="panel" style="width:350px">
+      <button class="cur-nav-btn active">🏖 地图绘制</button>
+      <button class="cur-nav-btn">🧩 省份</button>
+      <button class="cur-nav-btn">⛰ 地形</button>
+      <button class="cur-nav-btn">💧 河流</button>
+      <button class="cur-nav-btn">🏛 区域</button>
+      <button class="cur-nav-btn">🛤 后勤</button>
+      <button class="cur-nav-btn">⚙ 设置</button>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 A - 紧凑加粗</div>
+    <div class="panel" style="width:320px">
+      <button class="a-nav-btn active">🏖 地图绘制</button>
+      <button class="a-nav-btn">🧩 省份</button>
+      <button class="a-nav-btn">⛰ 地形</button>
+      <button class="a-nav-btn">💧 河流</button>
+      <button class="a-nav-btn">🏛 区域</button>
+      <button class="a-nav-btn">🛤 后勤</button>
+      <button class="a-nav-btn">⚙ 设置</button>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 B - 宽松分隔</div>
+    <div class="panel" style="width:350px">
+      <button class="b-nav-btn active">🏖 地图绘制</button>
+      <button class="b-nav-btn">🧩 省份</button>
+      <button class="b-nav-btn">⛰ 地形</button>
+      <div class="b-nav-sep"></div>
+      <button class="b-nav-btn">💧 河流</button>
+      <button class="b-nav-btn">🏛 区域</button>
+      <button class="b-nav-btn">🛤 后勤</button>
+      <div class="b-nav-sep"></div>
+      <button class="b-nav-btn">⚙ 设置</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 提示文字对比 ═══════ -->
+<h2>2. 提示文字</h2>
+<div class="compare">
+  <div class="version">
+    <div class="version-title current">当前 - 始终显示</div>
+    <div class="panel" style="width:350px; padding: 8px;">
+      <div class="cur-hint">在地图上绘制陆地、海洋和湖泊。画完后点「生成省份」自动划分省份边界。可以用参考图辅助绘制。</div>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 A - 缩小弱化</div>
+    <div class="panel" style="width:320px; padding: 8px;">
+      <div class="a-hint">在地图上绘制陆地、海洋和湖泊。画完后点「生成省份」自动划分省份边界。</div>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 B - 极简斜体</div>
+    <div class="panel" style="width:350px; padding: 8px;">
+      <div class="b-hint">绘制陆地/海洋 → 生成省份</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 工具区对比 ═══════ -->
+<h2>3. 工具按钮 + Section</h2>
+<div class="compare">
+  <div class="version">
+    <div class="version-title current">当前</div>
+    <div class="panel" style="width:350px">
+      <div class="cur-section">
+        <div class="cur-section-title">工具</div>
+        <div class="cur-tool-row">
+          <button class="cur-tool-btn active">画笔</button>
+          <button class="cur-tool-btn">橡皮</button>
+          <button class="cur-tool-btn">填充 (F)</button>
+        </div>
+        <div class="cur-tool-row">
+          <button class="cur-tool-btn">变换</button>
+          <button class="cur-tool-btn">平移</button>
+        </div>
+      </div>
+      <div class="cur-section">
+        <div class="cur-section-title">画笔大小</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span class="cur-label">大小</span>
+          <span class="cur-dim">30px</span>
+        </div>
+        <input type="range" class="cur-slider">
+      </div>
+      <div class="cur-section">
+        <div class="cur-section-title">地块类型</div>
+        <button class="cur-btn">🟢 陆地</button>
+        <button class="cur-btn">🔵 海洋</button>
+        <button class="cur-btn">🔷 湖泊</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="version">
+    <div class="version-title proposed">方案 A - 紧凑加粗</div>
+    <div class="panel" style="width:320px">
+      <div class="a-section">
+        <div class="a-section-title">TOOLS</div>
+        <div class="a-tool-row">
+          <button class="a-tool-btn active">画笔</button>
+          <button class="a-tool-btn">橡皮</button>
+          <button class="a-tool-btn">填充 (F)</button>
+        </div>
+        <div class="a-tool-row">
+          <button class="a-tool-btn">变换</button>
+          <button class="a-tool-btn">平移</button>
+        </div>
+      </div>
+      <div class="a-section">
+        <div class="a-section-title">BRUSH SIZE</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+          <span class="a-label">大小</span>
+          <span class="a-dim">30px</span>
+        </div>
+        <input type="range" class="cur-slider">
+      </div>
+      <div class="a-section">
+        <div class="a-section-title">TILE TYPE</div>
+        <button class="a-btn">🟢 陆地</button>
+        <button class="a-btn">🔵 海洋</button>
+        <button class="a-btn">🔷 湖泊</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="version">
+    <div class="version-title proposed">方案 B - 宽松圆角</div>
+    <div class="panel" style="width:350px">
+      <div class="b-section">
+        <div class="b-section-title">TOOLS</div>
+        <div class="b-tool-row">
+          <button class="b-tool-btn active">画笔</button>
+          <button class="b-tool-btn">橡皮</button>
+          <button class="b-tool-btn">填充 (F)</button>
+        </div>
+        <div class="b-tool-row">
+          <button class="b-tool-btn">变换</button>
+          <button class="b-tool-btn">平移</button>
+        </div>
+      </div>
+      <div class="b-section">
+        <div class="b-section-title">BRUSH SIZE</div>
+        <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+          <span class="b-label">大小</span>
+          <span class="b-dim">30px</span>
+        </div>
+        <input type="range" class="cur-slider">
+      </div>
+      <div class="b-section">
+        <div class="b-section-title">TILE TYPE</div>
+        <button class="b-btn">🟢 陆地</button>
+        <button class="b-btn">🔵 海洋</button>
+        <button class="b-btn">🔷 湖泊</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 主按钮对比 ═══════ -->
+<h2>4. 主要操作按钮</h2>
+<div class="compare">
+  <div class="version">
+    <div class="version-title current">当前</div>
+    <div class="panel" style="width:350px; padding: 8px;">
+      <button class="cur-btn-primary">生成省份</button>
+      <button class="cur-btn" style="margin-top:8px">验证地图</button>
+      <button class="cur-btn-primary" style="background:#22c55e; margin-top:8px">一键初始化</button>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 A</div>
+    <div class="panel" style="width:320px; padding: 8px 12px;">
+      <button class="a-btn-primary">生成省份</button>
+      <button class="a-btn" style="margin-top:8px">验证地图</button>
+      <button class="a-btn-primary" style="background:#22c55e; margin-top:8px">一键初始化</button>
+    </div>
+  </div>
+  <div class="version">
+    <div class="version-title proposed">方案 B</div>
+    <div class="panel" style="width:350px; padding: 10px 14px;">
+      <button class="b-btn-primary">生成省份</button>
+      <button class="b-btn" style="margin-top:10px">验证地图</button>
+      <button class="b-btn-primary" style="background:#22c55e; margin-top:10px">一键初始化</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 总结 ═══════ -->
+<h2>方案对比总结</h2>
+<table style="width:100%; border-collapse:collapse; font-size:13px;">
+<tr style="border-bottom:1px solid #3a3a4a;">
+  <th style="text-align:left; padding:8px; color:#8080ff;">项目</th>
+  <th style="padding:8px; color:#ff8888;">当前</th>
+  <th style="padding:8px; color:#88ff88;">方案 A 紧凑</th>
+  <th style="padding:8px; color:#88ff88;">方案 B 宽松</th>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">面板宽度</td>
+  <td style="padding:8px; text-align:center;">380px</td>
+  <td style="padding:8px; text-align:center;">320px</td>
+  <td style="padding:8px; text-align:center;">350px</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">字号</td>
+  <td style="padding:8px; text-align:center;">15px 全局</td>
+  <td style="padding:8px; text-align:center;">13px 主体</td>
+  <td style="padding:8px; text-align:center;">13px 主体</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">导航按钮</td>
+  <td style="padding:8px; text-align:center;">13px 不加粗</td>
+  <td style="padding:8px; text-align:center;">13px 加粗</td>
+  <td style="padding:8px; text-align:center;">14px 加粗+分隔线</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">Section 标题</td>
+  <td style="padding:8px; text-align:center;">15px 紫色</td>
+  <td style="padding:8px; text-align:center;">12px 大写紫色</td>
+  <td style="padding:8px; text-align:center;">11px 大写亮紫</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">提示文字</td>
+  <td style="padding:8px; text-align:center;">12px 始终显示</td>
+  <td style="padding:8px; text-align:center;">11px 弱化</td>
+  <td style="padding:8px; text-align:center;">11px 极简斜体</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">按钮风格</td>
+  <td style="padding:8px; text-align:center;">15px 不加粗</td>
+  <td style="padding:8px; text-align:center;">13px 加粗</td>
+  <td style="padding:8px; text-align:center;">13px 加粗+大圆角</td>
+</tr>
+<tr style="border-bottom:1px solid #2a2a3a;">
+  <td style="padding:8px;">间距感</td>
+  <td style="padding:8px; text-align:center;">紧</td>
+  <td style="padding:8px; text-align:center;">更紧凑</td>
+  <td style="padding:8px; text-align:center;">更宽松</td>
+</tr>
+<tr>
+  <td style="padding:8px;">适合场景</td>
+  <td style="padding:8px; text-align:center;">-</td>
+  <td style="padding:8px; text-align:center;">小屏 / 给画布更多空间</td>
+  <td style="padding:8px; text-align:center;">大屏 / 更好的视觉层次</td>
+</tr>
+</table>
+
+<div class="note" style="margin-top:30px;">
+  <b>看完告诉我：</b><br>
+  1. 选 A 还是 B？还是混搭？<br>
+  2. 哪些细节要调整？（颜色/间距/圆角/字号等）<br>
+  3. 提示文字要折叠还是直接缩短？
+</div>
+
+</body>
+</html>

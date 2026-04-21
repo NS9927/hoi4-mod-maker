@@ -286,6 +286,65 @@ def detect_coastal_mismatch(
     return sorted(coastal_provinces)
 
 
+def build_coastal_land_to_sea(
+    tile_map: np.ndarray,
+    province_map: np.ndarray,
+) -> dict[int, int]:
+    """返回 {coastal_land_pid: adjacent_sea_pid} 映射（**像素级**邻接）。
+
+    保证和 get_coastal_provinces 的结果**完全一致** — 任何被标记为 coastal 的
+    陆地省都能在这里找到配对的海洋省。buildings.txt 就用这个结果写
+    naval_base_spawn，避免"CSV 标 coastal 但 buildings 没 port"的崩溃。
+    """
+    land_mask = tile_map == TILE_LAND
+    sea_mask = tile_map == TILE_SEA
+    out: dict[int, int] = {}
+
+    # 4 方向扫描：每个像素对 (land, sea) 检查是否真的是 land 在 a 侧、sea 在 b 侧
+    # 上: (y, x) is land, (y-1, x) is sea  → land pid from (y, x), sea pid from (y-1, x)
+    m_up = land_mask[1:, :] & sea_mask[:-1, :]
+    if np.any(m_up):
+        ys, xs = np.where(m_up)
+        lp = province_map[ys + 1, xs]
+        sp = province_map[ys, xs]
+        for i in range(len(lp)):
+            pid = int(lp[i])
+            if pid > 0 and pid not in out:
+                out[pid] = int(sp[i])
+
+    m_down = land_mask[:-1, :] & sea_mask[1:, :]
+    if np.any(m_down):
+        ys, xs = np.where(m_down)
+        lp = province_map[ys, xs]
+        sp = province_map[ys + 1, xs]
+        for i in range(len(lp)):
+            pid = int(lp[i])
+            if pid > 0 and pid not in out:
+                out[pid] = int(sp[i])
+
+    m_left = land_mask[:, 1:] & sea_mask[:, :-1]
+    if np.any(m_left):
+        ys, xs = np.where(m_left)
+        lp = province_map[ys, xs + 1]
+        sp = province_map[ys, xs]
+        for i in range(len(lp)):
+            pid = int(lp[i])
+            if pid > 0 and pid not in out:
+                out[pid] = int(sp[i])
+
+    m_right = land_mask[:, :-1] & sea_mask[:, 1:]
+    if np.any(m_right):
+        ys, xs = np.where(m_right)
+        lp = province_map[ys, xs]
+        sp = province_map[ys, xs + 1]
+        for i in range(len(lp)):
+            pid = int(lp[i])
+            if pid > 0 and pid not in out:
+                out[pid] = int(sp[i])
+
+    return out
+
+
 def detect_too_large_provinces(province_map: np.ndarray) -> list[int]:
     """
     检测单个省份的 bounding box 是否超过地图宽/高的 1/8。

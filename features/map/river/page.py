@@ -57,7 +57,7 @@ class RiverPage(QWidget):
             btn.setCheckable(True)
             btn.setProperty("river_idx", idx)
             self._width_group.addButton(btn, idx)
-            btn.clicked.connect(lambda _, ix=idx: self.river_type_changed.emit(ix))
+            btn.clicked.connect(lambda _, ix=idx: self._on_width_clicked(ix))
             wgrid.addWidget(btn, i // 4, i % 4)
         manual_layout.addLayout(wgrid)
 
@@ -93,7 +93,7 @@ class RiverPage(QWidget):
             btn.setCheckable(True)
             btn.setProperty("river_idx", idx)
             self._marker_group.addButton(btn, idx)
-            btn.clicked.connect(lambda _, ix=idx: self.river_type_changed.emit(ix))
+            btn.clicked.connect(lambda _, ix=idx: self._on_marker_clicked(ix))
             mgrid.addWidget(btn, 0, i)
         manual_layout.addLayout(mgrid)
 
@@ -158,15 +158,38 @@ class RiverPage(QWidget):
 
         lay.addStretch()
 
+    def _on_width_clicked(self, idx: int) -> None:
+        """选了宽度按钮 → 取消标记组选中。"""
+        checked = self._marker_group.checkedButton()
+        if checked:
+            self._marker_group.setExclusive(False)
+            checked.setChecked(False)
+            self._marker_group.setExclusive(True)
+        self.river_type_changed.emit(idx)
+
+    def _on_marker_clicked(self, idx: int) -> None:
+        """选了标记按钮 → 取消宽度组选中。"""
+        checked = self._width_group.checkedButton()
+        if checked:
+            self._width_group.setExclusive(False)
+            checked.setChecked(False)
+            self._width_group.setExclusive(True)
+        self.river_type_changed.emit(idx)
+
     def _on_river_brush(self, size: int) -> None:
         self._river_brush_label.setText(f"{size}px")
         self.brush_size_changed.emit(size)
 
     def showEvent(self, event):
-        """每次切到河流 tab 都自动把画笔重置为 1px（HOI4 河流必须 1 像素宽）。"""
+        """每次切到河流 tab 都重置为默认宽度画笔（非源头）。"""
         super().showEvent(event)
         if self._river_brush_slider.value() != 1:
             self._river_brush_slider.setValue(1)
+        # 重置到宽度模式，取消标记组
+        default_btn = self._width_group.button(RIVER_WIDTH_4)
+        if default_btn and not default_btn.isChecked():
+            default_btn.setChecked(True)
+            self._on_width_clicked(RIVER_WIDTH_4)
 
 
 def _make_river_btn(name: str, r: int, g: int, b: int) -> QPushButton:

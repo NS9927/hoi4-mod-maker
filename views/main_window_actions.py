@@ -614,7 +614,8 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
 
     def _on_validate_river(self) -> None:
         from domain.managers.river import validate_rivers
-        warnings = validate_rivers(self._canvas.river_map)
+        from ui.i18n import get_language
+        warnings = validate_rivers(self._canvas.river_map, lang=get_language())
         QMessageBox.information(self, tr("dlg_river_validate_title"), "\n".join(warnings))
 
     def _on_auto_terrain(self) -> None:
@@ -679,6 +680,30 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         from services.terrain_service import smooth_height
         self._canvas.height_map = smooth_height(self._canvas.height_map)
         self._status_info.setText(tr("status_height_smoothed"))
+
+    def _on_import_heightmap(self) -> None:
+        from PyQt5.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(
+            self, tr("height_import_btn"),
+            "", "Images (*.bmp *.png *.jpg *.tif);;All Files (*)"
+        )
+        if not path:
+            return
+        try:
+            from PIL import Image
+            import numpy as np
+            img = Image.open(path).convert("L")
+            h, w = self._project.map_data.height_map.shape
+            img = img.resize((w, h), Image.BILINEAR)
+            new_height = np.array(img, dtype=np.uint8)
+            self._project.map_data.height_map[:] = new_height
+            self._canvas.height_map = self._project.map_data.height_map
+            self._canvas.refresh_display()
+            self._project.mark_dirty()
+            self._status_info.setText(tr("height_import_success"))
+        except Exception as e:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(self, tr("dlg_error"), tr("height_import_fail", str(e)))
 
     # ── 山脉画线 ──
 

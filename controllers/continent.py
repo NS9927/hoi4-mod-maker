@@ -20,6 +20,7 @@ class ContinentController(BaseController):
         super().__init__(project, command_history)
         self.pick_on: bool = False
         self.pick_index: int = -1
+        self.assign_by_state: bool = False
         # 始终监听省份重新生成
         self.event_bus.subscribe("province_map_regenerated", self._on_province_regen)
 
@@ -49,7 +50,7 @@ class ContinentController(BaseController):
             self._emit_status("大洲指派关闭")
 
     def on_province_clicked(self, pid: int) -> None:
-        """拾取模式下点击省份指派大陆。"""
+        """拾取模式下点击省份指派大陆。支持 State 级别批量分配。"""
         if not self.pick_on or self.pick_index < 0 or pid <= 0:
             return
 
@@ -60,25 +61,37 @@ class ContinentController(BaseController):
         province_map = map_data.province_map
         tile_map = map_data.tile_map
 
-        ys, xs = np.where(province_map == pid)
-        if len(ys) == 0:
-            return
-
-        # 只允许陆地省份
-        if int(tile_map[ys[0], xs[0]]) != TILE_LAND:
-            self._emit_status(f"省份 {pid} 不是陆地，跳过")
-            return
+        # 收集要分配的省份列表
+        if self.assign_by_state:
+            state_mgr = self.project.state_mgr
+            sid = state_mgr.get_state_of_province(pid)
+            state = state_mgr.get_state(sid) if sid > 0 else None
+            pids = list(state.provinces) if state else [pid]
+        else:
+            pids = [pid]
 
         continent_mgr = self.project.continent_mgr
-        continent_mgr.assign_province(pid, self.pick_index)
-        self.project.mark_dirty()
-        self._emit_status(f"省份 {pid} 已指派到大陆 #{self.pick_index + 1}")
+        count = 0
+        for p in pids:
+            ys, xs = np.where(province_map == p)
+            if len(ys) == 0:
+                continue
+            if int(tile_map[ys[0], xs[0]]) != TILE_LAND:
+                continue
+            continent_mgr.assign_province(p, self.pick_index)
+            count += 1
+
+        if count > 0:
+            self.project.mark_dirty()
+            self._emit_status(f"{count} 个省份已指派到大陆 #{self.pick_index + 1}")
+            self.event_bus.emit("continent_changed", action="assigned")
 
     def add_continent(self, name: str) -> bool:
         """添加大陆。返回是否成功。"""
         try:
             self.project.continent_mgr.add_continent(name)
             self.project.mark_dirty()
+            self.event_bus.emit("continent_changed", action="added")
             return True
         except ValueError as e:
             self._emit_status(f"添加大陆失败: {e}")
@@ -89,6 +102,7 @@ class ContinentController(BaseController):
         try:
             self.project.continent_mgr.rename_continent(index, name)
             self.project.mark_dirty()
+            self.event_bus.emit("continent_changed", action="renamed")
             return True
         except (ValueError, IndexError) as e:
             self._emit_status(f"重命名失败: {e}")
@@ -99,6 +113,7 @@ class ContinentController(BaseController):
         try:
             self.project.continent_mgr.remove_continent(index)
             self.project.mark_dirty()
+            self.event_bus.emit("continent_changed", action="removed")
             return True
         except (ValueError, IndexError) as e:
             self._emit_status(f"删除失败: {e}")

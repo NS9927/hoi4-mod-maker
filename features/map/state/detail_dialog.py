@@ -137,6 +137,27 @@ class StateDetailDialog(QDialog):
         self._supplies_spin.setDecimals(2)
         lay.addRow(tr("state_dlg_supplies_label"), self._supplies_spin)
 
+        # VP 城市命名
+        vp_box = QGroupBox(tr("state_dlg_vp_names"))
+        vp_lay = QGridLayout(vp_box)
+        vp_lay.addWidget(QLabel(tr("state_dlg_vp_province")), 0, 0)
+        vp_lay.addWidget(QLabel(tr("state_dlg_vp_value")), 0, 1)
+        vp_lay.addWidget(QLabel(tr("state_dlg_vp_city_name")), 0, 2)
+        self._vp_name_edits: dict[int, QLineEdit] = {}
+        row_idx = 1
+        for vpid, vpval in self._state.victory_points.items():
+            vp_lay.addWidget(QLabel(str(vpid)), row_idx, 0)
+            vp_lay.addWidget(QLabel(str(vpval)), row_idx, 1)
+            edit = QLineEdit()
+            edit.setPlaceholderText(self._state.name)
+            edit.setText(self._state.vp_names.get(vpid, ""))
+            self._vp_name_edits[vpid] = edit
+            vp_lay.addWidget(edit, row_idx, 2)
+            row_idx += 1
+        if not self._state.victory_points:
+            vp_lay.addWidget(QLabel(tr("state_dlg_vp_none")), 1, 0, 1, 3)
+        lay.addRow(vp_box)
+
         return w
 
     def _build_resources_tab(self) -> QWidget:
@@ -285,6 +306,11 @@ class StateDetailDialog(QDialog):
         s.claims = [
             self._claims_list.item(i).text() for i in range(self._claims_list.count())
         ]
+
+        # VP 城市名
+        for vpid, edit in self._vp_name_edits.items():
+            name = edit.text().strip()
+            s.vp_names[vpid] = name
 
         self.accept()
 

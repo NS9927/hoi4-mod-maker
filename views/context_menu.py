@@ -12,6 +12,7 @@ from data.terrain_types import (
     TERRAIN_TYPES, GRAPHICAL_TERRAIN_BY_INDEX,
     graphical_terrain_display_name,
 )
+from ui.i18n import tr
 
 if TYPE_CHECKING:
     from model.project import Project
@@ -39,12 +40,12 @@ class ProvinceContextMenu:
         menu = QMenu()
 
         # ── 省份信息 ──
-        info_action = menu.addAction(f"省份 {pid} 信息")
+        info_action = menu.addAction(tr("context_province_info", pid))
         info_action.setEnabled(False)
         menu.addSeparator()
 
         # ── 地形设置 ──
-        terrain_menu = menu.addMenu("设置地形")
+        terrain_menu = menu.addMenu(tr("context_set_terrain"))
         terrain_actions: dict[object, int] = {}
         for gt in sorted(GRAPHICAL_TERRAIN_BY_INDEX.values(), key=lambda g: g.palette_index):
             if gt.type in ("ocean", "lakes"):
@@ -61,23 +62,23 @@ class ProvinceContextMenu:
         copy_action = None
 
         if state_id:
-            state_info = menu.addAction(f"所属 State: {state_id}")
+            state_info = menu.addAction(tr("context_belongs_state", state_id))
             state_info.setEnabled(False)
 
-            vp_action = menu.addAction("设置胜利点...")
+            vp_action = menu.addAction(tr("context_set_vp"))
 
             tag = self._project.country_mgr.get_owner_of_state(state_id)
             if tag:
-                country_info = menu.addAction(f"所属国家: {tag}")
+                country_info = menu.addAction(tr("context_belongs_country", tag))
                 country_info.setEnabled(False)
 
-            capital_action = menu.addAction("设为首都")
+            capital_action = menu.addAction(tr("context_set_capital"))
         else:
-            no_state = menu.addAction("(未分配 State)")
+            no_state = menu.addAction(tr("context_unassigned_state"))
             no_state.setEnabled(False)
 
         menu.addSeparator()
-        copy_action = menu.addAction("复制省份ID")
+        copy_action = menu.addAction(tr("context_copy_province_id"))
 
         # ── 执行 ──
         chosen = menu.exec_(screen_pos)
@@ -138,8 +139,8 @@ class ProvinceContextMenu:
         """弹出对话框设置胜利点。"""
         parent = self._canvas.window()
         value, ok = QInputDialog.getInt(
-            parent, "设置胜利点",
-            f"省份 {pid} 的 VP 分值\n(1=小镇, 5=中等, 10=城市, 20=首都):",
+            parent, tr("context_set_vp_title"),
+            tr("context_set_vp_label", pid),
             1, 0, 50, 1,
         )
         if ok:

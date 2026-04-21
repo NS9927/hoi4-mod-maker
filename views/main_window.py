@@ -177,6 +177,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         edit_menu = menubar.addMenu(tr("menu_edit"))
         self._undo_action = self._add_action(edit_menu, tr("action_undo"), self._on_undo, "Ctrl+Z")
         self._redo_action = self._add_action(edit_menu, tr("action_redo"), self._on_redo, "Ctrl+Y")
+        self._undo_action.setEnabled(False)
+        self._redo_action.setEnabled(False)
 
         # 视图
         view_menu = menubar.addMenu(tr("menu_view"))
@@ -293,7 +295,10 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             lambda s: setattr(self._controllers["terrain"], "soft_edge", s)
         )
         tp.auto_height_requested.connect(self._on_auto_height)
-        tp.smooth_height_requested.connect(self._on_smooth_height)
+        tp.import_heightmap_requested.connect(self._on_import_heightmap)
+        tp.height_brush_mode_changed.connect(cv.set_height_brush_mode)
+        tp.height_brush_size_changed.connect(cv.set_height_brush_size)
+        tp.height_brush_strength_changed.connect(cv.set_height_brush_strength)
         tp.ridge_mode_toggled.connect(self._on_ridge_mode)
         tp.ridge_peak_changed.connect(
             lambda v: setattr(self, '_ridge_peak', v))
@@ -358,6 +363,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
         # Continent 信号 → controller
         tp.continent_pick_toggled.connect(self._on_continent_pick_toggled)
+        tp.assign_by_state_changed.connect(
+            lambda on: setattr(self._controllers["continent"], "assign_by_state", on)
+        )
         tp.continent_add_requested.connect(
             lambda name: self._on_continent_add(name)
         )
@@ -435,7 +443,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._status_info.setText(event.data.get("text", ""))
 
     def _on_evt_undo_state(self, event) -> None:
-        pass  # TODO: enable/disable undo/redo actions
+        self._undo_action.setEnabled(event.data.get("can_undo", False))
+        self._redo_action.setEnabled(event.data.get("can_redo", False))
 
     def _on_evt_sr_select_in_list(self, event) -> None:
         """点击省份查到所属战略区 → 在侧边栏列表中选中它。"""

@@ -76,3 +76,26 @@ def load_project(
     # tile_snapshot（省份生成时的 tile_map 快照）
     # 旧项目没有快照 → 用当前 tile_map 作为快照（假设保存时 tile_map 未被修改过）
     canvas.map_data.tile_snapshot = tile_snapshot if tile_snapshot is not None else tm.copy()
+
+
+def create_mod_skeleton(output_dir: str) -> None:
+    """在项目导出目录创建 HOI4 MOD 基本空目录结构。"""
+    import os
+    dirs = [
+        "common/countries",
+        "common/country_tags",
+        "common/national_focus",
+        "common/ideas",
+        "common/technologies",
+        "common/units",
+        "history/countries",
+        "history/states",
+        "history/units",
+        "map/strategicregions",
+        "gfx/flags",
+        "gfx/leaders",
+        "localisation",
+        "events",
+    ]
+    for d in dirs:
+        os.makedirs(os.path.join(output_dir, d), exist_ok=True)

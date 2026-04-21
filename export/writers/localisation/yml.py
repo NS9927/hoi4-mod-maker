@@ -33,10 +33,21 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
         """lang: 'english' or 'simp_chinese'"""
         with open(os.path.join(d, f"{safe}_l_{lang}.yml"), "w", encoding="utf-8-sig") as f:
             f.write(f"l_{lang}:\n")
-            # State 名称
+            # State 名称 + VP（城市）名称
             if state_mgr and state_mgr.states:
                 for sid, s in state_mgr.states.items():
                     f.write(f' STATE_{sid}:0 "{s.name}"\n')
+                    # 每个 VP 省份生成独立城市名
+                    for vp_idx, vpid in enumerate(s.victory_points.keys()):
+                        # 优先用用户自定义的城市名
+                        custom_name = s.vp_names.get(vpid, "").strip()
+                        if custom_name:
+                            city_name = custom_name
+                        elif vp_idx == 0:
+                            city_name = s.name
+                        else:
+                            city_name = f"{s.name} City {vp_idx + 1}"
+                        f.write(f' VICTORY_POINTS_{vpid}:0 "{city_name}"\n')
             else:
                 for sid in states:
                     f.write(f' STATE_{sid}:0 "State {sid}"\n')

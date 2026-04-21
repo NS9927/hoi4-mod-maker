@@ -42,72 +42,70 @@ class StatePage(QWidget):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(10)
 
-        # 自动分组按钮
+        # ── 快速开始 ──
+        quick_box = _make_section(tr("state_quick_section"))
+        ql = quick_box.layout()
+        auto_row = QHBoxLayout()
         auto_btn = QPushButton(tr("state_auto_btn"))
         auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(self._on_auto_states)
-        lay.addWidget(auto_btn)
-
-        # 每State省份数
-        spin_row = QHBoxLayout()
+        auto_row.addWidget(auto_btn, 2)
         spin_lbl = QLabel(tr("state_per_spin_label"))
         spin_lbl.setStyleSheet(_LABEL_STYLE)
-        spin_row.addWidget(spin_lbl)
+        auto_row.addWidget(spin_lbl)
         self._state_per_spin = QSpinBox()
         self._state_per_spin.setRange(5, 30)
         self._state_per_spin.setValue(15)
         self._state_per_spin.setStyleSheet(_SPINBOX_STYLE)
-        spin_row.addWidget(self._state_per_spin)
-        lay.addLayout(spin_row)
+        auto_row.addWidget(self._state_per_spin, 1)
+        ql.addLayout(auto_row)
+        lay.addWidget(quick_box)
 
-        # 批量建州
-        batch_box = _make_section(tr("state_batch_section"))
-        self._batch_btn = QPushButton(tr("state_batch_select_btn"))
+        # ── 手动编辑 ──
+        edit_box = _make_section(tr("state_edit_section"))
+        el = edit_box.layout()
+
+        self._assign_chk = QCheckBox(tr("state_assign_drag_label"))
+        self._assign_chk.setChecked(False)
+        self._assign_chk.setStyleSheet(
+            "QCheckBox { color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }"
+            "QCheckBox:checked { color: #86efac; }"
+        )
+        self._assign_chk.toggled.connect(self.assign_mode_changed)
+        el.addWidget(self._assign_chk)
+
+        batch_row = QHBoxLayout()
+        self._batch_btn = QPushButton(tr("state_batch_select_btn_short"))
         self._batch_btn.setCheckable(True)
         self._batch_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._batch_btn.setToolTip(tr("state_batch_select_tip"))
         self._batch_btn.toggled.connect(self.batch_create_state_toggled.emit)
-        batch_box.layout().addWidget(self._batch_btn)
+        batch_row.addWidget(self._batch_btn)
 
-        self._batch_confirm_btn = QPushButton(tr("state_batch_confirm_btn"))
+        self._batch_confirm_btn = QPushButton(tr("state_batch_confirm_btn_short"))
         self._batch_confirm_btn.setStyleSheet(
             "QPushButton { background: #22c55e; color: white; padding: 6px;"
             " border-radius: 4px; font-weight: bold; }"
             "QPushButton:hover { background: #2ad66a; }"
         )
         self._batch_confirm_btn.clicked.connect(self.batch_create_state_confirmed.emit)
-        batch_box.layout().addWidget(self._batch_confirm_btn)
-        lay.addWidget(batch_box)
+        batch_row.addWidget(self._batch_confirm_btn)
+        el.addLayout(batch_row)
+        lay.addWidget(edit_box)
 
-        # 分配模式开关
-        self._assign_chk = QCheckBox(tr("state_assign_mode_label"))
-        self._assign_chk.setChecked(False)
-        self._assign_chk.setStyleSheet(
-            f"QCheckBox {{ color: #f0f0ff; font-size: 13px; font-weight: 600; padding: 6px; }}"
-            f"QCheckBox:checked {{ color: #86efac; }}"
-        )
-        self._assign_chk.toggled.connect(self.assign_mode_changed)
-        lay.addWidget(self._assign_chk)
-
-        hint_view = QLabel(tr("state_assign_hint"))
-        hint_view.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 2px;")
-        hint_view.setWordWrap(True)
-        lay.addWidget(hint_view)
-
-        # State 列表
+        # ── 州列表 ──
         list_box = _make_section(tr("state_list_section"))
         self._state_list = QListWidget()
         self._state_list.setStyleSheet(_LIST_STYLE)
-        self._state_list.setMaximumHeight(200)
+        self._state_list.setMinimumHeight(200)
         self._state_list.currentRowChanged.connect(self._on_state_list_clicked)
         list_box.layout().addWidget(self._state_list)
         lay.addWidget(list_box)
 
-        # State 属性面板
+        # ── 选中州属性 ──
         info_box = _make_section(tr("state_props_section"))
         il = info_box.layout()
 
-        # 名称
         name_row = QHBoxLayout()
         name_lbl = QLabel(tr("state_name_label"))
         name_lbl.setStyleSheet(_LABEL_STYLE)
@@ -118,7 +116,6 @@ class StatePage(QWidget):
         name_row.addWidget(self._state_name_edit)
         il.addLayout(name_row)
 
-        # 人口
         mp_row = QHBoxLayout()
         mp_lbl = QLabel(tr("state_manpower_label"))
         mp_lbl.setStyleSheet(_LABEL_STYLE)
@@ -131,7 +128,6 @@ class StatePage(QWidget):
         mp_row.addWidget(self._state_manpower_spin)
         il.addLayout(mp_row)
 
-        # 类别
         cat_row = QHBoxLayout()
         cat_lbl = QLabel(tr("state_category_label"))
         cat_lbl.setStyleSheet(_LABEL_STYLE)
@@ -143,23 +139,11 @@ class StatePage(QWidget):
         cat_row.addWidget(self._state_category_combo)
         il.addLayout(cat_row)
 
-        lay.addWidget(info_box)
-
-        # 详情按钮
         detail_btn = QPushButton(tr("state_detail_btn"))
         detail_btn.clicked.connect(self._on_state_detail_clicked)
-        lay.addWidget(detail_btn)
+        il.addWidget(detail_btn)
 
-        # 提示
-        hint = QLabel(tr("state_vp_hint"))
-        hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px;")
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-
-        hint2 = QLabel(tr("state_hint"))
-        hint2.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px;")
-        hint2.setWordWrap(True)
-        lay.addWidget(hint2)
+        lay.addWidget(info_box)
 
         lay.addStretch()
 
@@ -204,11 +188,11 @@ class StatePage(QWidget):
             self.state_detail_requested.emit(self._current_state_id)
 
     # ── 公共更新方法 ──
-    def update_state_list(self, states: list[tuple[int, str]]) -> None:
-        """刷新 State 列表，items 为 (id, name)"""
+    def update_state_list(self, states: list[tuple[int, str, int]]) -> None:
+        """刷新 State 列表，items 为 (id, name, province_count)"""
         self._state_list.clear()
-        for state_id, name in states:
-            item = QListWidgetItem(f"[{state_id}] {name}")
+        for state_id, name, prov_count in states:
+            item = QListWidgetItem(f"[{state_id}] {name} ({prov_count})")
             item.setData(Qt.UserRole, state_id)
             self._state_list.addItem(item)
 

@@ -11,8 +11,9 @@ from features.map.land import renderer as land_renderer
 from domain.managers.river import VALID_RIVER_VALUES
 
 
-# 视觉膨胀半径（画布显示加粗）。1 = 3px × 3px，2 = 5px × 5px
-_DISPLAY_DILATE_RADIUS = 1
+# 视觉膨胀半径（画布显示加粗）。0 = 不膨胀（1px），1 = 3×3，2 = 5×5
+# 数据层永远是 1px（HOI4 规则），这只影响编辑器里的视觉粗细。
+_DISPLAY_DILATE_RADIUS = 0
 
 
 def _make_river_mask(river_data: np.ndarray) -> np.ndarray:

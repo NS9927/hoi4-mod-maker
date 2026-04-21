@@ -79,6 +79,11 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 地形画笔模式: False=按省份(默认), True=逐像素画笔
         self._terrain_brush_mode = False
 
+        # 高度画笔: "off"(按省份) / "raise" / "lower" / "smooth"
+        self._height_brush_mode = "off"
+        self._height_brush_size = 30
+        self._height_brush_strength = 5  # 每刷一下 ±N，平滑时做混合强度
+
         # 显示缓冲区（BGRA）
         self._display_buffer = np.zeros((MAP_HEIGHT, MAP_WIDTH, 4), dtype=np.uint8)
         self._province_border_buffer = None  # 延迟创建
@@ -90,6 +95,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._railway_color_rgb = None # np.ndarray (H, W, 3) or None
         # 省份属性地形（gameplay terrain）颜色缓冲区
         self._provincial_terrain_color_rgb = None  # np.ndarray (H, W, 3) or None
+        # 大陆颜色缓冲区
+        self._continent_color_rgb = None  # np.ndarray (H, W, 3) or None
 
         # 显示/编辑模式
         self._display_mode = "land"
@@ -305,6 +312,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._sr_color_rgb = None
         self._railway_color_rgb = None
         self._provincial_terrain_color_rgb = None
+        self._continent_color_rgb = None
         h, w = map_data.tile_map.shape[0], map_data.tile_map.shape[1]
         self.new_land_mask = np.zeros((h, w), dtype=bool)
         self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
@@ -482,6 +490,20 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     def set_height_value(self, value: int) -> None:
         self._current_height_value = max(0, min(255, value))
 
+    def set_height_brush_mode(self, mode: str) -> None:
+        """高度画笔模式: 'off' / 'raise' / 'lower' / 'smooth'."""
+        if mode not in ("off", "raise", "lower", "smooth"):
+            mode = "off"
+        self._height_brush_mode = mode
+        self.setCursor(Qt.CursorShape.CrossCursor if mode != "off"
+                       else Qt.CursorShape.ArrowCursor)
+
+    def set_height_brush_size(self, size: int) -> None:
+        self._height_brush_size = max(1, min(400, int(size)))
+
+    def set_height_brush_strength(self, strength: int) -> None:
+        self._height_brush_strength = max(1, min(50, int(strength)))
+
     # ========== State / Country 颜色设置 ==========
 
     def set_state_colors(self, rgb: np.ndarray) -> None:
@@ -512,6 +534,12 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         """存储省份属性地形 RGB 数组并触发渲染"""
         self._provincial_terrain_color_rgb = rgb
         if self._display_mode == "province_terrain":
+            self._full_render()
+
+    def set_continent_colors(self, rgb: np.ndarray) -> None:
+        """存储大陆颜色 RGB 数组并触发渲染"""
+        self._continent_color_rgb = rgb
+        if self._display_mode == "continent":
             self._full_render()
 
     def set_batch_selection_pids(self, pids: list[int]) -> None:
@@ -743,7 +771,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "country": self._render_country_mode,
             "river": self._render_river_mode,
             "logistics": self._render_logistics_mode,
-            "continent": self._render_land_mode,
+            "continent": self._render_continent_mode,
             "strategic_region": self._render_sr_mode,
             "colormap": self._render_land_mode,
             "default_map": self._render_land_mode,
@@ -768,7 +796,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             "country": self._partial_render_country,
             "river": self._partial_render_river,
             "logistics": self._partial_render_logistics,
-            "continent": self._partial_render_land,
+            "continent": self._partial_render_continent,
             "strategic_region": self._partial_render_sr,
             "colormap": self._partial_render_land,
             "default_map": self._partial_render_land,
@@ -853,6 +881,16 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
     def _partial_render_country(self, x0: int, y0: int, x1: int, y1: int) -> None:
         from features.map.country.renderer import partial_render
+        partial_render(self, x0, y0, x1, y1)
+
+    # ---------- continent 模式渲染 ----------
+
+    def _render_continent_mode(self) -> None:
+        from features.map.continent.renderer import render
+        render(self)
+
+    def _partial_render_continent(self, x0: int, y0: int, x1: int, y1: int) -> None:
+        from features.map.continent.renderer import partial_render
         partial_render(self, x0, y0, x1, y1)
 
     # ---------- strategic_region 模式渲染 ----------
@@ -980,7 +1018,8 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         return True
 
     def merge_provinces(self, pid_keep: int, pid_remove: int,
-                         state_mgr=None, country_mgr=None) -> bool:
+                         state_mgr=None, country_mgr=None,
+                         strategic_region_mgr=None) -> bool:
         """合并两个省份：pid_remove 的所有像素归入 pid_keep。
         合并后立即压实 ID 并同步 state/country 引用，避免 ID gap。"""
         if pid_keep <= 0 or pid_remove <= 0 or pid_keep == pid_remove:
@@ -992,6 +1031,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 压实 + 同步引用
         mapping = self._map_data.compact_with_references(
             state_mgr=state_mgr, country_mgr=country_mgr,
+            strategic_region_mgr=strategic_region_mgr,
         )
         # 更新 canvas 持有的选中省份 id
         if self._selected_province_id in mapping:
@@ -1124,6 +1164,60 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
                     self._terrain_map[y0:y1, x0:x1] = self._current_terrain_index
 
         elif mode == "height":
+            if self._height_brush_mode == "off":
+                return
+            # 用独立的高度画笔尺寸，忽略通用 brush_size
+            hr = self._height_brush_size // 2
+            if hr < 1:
+                hr = 1
+            hy0 = max(0, cy - hr)
+            hy1 = min(self.map_h, cy + hr + 1)
+            hx0 = max(0, cx - hr)
+            hx1 = min(self.map_w, cx + hr + 1)
+            if hy0 >= hy1 or hx0 >= hx1:
+                return
+            yy_h, xx_h = np.ogrid[hy0:hy1, hx0:hx1]
+            dist_sq = (yy_h - cy) ** 2 + (xx_h - cx) ** 2
+            r_sq = hr * hr
+            disk = dist_sq <= r_sq
+            # 只改陆地像素 (tile_map != TILE_SEA)，海里不动
+            sub_tile = self._tile_map[hy0:hy1, hx0:hx1]
+            disk = disk & (sub_tile != TILE_SEA)
+            if not np.any(disk):
+                return
+            # 距离衰减（0..1, 中心最强, 边缘最弱）
+            dist_norm = np.sqrt(dist_sq.astype(np.float32)) / max(hr, 1)
+            falloff = np.clip(1.0 - dist_norm, 0.0, 1.0)
+            sub_h = self._height_map[hy0:hy1, hx0:hx1].astype(np.int16)
+            strength = float(self._height_brush_strength)
+            if self._height_brush_mode == "raise":
+                delta = (falloff * strength).astype(np.int16)
+                new_h = np.clip(sub_h + delta, 0, 255).astype(np.uint8)
+                self._height_map[hy0:hy1, hx0:hx1][disk] = new_h[disk]
+                # 被抬起来的陆地如果还低于海平面，拉到海平面+1
+                from data.constants import SEA_LEVEL
+                low_mask = disk & (self._height_map[hy0:hy1, hx0:hx1] <= SEA_LEVEL)
+                if np.any(low_mask):
+                    self._height_map[hy0:hy1, hx0:hx1][low_mask] = SEA_LEVEL + 1
+            elif self._height_brush_mode == "lower":
+                delta = (falloff * strength).astype(np.int16)
+                new_h = np.clip(sub_h - delta, 0, 255).astype(np.uint8)
+                self._height_map[hy0:hy1, hx0:hx1][disk] = new_h[disk]
+                # 不让陆地下沉到海平面以下（保持陆地身份）
+                from data.constants import SEA_LEVEL
+                below = disk & (self._height_map[hy0:hy1, hx0:hx1] <= SEA_LEVEL)
+                if np.any(below):
+                    self._height_map[hy0:hy1, hx0:hx1][below] = SEA_LEVEL + 1
+            elif self._height_brush_mode == "smooth":
+                # 盒式模糊（只在 disk 内取均值）：用 disk 像素平均拉近
+                area_vals = sub_h[disk]
+                avg = int(area_vals.mean())
+                blend = falloff * (strength / 10.0)  # 10 强度 = 完全拉到均值
+                blend = np.clip(blend, 0.0, 1.0)
+                new_h = (sub_h * (1.0 - blend) + avg * blend).astype(np.int16)
+                new_h = np.clip(new_h, 0, 255).astype(np.uint8)
+                self._height_map[hy0:hy1, hx0:hx1][disk] = new_h[disk]
+            self._mark_dirty(hx0, hy0, hx1, hy1)
             return
 
         elif mode == "province":

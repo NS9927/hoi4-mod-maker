@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HOI4 Map Maker - UI Redesign Comparison</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  /* Current palette */
+  --c-bg: #1e1e2e;
+  --c-panel: #2a2a3a;
+  --c-border: #4a4a5e;
+  --c-text: #f0f0ff;
+  --c-dim: #b0b0c8;
+  --c-accent: #8080ff;
+  --c-accent-hover: #9090ff;
+  --c-success: #22c55e;
+  --c-header: #7c7cff;
+
+  /* Proposed palette — subtle refinements */
+  --p-bg: #16161e;
+  --p-panel: #1e1e2a;
+  --p-surface: #252535;
+  --p-border: #2e2e42;
+  --p-border-hover: #4a4a6a;
+  --p-text: #e8e8f8;
+  --p-dim: #6e6e8a;
+  --p-accent: #7c7cff;
+  --p-accent-glow: rgba(124, 124, 255, 0.15);
+  --p-success: #34d673;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  background: #0a0a10;
+  color: #c0c0d8;
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ═══ Page Header ═══ */
+.page-header {
+  text-align: center;
+  padding: 60px 20px 40px;
+  position: relative;
+}
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  width: 600px; height: 300px;
+  background: radial-gradient(ellipse, rgba(124,124,255,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+.page-header h1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: #e0e0f0;
+  letter-spacing: -0.5px;
+  margin-bottom: 8px;
+}
+.page-header p {
+  font-size: 15px;
+  color: #6e6e8a;
+  font-weight: 300;
+}
+
+/* ═══ Section ═══ */
+.section {
+  max-width: 1400px;
+  margin: 0 auto 60px;
+  padding: 0 30px;
+}
+.section-label {
+  display: inline-block;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--p-accent);
+  background: var(--p-accent-glow);
+  padding: 4px 12px;
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-size: 22px;
+  font-weight: 600;
+  color: #e0e0f0;
+  margin-bottom: 6px;
+}
+.section-desc {
+  font-size: 14px;
+  color: #6e6e8a;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+/* ═══ Comparison Grid ═══ */
+.comparison {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+.comp-card {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid #1e1e2e;
+  transition: border-color 0.3s;
+}
+.comp-card:hover { border-color: #2e2e42; }
+.comp-card.current { border-color: #3a2020; }
+.comp-card.proposed { border-color: #1a2a1a; }
+
+.comp-label {
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  font-family: 'JetBrains Mono', monospace;
+}
+.comp-label.current-label {
+  background: linear-gradient(135deg, #2a1515 0%, #1e1e2e 100%);
+  color: #cc6666;
+}
+.comp-label.proposed-label {
+  background: linear-gradient(135deg, #152a15 0%, #1e1e2e 100%);
+  color: #66cc88;
+}
+.comp-body {
+  padding: 0;
+}
+
+/* ═══ CURRENT PANEL SIMULATION ═══ */
+.cur-panel { background: var(--c-bg); padding: 0; }
+
+.cur-nav { border-bottom: 1px solid #3a3a4a; }
+.cur-nav-item {
+  display: block; width: 100%;
+  padding: 10px 12px;
+  font-size: 13px; color: #b0b0c8;
+  background: transparent; border: none;
+  border-left: 3px solid transparent;
+  text-align: left; cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+}
+.cur-nav-item.active {
+  border-left-color: #8080ff;
+  background: rgba(108,108,240,0.15);
+  color: #f0f0ff;
+}
+.cur-hint-text {
+  padding: 8px; font-size: 12px; color: #b0b0c8; line-height: 1.5;
+}
+.cur-sec {
+  background: #2a2a3a; border: 1px solid #4a4a5e; border-radius: 6px;
+  margin: 8px; padding: 10px;
+}
+.cur-sec-title { color: #7c7cff; font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+.cur-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.cur-row .l { color: #f0f0ff; font-size: 15px; }
+.cur-row .r { color: #b0b0c8; font-size: 15px; }
+.cur-slider-track {
+  width: 100%; height: 4px; background: #4a4a5e; border-radius: 2px;
+  margin: 6px 0; position: relative;
+}
+.cur-slider-track::after {
+  content: ''; position: absolute; left: 0; top: 0;
+  width: 40%; height: 100%; background: #8080ff; border-radius: 2px;
+}
+.cur-slider-handle {
+  width: 14px; height: 14px; background: #8080ff; border-radius: 50%;
+  position: relative; top: -9px; left: 38%;
+}
+.cur-tools { display: flex; gap: 3px; margin-bottom: 6px; }
+.cur-tool {
+  flex: 1; text-align: center; padding: 6px 4px; font-size: 15px;
+  background: #2a2a3a; border: 1px solid #4a4a5e; border-radius: 4px;
+  color: #b0b0c8; cursor: pointer; font-family: 'Outfit', sans-serif;
+}
+.cur-tool.on { background: #8080ff; color: white; border-color: #8080ff; }
+.cur-btn-sec {
+  display: block; width: 100%; padding: 7px 12px; font-size: 15px;
+  background: #2a2a3a; border: 1px solid #4a4a5e; border-radius: 5px;
+  color: #f0f0ff; cursor: pointer; margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+}
+.cur-btn-pri {
+  display: block; width: 100%; padding: 8px 14px; font-size: 15px; font-weight: 600;
+  background: #8080ff; border: none; border-radius: 5px;
+  color: white; cursor: pointer; margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+}
+.cur-btn-green {
+  display: block; width: 100%; padding: 8px 14px; font-size: 15px; font-weight: 700;
+  background: #22c55e; border: none; border-radius: 5px;
+  color: white; cursor: pointer; margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+}
+
+/* ═══ PROPOSED PANEL SIMULATION ═══ */
+.pro-panel { background: var(--p-bg); padding: 0; }
+
+.pro-nav { border-bottom: 1px solid var(--p-border); }
+.pro-nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 16px;
+  font-size: 13px; font-weight: 500; color: #6e6e8a;
+  background: transparent; border: none;
+  border-left: 2px solid transparent;
+  text-align: left; cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.pro-nav-item:hover { color: #b0b0c8; background: rgba(124,124,255,0.04); }
+.pro-nav-item.active {
+  border-left-color: var(--p-accent);
+  background: rgba(124,124,255,0.08);
+  color: #e0e0f0;
+  font-weight: 600;
+}
+.pro-nav-item .nav-icon {
+  font-size: 15px;
+  width: 22px;
+  text-align: center;
+}
+.pro-nav-item .nav-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: #3a3a50;
+  margin-left: auto;
+}
+.pro-nav-sep { height: 1px; background: var(--p-border); margin: 4px 16px; }
+
+.pro-hint {
+  padding: 8px 16px;
+  font-size: 11px; color: #4a4a64;
+  border-bottom: 1px solid var(--p-border);
+  line-height: 1.5;
+  font-weight: 300;
+}
+
+.pro-content { padding: 8px 12px; }
+
+.pro-sec {
+  background: var(--p-panel);
+  border: 1px solid var(--p-border);
+  border-radius: 8px;
+  margin-bottom: 10px;
+  padding: 12px;
+  transition: border-color 0.2s;
+}
+.pro-sec:hover { border-color: var(--p-border-hover); }
+
+.pro-sec-title {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; font-weight: 600;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  color: #5a5a78;
+  margin-bottom: 10px;
+}
+
+.pro-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.pro-row .l { color: var(--p-text); font-size: 13px; font-weight: 500; }
+.pro-row .r {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--p-dim);
+}
+
+.pro-slider-track {
+  width: 100%; height: 3px;
+  background: var(--p-border); border-radius: 2px;
+  margin: 8px 0; position: relative;
+}
+.pro-slider-track::after {
+  content: ''; position: absolute; left: 0; top: 0;
+  width: 40%; height: 100%;
+  background: linear-gradient(90deg, var(--p-accent), #9a9aff);
+  border-radius: 2px;
+}
+.pro-slider-handle {
+  width: 16px; height: 16px;
+  background: var(--p-accent);
+  border: 2px solid var(--p-bg);
+  border-radius: 50%;
+  position: relative; top: -10px; left: 37%;
+  box-shadow: 0 0 8px rgba(124,124,255,0.3);
+}
+
+.pro-tools { display: flex; gap: 4px; margin-bottom: 8px; }
+.pro-tool {
+  flex: 1; text-align: center;
+  padding: 7px 4px; font-size: 12px; font-weight: 600;
+  background: var(--p-surface);
+  border: 1px solid var(--p-border);
+  border-radius: 6px;
+  color: #6e6e8a; cursor: pointer;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.pro-tool:hover { border-color: var(--p-border-hover); color: #b0b0c8; }
+.pro-tool.on {
+  background: var(--p-accent);
+  color: white; border-color: var(--p-accent);
+  box-shadow: 0 2px 8px rgba(124,124,255,0.25);
+}
+
+.pro-btn-sec {
+  display: block; width: 100%;
+  padding: 8px 12px; font-size: 12px; font-weight: 600;
+  background: var(--p-surface);
+  border: 1px solid var(--p-border);
+  border-radius: 6px;
+  color: var(--p-text); cursor: pointer;
+  margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+.pro-btn-sec:hover { border-color: var(--p-border-hover); background: #2a2a3a; }
+
+.pro-btn-pri {
+  display: block; width: 100%;
+  padding: 9px 14px; font-size: 12px; font-weight: 700;
+  background: var(--p-accent);
+  border: none; border-radius: 6px;
+  color: white; cursor: pointer;
+  margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+  transition: all 0.15s;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 12px rgba(124,124,255,0.2);
+}
+.pro-btn-pri:hover { background: var(--c-accent-hover); box-shadow: 0 4px 16px rgba(124,124,255,0.3); }
+
+.pro-btn-green {
+  display: block; width: 100%;
+  padding: 9px 14px; font-size: 12px; font-weight: 700;
+  background: var(--p-success);
+  border: none; border-radius: 6px;
+  color: #0a2010; cursor: pointer;
+  margin-top: 6px; text-align: center;
+  font-family: 'Outfit', sans-serif;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 12px rgba(52,214,115,0.15);
+}
+
+.pro-tile-btns { display: flex; flex-direction: column; gap: 4px; }
+.pro-tile-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; font-size: 12px; font-weight: 500;
+  background: var(--p-surface); border: 1px solid var(--p-border);
+  border-radius: 6px; color: var(--p-text); cursor: pointer;
+  font-family: 'Outfit', sans-serif; transition: all 0.15s;
+}
+.pro-tile-btn:hover { border-color: var(--p-border-hover); }
+.pro-tile-dot {
+  width: 10px; height: 10px; border-radius: 3px;
+}
+
+/* ═══ Changes Summary ═══ */
+.changes {
+  max-width: 1400px; margin: 0 auto 60px; padding: 0 30px;
+}
+.changes-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+}
+.change-card {
+  background: var(--p-panel);
+  border: 1px solid var(--p-border);
+  border-radius: 10px;
+  padding: 20px;
+  transition: border-color 0.3s;
+}
+.change-card:hover { border-color: var(--p-border-hover); }
+.change-icon { font-size: 24px; margin-bottom: 10px; }
+.change-title { font-size: 14px; font-weight: 600; color: #e0e0f0; margin-bottom: 6px; }
+.change-before { font-size: 12px; color: #cc6666; margin-bottom: 3px; }
+.change-after { font-size: 12px; color: #66cc88; }
+.change-before::before { content: '- '; }
+.change-after::before { content: '+ '; }
+
+/* ═══ Full Layout Preview ═══ */
+.full-preview {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+  margin-top: 24px;
+}
+.full-frame {
+  border-radius: 12px; overflow: hidden;
+  border: 1px solid #1e1e2e;
+  height: 520px;
+}
+.full-frame-inner {
+  display: flex; height: 100%;
+}
+.full-sidebar {
+  flex-shrink: 0; overflow-y: auto;
+}
+.full-canvas {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  font-size: 14px; color: #3a3a50;
+  font-family: 'JetBrains Mono', monospace;
+}
+.full-canvas-cur { background: #161625; }
+.full-canvas-pro {
+  background: #0e0e16;
+  background-image:
+    radial-gradient(circle at 30% 40%, rgba(124,124,255,0.03) 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(52,214,115,0.02) 0%, transparent 50%);
+}
+
+.full-statusbar {
+  display: flex; align-items: center; gap: 16px;
+  padding: 4px 12px; font-size: 11px;
+  border-top: 1px solid;
+}
+.full-statusbar.cur-status {
+  background: #18182a; border-color: #3a3a4a; color: #8888a8;
+}
+.full-statusbar.pro-status {
+  background: #12121a; border-color: var(--p-border); color: #4a4a64;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+}
+.status-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: #22c55e;
+}
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1>UI Redesign Comparison</h1>
+  <p>HOI4 Map Maker Editor Panel</p>
+</div>
+
+<!-- ═══════ FULL LAYOUT PREVIEW ═══════ -->
+<div class="section">
+  <span class="section-label">OVERVIEW</span>
+  <h2 class="section-title">Complete Layout</h2>
+  <p class="section-desc">Side panel + canvas + status bar - full editor view at a glance</p>
+
+  <div class="full-preview">
+    <!-- Current Full -->
+    <div>
+      <div class="comp-label current-label">CURRENT</div>
+      <div class="full-frame" style="border-color:#3a2020;">
+        <div class="full-frame-inner">
+          <div class="full-sidebar" style="width:380px; background:var(--c-bg);">
+            <div class="cur-nav">
+              <button class="cur-nav-item active">🏖 地图绘制</button>
+              <button class="cur-nav-item">🧩 省份</button>
+              <button class="cur-nav-item">⛰ 地形</button>
+              <button class="cur-nav-item">💧 河流</button>
+              <button class="cur-nav-item">🏛 区域</button>
+              <button class="cur-nav-item">🛤 后勤</button>
+              <button class="cur-nav-item">⚙ 设置</button>
+            </div>
+            <div class="cur-hint-text">在地图上绘制陆地、海洋和湖泊。画完后点「生成省份」自动划分省份边界。可以用参考图辅助绘制。</div>
+            <div class="cur-sec">
+              <div class="cur-sec-title">工具</div>
+              <div class="cur-tools">
+                <button class="cur-tool on">画笔</button>
+                <button class="cur-tool">橡皮</button>
+                <button class="cur-tool">填充</button>
+              </div>
+            </div>
+            <div class="cur-sec">
+              <div class="cur-sec-title">画笔大小</div>
+              <div class="cur-row"><span class="l">大小</span><span class="r">30px</span></div>
+              <div class="cur-slider-track"><div class="cur-slider-handle"></div></div>
+            </div>
+            <div class="cur-sec">
+              <div class="cur-sec-title">地块类型</div>
+              <button class="cur-btn-sec">🟢 陆地</button>
+              <button class="cur-btn-sec">🔵 海洋</button>
+            </div>
+          </div>
+          <div class="full-canvas full-canvas-cur">MAP CANVAS (820px)</div>
+        </div>
+        <div class="full-statusbar cur-status">
+          <span>Ready</span>
+          <span style="margin-left:auto">Province: 0</span>
+          <span>Pos: (0, 0)</span>
+          <span>Zoom: 100%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Proposed Full -->
+    <div>
+      <div class="comp-label proposed-label">PROPOSED</div>
+      <div class="full-frame" style="border-color:#1a2a1a;">
+        <div class="full-frame-inner">
+          <div class="full-sidebar" style="width:340px; background:var(--p-bg);">
+            <div class="pro-nav">
+              <button class="pro-nav-item active">
+                <span class="nav-icon">🏖</span> 地图绘制 <span class="nav-num">01</span>
+              </button>
+              <button class="pro-nav-item">
+                <span class="nav-icon">🧩</span> 省份 <span class="nav-num">02</span>
+              </button>
+              <button class="pro-nav-item">
+                <span class="nav-icon">⛰</span> 地形 <span class="nav-num">03</span>
+              </button>
+              <button class="pro-nav-item">
+                <span class="nav-icon">💧</span> 河流 <span class="nav-num">04</span>
+              </button>
+              <div class="pro-nav-sep"></div>
+              <button class="pro-nav-item">
+                <span class="nav-icon">🏛</span> 区域 <span class="nav-num">05</span>
+              </button>
+              <button class="pro-nav-item">
+                <span class="nav-icon">🛤</span> 后勤 <span class="nav-num">06</span>
+              </button>
+              <div class="pro-nav-sep"></div>
+              <button class="pro-nav-item">
+                <span class="nav-icon">⚙</span> 设置 <span class="nav-num">07</span>
+              </button>
+            </div>
+            <div class="pro-hint">绘制陆地/海洋 → 生成省份 → 设置地形</div>
+            <div class="pro-content">
+              <div class="pro-sec">
+                <div class="pro-sec-title">TOOLS</div>
+                <div class="pro-tools">
+                  <button class="pro-tool on">画笔</button>
+                  <button class="pro-tool">橡皮</button>
+                  <button class="pro-tool">填充</button>
+                </div>
+              </div>
+              <div class="pro-sec">
+                <div class="pro-sec-title">BRUSH</div>
+                <div class="pro-row"><span class="l">大小</span><span class="r">30px</span></div>
+                <div class="pro-slider-track"><div class="pro-slider-handle"></div></div>
+              </div>
+              <div class="pro-sec">
+                <div class="pro-sec-title">TILE TYPE</div>
+                <div class="pro-tile-btns">
+                  <button class="pro-tile-btn"><span class="pro-tile-dot" style="background:#4ade80;"></span> 陆地</button>
+                  <button class="pro-tile-btn"><span class="pro-tile-dot" style="background:#3b82f6;"></span> 海洋</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="full-canvas full-canvas-pro">MAP CANVAS (860px)</div>
+        </div>
+        <div class="full-statusbar pro-status">
+          <span class="status-dot"></span>
+          <span>Ready</span>
+          <span style="margin-left:auto">PRV 0</span>
+          <span>0, 0</span>
+          <span>100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ NAVIGATION BAR ═══════ -->
+<div class="section">
+  <span class="section-label">COMPONENT 01</span>
+  <h2 class="section-title">Navigation Bar</h2>
+  <p class="section-desc">Mode switching - the primary navigation element</p>
+  <div class="comparison">
+    <div class="comp-card current">
+      <div class="comp-label current-label">CURRENT</div>
+      <div class="comp-body cur-panel">
+        <button class="cur-nav-item active">🏖 地图绘制</button>
+        <button class="cur-nav-item">🧩 省份</button>
+        <button class="cur-nav-item">⛰ 地形</button>
+        <button class="cur-nav-item">💧 河流</button>
+        <button class="cur-nav-item">🏛 区域</button>
+        <button class="cur-nav-item">🛤 后勤</button>
+        <button class="cur-nav-item">⚙ 设置</button>
+      </div>
+    </div>
+    <div class="comp-card proposed">
+      <div class="comp-label proposed-label">PROPOSED</div>
+      <div class="comp-body pro-panel">
+        <button class="pro-nav-item active">
+          <span class="nav-icon">🏖</span> 地图绘制 <span class="nav-num">01</span>
+        </button>
+        <button class="pro-nav-item">
+          <span class="nav-icon">🧩</span> 省份 <span class="nav-num">02</span>
+        </button>
+        <button class="pro-nav-item">
+          <span class="nav-icon">⛰</span> 地形 <span class="nav-num">03</span>
+        </button>
+        <button class="pro-nav-item">
+          <span class="nav-icon">💧</span> 河流 <span class="nav-num">04</span>
+        </button>
+        <div class="pro-nav-sep"></div>
+        <button class="pro-nav-item">
+          <span class="nav-icon">🏛</span> 区域 <span class="nav-num">05</span>
+        </button>
+        <button class="pro-nav-item">
+          <span class="nav-icon">🛤</span> 后勤 <span class="nav-num">06</span>
+        </button>
+        <div class="pro-nav-sep"></div>
+        <button class="pro-nav-item">
+          <span class="nav-icon">⚙</span> 设置 <span class="nav-num">07</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ TOOL SECTIONS ═══════ -->
+<div class="section">
+  <span class="section-label">COMPONENT 02</span>
+  <h2 class="section-title">Tool Sections</h2>
+  <p class="section-desc">Grouped controls for each editing mode</p>
+  <div class="comparison">
+    <div class="comp-card current">
+      <div class="comp-label current-label">CURRENT</div>
+      <div class="comp-body cur-panel" style="padding: 8px;">
+        <div class="cur-sec">
+          <div class="cur-sec-title">工具</div>
+          <div class="cur-tools">
+            <button class="cur-tool on">画笔</button>
+            <button class="cur-tool">橡皮</button>
+            <button class="cur-tool">填充 (F)</button>
+          </div>
+          <div class="cur-tools">
+            <button class="cur-tool">变换</button>
+            <button class="cur-tool">平移</button>
+          </div>
+        </div>
+        <div class="cur-sec">
+          <div class="cur-sec-title">画笔大小</div>
+          <div class="cur-row"><span class="l">大小</span><span class="r">30px</span></div>
+          <div class="cur-slider-track"><div class="cur-slider-handle"></div></div>
+        </div>
+        <div class="cur-sec">
+          <div class="cur-sec-title">地块类型</div>
+          <button class="cur-btn-sec">🟢 陆地</button>
+          <button class="cur-btn-sec">🔵 海洋</button>
+          <button class="cur-btn-sec">🔷 湖泊</button>
+        </div>
+      </div>
+    </div>
+    <div class="comp-card proposed">
+      <div class="comp-label proposed-label">PROPOSED</div>
+      <div class="comp-body pro-panel" style="padding: 8px 12px;">
+        <div class="pro-sec">
+          <div class="pro-sec-title">TOOLS</div>
+          <div class="pro-tools">
+            <button class="pro-tool on">画笔</button>
+            <button class="pro-tool">橡皮</button>
+            <button class="pro-tool">填充 (F)</button>
+          </div>
+          <div class="pro-tools">
+            <button class="pro-tool">变换</button>
+            <button class="pro-tool">平移</button>
+          </div>
+        </div>
+        <div class="pro-sec">
+          <div class="pro-sec-title">BRUSH</div>
+          <div class="pro-row"><span class="l">大小</span><span class="r">30px</span></div>
+          <div class="pro-slider-track"><div class="pro-slider-handle"></div></div>
+        </div>
+        <div class="pro-sec">
+          <div class="pro-sec-title">TILE TYPE</div>
+          <div class="pro-tile-btns">
+            <button class="pro-tile-btn"><span class="pro-tile-dot" style="background:#4ade80;"></span> 陆地</button>
+            <button class="pro-tile-btn"><span class="pro-tile-dot" style="background:#3b82f6;"></span> 海洋</button>
+            <button class="pro-tile-btn"><span class="pro-tile-dot" style="background:#67b8e3;"></span> 湖泊</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ BUTTONS ═══════ -->
+<div class="section">
+  <span class="section-label">COMPONENT 03</span>
+  <h2 class="section-title">Action Buttons</h2>
+  <p class="section-desc">Primary, secondary, and success button styles</p>
+  <div class="comparison">
+    <div class="comp-card current">
+      <div class="comp-label current-label">CURRENT</div>
+      <div class="comp-body cur-panel" style="padding: 12px;">
+        <button class="cur-btn-pri">生成省份</button>
+        <button class="cur-btn-sec">验证地图</button>
+        <button class="cur-btn-green">一键初始化</button>
+        <button class="cur-btn-sec">平滑海岸线</button>
+      </div>
+    </div>
+    <div class="comp-card proposed">
+      <div class="comp-label proposed-label">PROPOSED</div>
+      <div class="comp-body pro-panel" style="padding: 12px;">
+        <button class="pro-btn-pri">生成省份</button>
+        <button class="pro-btn-sec">验证地图</button>
+        <button class="pro-btn-green">一键初始化</button>
+        <button class="pro-btn-sec">平滑海岸线</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ CHANGES SUMMARY ═══════ -->
+<div class="changes">
+  <span class="section-label">SUMMARY</span>
+  <h2 class="section-title" style="margin-bottom: 20px;">Key Changes</h2>
+  <div class="changes-grid">
+    <div class="change-card">
+      <div class="change-icon">📐</div>
+      <div class="change-title">Panel Width</div>
+      <div class="change-before">380px fixed</div>
+      <div class="change-after">340px (canvas gains 40px)</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">🔤</div>
+      <div class="change-title">Font Size</div>
+      <div class="change-before">15px everywhere</div>
+      <div class="change-after">13px body, 12px buttons, monospace for values</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">📝</div>
+      <div class="change-title">Section Titles</div>
+      <div class="change-before">15px purple, sentence case</div>
+      <div class="change-after">10px uppercase monospace, subtle gray</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">💬</div>
+      <div class="change-title">Hint Text</div>
+      <div class="change-before">12px, always visible, full paragraph</div>
+      <div class="change-after">11px, one-line summary, dimmer</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">🎯</div>
+      <div class="change-title">Navigation</div>
+      <div class="change-before">Flat list, no grouping</div>
+      <div class="change-after">Grouped with separators, step numbers</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">🎨</div>
+      <div class="change-title">Visual Depth</div>
+      <div class="change-before">Flat sections, same border weight</div>
+      <div class="change-after">Subtler borders, hover states, glow on active</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">🔘</div>
+      <div class="change-title">Buttons</div>
+      <div class="change-before">15px, thin weight, small radius</div>
+      <div class="change-after">12px bold, larger radius, shadow on primary</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">🎚️</div>
+      <div class="change-title">Slider</div>
+      <div class="change-before">14px handle, no shadow</div>
+      <div class="change-after">16px handle, gradient fill, glow</div>
+    </div>
+    <div class="change-card">
+      <div class="change-icon">📊</div>
+      <div class="change-title">Status Bar</div>
+      <div class="change-before">15px, default font</div>
+      <div class="change-after">10px monospace, status dot indicator</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

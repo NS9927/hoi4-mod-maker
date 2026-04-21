@@ -65,6 +65,7 @@ class ApplicationController:
         bus.subscribe("province_count_changed", self._on_province_count)
         bus.subscribe("state_changed", self._on_state_changed)
         bus.subscribe("country_changed", self._on_country_changed)
+        bus.subscribe("continent_changed", self._on_continent_changed)
         bus.subscribe("vp_changed", self._on_vp_changed)
         bus.subscribe("province_map_regenerated", self._on_province_regen)
         bus.subscribe("clear_batch_selection", lambda e: self._canvas.set_batch_selection_pids([]))
@@ -141,6 +142,8 @@ class ApplicationController:
             self._canvas.refresh_logistics_overlay()
         elif mode == "province_terrain":
             self._refresh_provincial_terrain_colors()
+        elif mode == "continent":
+            self._refresh_continent_colors()
 
         # 离开战略区模式时隐藏 state 边界叠加
         if mode != "strategic_region":
@@ -208,7 +211,12 @@ class ApplicationController:
         else:
             terrain_data = self._canvas.terrain_map[mask]
             if len(terrain_data) > 0:
-                terrain_idx = int(np.bincount(terrain_data).argmax())
+                counts = np.bincount(terrain_data)
+                # 跳过 index 0（背景/海洋），优先取非零地形
+                if len(counts) > 1 and counts[1:].max() > 0:
+                    terrain_idx = int(counts[1:].argmax()) + 1
+                else:
+                    terrain_idx = int(counts.argmax())
                 gt = GRAPHICAL_TERRAIN_BY_INDEX.get(terrain_idx)
                 terrain_name = graphical_terrain_display_name(gt) if gt else tr("terrain_unknown")
             else:
@@ -224,7 +232,7 @@ class ApplicationController:
     # ═══════════════════════ State/Country 刷新 ═══════════════
 
     def _refresh_state_list(self) -> None:
-        items = [(sid, s.name) for sid, s in self._project.state_mgr.states.items()]
+        items = [(sid, s.name, len(s.provinces)) for sid, s in self._project.state_mgr.states.items()]
         self._panel.update_state_list(items)
 
     def _refresh_state_colors(self) -> None:
@@ -295,8 +303,11 @@ class ApplicationController:
     def _refresh_country_colors(self) -> None:
         if int(self._canvas.province_map.max()) == 0:
             return
+        # 传 tile_map → 让 builder 用多数决识别陆地省, 避免海洋省被涂色
         rgb = self._project.country_mgr.build_country_color_map(
-            self._canvas.province_map, self._project.state_mgr
+            self._canvas.province_map,
+            self._project.state_mgr,
+            tile_map=self._canvas.tile_map,
         )
         self._canvas.set_country_colors(rgb)
 
@@ -307,6 +318,16 @@ class ApplicationController:
             self._canvas.province_map, self._canvas.tile_map
         )
         self._canvas.set_sr_colors(rgb)
+
+    def _refresh_continent_colors(self) -> None:
+        if int(self._canvas.province_map.max()) == 0:
+            return
+        rgb = self._project.continent_mgr.build_continent_color_map(
+            self._canvas.province_map,
+            self._canvas.tile_map,
+            state_manager=self._project.state_mgr,
+        )
+        self._canvas.set_continent_colors(rgb)
 
     def _on_railway_changed(self, event=None) -> None:
         if self._canvas.display_mode == "logistics":
@@ -420,6 +441,12 @@ class ApplicationController:
     def _on_vp_changed(self, event) -> None:
         self._refresh_vp_data()
 
+    def _on_continent_changed(self, event) -> None:
+        """大陆列表/指派变化 → 如果在大陆模式下，立即刷新颜色图。"""
+        if self._canvas.display_mode == "continent":
+            self._refresh_continent_colors()
+            self._canvas.refresh_display()
+
     def _on_province_regen(self, event) -> None:
         """省份重新生成 → 清除所有颜色缓存，强制下次切模式时重建。"""
         self.invalidate_province_cache()
@@ -428,6 +455,7 @@ class ApplicationController:
         self._canvas._sr_color_rgb = None
         self._canvas._railway_color_rgb = None
         self._canvas._provincial_terrain_color_rgb = None
+        self._canvas._continent_color_rgb = None
         # 立即刷新当前模式的颜色（不然切模式前看到的是旧的）
         mode = self._canvas.display_mode
         if mode == "state":
@@ -536,6 +564,8 @@ class ApplicationController:
             self._refresh_country_colors()
         elif mode == "strategic_region":
             self._refresh_sr_colors()
+        elif mode == "continent":
+            self._refresh_continent_colors()
         self._canvas.refresh_display()
 
     # ═══════════════════════ 省份点击路由 ═══════════════════

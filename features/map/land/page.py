@@ -44,63 +44,68 @@ class LandPage(QWidget):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(10)
 
-        # 提示
-        hint = QLabel(tr("land_hint"))
-        hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
+        # ── 一键初始化（提到最顶部）──
+        quick_init_btn = QPushButton(tr("land_btn_quick_init"))
+        quick_init_btn.setStyleSheet(
+            "QPushButton { background: #22c55e; color: white; padding: 10px;"
+            " border-radius: 5px; font-weight: bold; font-size: 14px; }"
+            "QPushButton:hover { background: #2ad66a; }"
+        )
+        quick_init_btn.setToolTip(tr("land_btn_quick_init_tip"))
+        quick_init_btn.clicked.connect(self.quick_init_requested.emit)
+        lay.addWidget(quick_init_btn)
 
-        # 工具按钮 (Grid 2行3列，避免横排挤不下)
+        # ── 工具 + 画笔大小（合并为一个 section）──
         tools_box = _make_section(tr("land_section_tools"))
-        tl = QGridLayout()
+        tl = QHBoxLayout()
         tl.setSpacing(3)
-        tl.setColumnStretch(0, 1)
-        tl.setColumnStretch(1, 1)
-        tl.setColumnStretch(2, 1)
         self._land_tool_group = QButtonGroup(self)
         self._land_tool_group.setExclusive(True)
         tools = [("brush", tr("land_tool_brush")), ("eraser", tr("land_tool_eraser")),
+                 ("fill", tr("land_tool_fill")),
                  ("transform", tr("land_tool_transform")),
                  ("pan", tr("land_tool_pan"))]
-        for i, (tid, label) in enumerate(tools):
+        for tid, label in tools:
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
             btn.setStyleSheet(_TOOL_BTN_STYLE)
             if tid == "transform":
                 btn.setToolTip(tr("land_tool_transform_tip"))
+            elif tid == "fill":
+                btn.setToolTip(tr("land_tool_fill_tip"))
             self._land_tool_group.addButton(btn)
-            tl.addWidget(btn, i // 3, i % 3)
+            tl.addWidget(btn)
             if tid == "brush":
                 btn.setChecked(True)
         self._land_tool_group.buttonClicked.connect(
             lambda b: self.tool_changed.emit(b.property("tool_id"))
         )
         tools_box.layout().addLayout(tl)
-        lay.addWidget(tools_box)
 
-        # 画笔大小
-        brush_box = _make_section(tr("land_section_brush_size"))
-        self._land_brush_label = QLabel(f"{BRUSH_DEFAULT}px")
-        self._land_brush_label.setStyleSheet(_DIM_LABEL_STYLE)
-        row = QHBoxLayout()
+        # 画笔大小（内嵌在工具 section 里）
+        brush_row = QHBoxLayout()
         lbl = QLabel(tr("land_label_size"))
         lbl.setStyleSheet(_LABEL_STYLE)
-        row.addWidget(lbl)
-        row.addStretch()
-        row.addWidget(self._land_brush_label)
-        brush_box.layout().addLayout(row)
+        brush_row.addWidget(lbl)
+        brush_row.addStretch()
+        self._land_brush_label = QLabel(f"{BRUSH_DEFAULT}px")
+        self._land_brush_label.setStyleSheet(_DIM_LABEL_STYLE)
+        brush_row.addWidget(self._land_brush_label)
+        tools_box.layout().addLayout(brush_row)
 
         self._land_brush_slider = QSlider(Qt.Orientation.Horizontal)
         self._land_brush_slider.setRange(BRUSH_MIN, BRUSH_MAX)
         self._land_brush_slider.setValue(BRUSH_DEFAULT)
         self._land_brush_slider.setStyleSheet(_SLIDER_STYLE)
         self._land_brush_slider.valueChanged.connect(self._on_land_brush)
-        brush_box.layout().addWidget(self._land_brush_slider)
-        lay.addWidget(brush_box)
+        tools_box.layout().addWidget(self._land_brush_slider)
+        lay.addWidget(tools_box)
 
-        # 地块类型
+        # ── 地块类型（改横排 toggle）──
         tile_box = _make_section(tr("land_section_tile_draw"))
+        tile_row = QHBoxLayout()
+        tile_row.setSpacing(3)
         for tile_id, label, color in [
             (TILE_LAND, tr("land_draw_land"), (139, 172, 101)),
             (TILE_SEA,  tr("land_draw_sea"), (68, 105, 156)),
@@ -110,7 +115,8 @@ class LandPage(QWidget):
             btn.setIcon(_color_icon(*color))
             btn.setStyleSheet(_SECONDARY_BTN_STYLE)
             btn.clicked.connect(lambda _, t=tile_id: self._on_tile_click(t))
-            tile_box.layout().addWidget(btn)
+            tile_row.addWidget(btn)
+        tile_box.layout().addLayout(tile_row)
         lay.addWidget(tile_box)
 
         # 平滑海岸线
@@ -120,12 +126,8 @@ class LandPage(QWidget):
         coast_btn.clicked.connect(self.smooth_coast_requested.emit)
         lay.addWidget(coast_btn)
 
-        # 生成省份
+        # ── 省份生成 ──
         gen_box = _make_section(tr("land_section_province_gen"))
-        gen_btn = QPushButton(tr("land_btn_generate"))
-        gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        gen_btn.clicked.connect(self._on_generate_provinces)
-        gen_box.layout().addWidget(gen_btn)
 
         spin_row = QHBoxLayout()
         spin_lbl = QLabel(tr("land_label_province_count"))
@@ -179,35 +181,35 @@ class LandPage(QWidget):
         )
         gen_box.layout().addWidget(self._lake_density_slider)
 
+        # 生成 + 验证 并排
+        gen_btn_row = QHBoxLayout()
+        gen_btn_row.setSpacing(4)
+        gen_btn = QPushButton(tr("land_btn_generate"))
+        gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        gen_btn.clicked.connect(self._on_generate_provinces)
+        gen_btn_row.addWidget(gen_btn)
+
         validate_btn = QPushButton(tr("land_btn_validate"))
         validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_requested.emit)
-        gen_box.layout().addWidget(validate_btn)
-
-        quick_init_btn = QPushButton(tr("land_btn_quick_init"))
-        quick_init_btn.setStyleSheet(
-            "QPushButton { background: #22c55e; color: white; padding: 8px;"
-            " border-radius: 4px; font-weight: bold; }"
-            "QPushButton:hover { background: #2ad66a; }"
-        )
-        quick_init_btn.setToolTip(tr("land_btn_quick_init_tip"))
-        quick_init_btn.clicked.connect(self.quick_init_requested.emit)
-        gen_box.layout().addWidget(quick_init_btn)
+        gen_btn_row.addWidget(validate_btn)
+        gen_box.layout().addLayout(gen_btn_row)
 
         lay.addWidget(gen_box)
 
-        # ── 原版地图参考 ──
-        vanilla_box = _make_section(tr("land_section_vanilla_ref"))
-        v_opacity_row = QHBoxLayout()
-        v_olbl = QLabel(tr("land_label_opacity"))
-        v_olbl.setStyleSheet(_LABEL_STYLE)
-        v_opacity_row.addWidget(v_olbl)
+        # ── 参考图（合并为一个 section）──
+        ref_box = _make_section(tr("land_section_ref"))
+
+        # 原版参考
+        v_lbl = QLabel(tr("land_section_vanilla_ref"))
+        v_lbl.setStyleSheet(_LABEL_STYLE)
+        ref_box.layout().addWidget(v_lbl)
+
+        v_row = QHBoxLayout()
+        v_row.setSpacing(4)
         self._vanilla_ref_opacity_label = QLabel("30%")
         self._vanilla_ref_opacity_label.setStyleSheet(_DIM_LABEL_STYLE)
-        v_opacity_row.addStretch()
-        v_opacity_row.addWidget(self._vanilla_ref_opacity_label)
-        vanilla_box.layout().addLayout(v_opacity_row)
-
+        self._vanilla_ref_opacity_label.setFixedWidth(36)
         self._vanilla_ref_opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._vanilla_ref_opacity_slider.setRange(0, 100)
         self._vanilla_ref_opacity_slider.setValue(30)
@@ -215,28 +217,28 @@ class LandPage(QWidget):
         self._vanilla_ref_opacity_slider.valueChanged.connect(
             lambda v: self._vanilla_ref_opacity_label.setText(f"{v}%")
         )
-        vanilla_box.layout().addWidget(self._vanilla_ref_opacity_slider)
         self._vanilla_ref_toggle = QPushButton(tr("land_btn_hide"))
         self._vanilla_ref_toggle.setCheckable(True)
         self._vanilla_ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._vanilla_ref_toggle.setFixedWidth(50)
         self._vanilla_ref_toggle.toggled.connect(
-            lambda on: (self._vanilla_ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide")))
+            lambda on: self._vanilla_ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
         )
-        vanilla_box.layout().addWidget(self._vanilla_ref_toggle)
-        lay.addWidget(vanilla_box)
+        v_row.addWidget(self._vanilla_ref_opacity_slider)
+        v_row.addWidget(self._vanilla_ref_opacity_label)
+        v_row.addWidget(self._vanilla_ref_toggle)
+        ref_box.layout().addLayout(v_row)
 
-        # ── 自定义参考图 ──
-        ref_box = _make_section(tr("land_section_custom_ref"))
-        opacity_row = QHBoxLayout()
-        olbl = QLabel(tr("land_label_opacity"))
-        olbl.setStyleSheet(_LABEL_STYLE)
-        opacity_row.addWidget(olbl)
+        # 自定义参考
+        c_lbl = QLabel(tr("land_section_custom_ref"))
+        c_lbl.setStyleSheet(_LABEL_STYLE)
+        ref_box.layout().addWidget(c_lbl)
+
+        c_row = QHBoxLayout()
+        c_row.setSpacing(4)
         self._ref_opacity_label = QLabel("40%")
         self._ref_opacity_label.setStyleSheet(_DIM_LABEL_STYLE)
-        opacity_row.addStretch()
-        opacity_row.addWidget(self._ref_opacity_label)
-        ref_box.layout().addLayout(opacity_row)
-
+        self._ref_opacity_label.setFixedWidth(36)
         self._ref_opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._ref_opacity_slider.setRange(0, 100)
         self._ref_opacity_slider.setValue(40)
@@ -244,17 +246,32 @@ class LandPage(QWidget):
         self._ref_opacity_slider.valueChanged.connect(
             lambda v: self._ref_opacity_label.setText(f"{v}%")
         )
-        ref_box.layout().addWidget(self._ref_opacity_slider)
+        self._ref_toggle = QPushButton(tr("land_btn_hide"))
+        self._ref_toggle.setCheckable(True)
+        self._ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._ref_toggle.setFixedWidth(50)
+        self._ref_toggle.toggled.connect(
+            lambda on: self._ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
+        )
+        c_row.addWidget(self._ref_opacity_slider)
+        c_row.addWidget(self._ref_opacity_label)
+        c_row.addWidget(self._ref_toggle)
+        ref_box.layout().addLayout(c_row)
 
-        # 缩放控制
+        # 缩放 + 铺满
         scale_row = QHBoxLayout()
+        scale_row.setSpacing(4)
         slbl = QLabel(tr("land_label_scale"))
         slbl.setStyleSheet(_LABEL_STYLE)
         scale_row.addWidget(slbl)
         self._ref_scale_label = QLabel("100%")
         self._ref_scale_label.setStyleSheet(_DIM_LABEL_STYLE)
-        scale_row.addStretch()
         scale_row.addWidget(self._ref_scale_label)
+        scale_row.addStretch()
+        self._ref_fit_btn = QPushButton(tr("land_btn_fit_map"))
+        self._ref_fit_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._ref_fit_btn.setFixedWidth(70)
+        scale_row.addWidget(self._ref_fit_btn)
         ref_box.layout().addLayout(scale_row)
 
         self._ref_scale_slider = QSlider(Qt.Orientation.Horizontal)
@@ -265,20 +282,6 @@ class LandPage(QWidget):
             lambda v: self._ref_scale_label.setText(f"{v}%")
         )
         ref_box.layout().addWidget(self._ref_scale_slider)
-
-        # 铺满地图按钮
-        self._ref_fit_btn = QPushButton(tr("land_btn_fit_map"))
-        self._ref_fit_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        ref_box.layout().addWidget(self._ref_fit_btn)
-
-        # 显示/隐藏
-        self._ref_toggle = QPushButton(tr("land_btn_hide"))
-        self._ref_toggle.setCheckable(True)
-        self._ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._ref_toggle.toggled.connect(
-            lambda on: self._ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
-        )
-        ref_box.layout().addWidget(self._ref_toggle)
 
         lay.addWidget(ref_box)
 

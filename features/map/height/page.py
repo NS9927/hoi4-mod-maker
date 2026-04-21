@@ -7,6 +7,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QPushButton, QSlider, QLabel, QGridLayout, QSpinBox,
+    QButtonGroup,
 )
 
 from ui.styles import (
@@ -23,13 +24,17 @@ class HeightPage(QWidget):
     # 输出信号
     height_value_changed = pyqtSignal(int)
     auto_height_requested = pyqtSignal()
-    smooth_height_requested = pyqtSignal()
+    import_heightmap_requested = pyqtSignal()
     ridge_mode_toggled = pyqtSignal(bool)       # 山脉画线模式开关
     ridge_peak_changed = pyqtSignal(int)         # 山峰高度
     ridge_falloff_changed = pyqtSignal(int)      # 衰减距离
     ridge_preview_requested = pyqtSignal()       # 请求刷新预览
     ridge_confirmed = pyqtSignal()               # 确认应用山脉
     ridge_cancelled = pyqtSignal()               # 取消山脉
+    # 手动微调画笔
+    height_brush_mode_changed = pyqtSignal(str)   # "off" | "raise" | "lower" | "smooth"
+    height_brush_size_changed = pyqtSignal(int)
+    height_brush_strength_changed = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -70,25 +75,9 @@ class HeightPage(QWidget):
 
         lay.addWidget(auto_top_box)
 
-        # ── 使用说明 ──
-        hint = QLabel(tr("height_hint"))
-        hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
-        hint.setWordWrap(True)
-        lay.addWidget(hint)
-
-        # ── 详细参数（原智能生成区）──
+        # ── 详细参数（自动生成区）──
         gen_box = _make_section(tr("height_section_auto_gen"))
         gl = gen_box.layout()
-
-        auto_btn = QPushButton(tr("height_btn_auto_gen"))
-        auto_btn.setStyleSheet(
-            "QPushButton { background: #6c6cf0; color: white; padding: 10px;"
-            " font-size: 14px; font-weight: bold; border-radius: 5px; border: none; }"
-            "QPushButton:hover { background: #7c7cff; }"
-        )
-        auto_btn.setToolTip(tr("height_btn_auto_gen_tip"))
-        auto_btn.clicked.connect(self.auto_height_requested.emit)
-        gl.addWidget(auto_btn)
 
         # 种子
         seed_row = QHBoxLayout()
@@ -127,11 +116,11 @@ class HeightPage(QWidget):
         )
         gl.addWidget(self._mountain_slider)
 
-        smooth_btn = QPushButton(tr("height_btn_smooth"))
-        smooth_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        smooth_btn.setToolTip(tr("height_btn_smooth_tip"))
-        smooth_btn.clicked.connect(self.smooth_height_requested.emit)
-        gl.addWidget(smooth_btn)
+        import_btn = QPushButton(tr("height_import_btn"))
+        import_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        import_btn.setToolTip(tr("height_import_tip"))
+        import_btn.clicked.connect(self.import_heightmap_requested.emit)
+        gl.addWidget(import_btn)
 
         lay.addWidget(gen_box)
 
@@ -139,15 +128,10 @@ class HeightPage(QWidget):
         ridge_box = _make_section(tr("height_section_ridge"))
         rl = ridge_box.layout()
 
-        ridge_hint = QLabel(tr("height_ridge_hint"))
-        ridge_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
-        ridge_hint.setWordWrap(True)
-        rl.addWidget(ridge_hint)
-
         self._ridge_btn = QPushButton(tr("height_btn_ridge"))
         self._ridge_btn.setCheckable(True)
         self._ridge_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._ridge_btn.toggled.connect(self.ridge_mode_toggled.emit)
+        self._ridge_btn.toggled.connect(self._on_ridge_toggled)
         rl.addWidget(self._ridge_btn)
 
         # 山峰高度
@@ -219,14 +203,9 @@ class HeightPage(QWidget):
 
         lay.addWidget(ridge_box)
 
-        # ── 手动画笔 ──
-        brush_box = _make_section(tr("height_section_brush"))
+        # ── 手动微调 ──
+        brush_box = _make_section(tr("height_section_manual"))
         bl = brush_box.layout()
-
-        brush_hint = QLabel(tr("height_brush_hint"))
-        brush_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
-        brush_hint.setWordWrap(True)
-        bl.addWidget(brush_hint)
 
         val_row = QHBoxLayout()
         vlbl = QLabel(tr("height_label_value"))
@@ -257,14 +236,77 @@ class HeightPage(QWidget):
             preset_row.addWidget(btn)
         bl.addLayout(preset_row)
 
-        lay.addWidget(brush_box)
+        # ── 雕刻画笔（抬升 / 下沉 / 平滑）──
+        sep = QLabel("—— " + tr("height_brush_section") + " ——")
+        sep.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sep.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 6px 0 2px 0;")
+        bl.addWidget(sep)
 
-        # ── 高度参考 ──
-        ref_box = _make_section(tr("height_section_ref"))
-        ref_lbl = QLabel(tr("height_ref_text"))
-        ref_lbl.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
-        ref_box.layout().addWidget(ref_lbl)
-        lay.addWidget(ref_box)
+        brush_row = QHBoxLayout()
+        brush_row.setSpacing(4)
+        # 非互斥按钮组 — 再次点击已选按钮 = 关闭画笔（切回按省份模式）
+        self._brush_group = QButtonGroup(self)
+        self._brush_group.setExclusive(False)
+        self._brush_btns: dict[str, QPushButton] = {}
+        for key, label_key, tip_key in [
+            ("raise", "height_brush_raise", "height_brush_raise_tip"),
+            ("lower", "height_brush_lower", "height_brush_lower_tip"),
+            ("smooth", "height_brush_smooth", "height_brush_smooth_tip"),
+        ]:
+            b = QPushButton(tr(label_key))
+            b.setCheckable(True)
+            b.setToolTip(tr(tip_key))
+            b.setStyleSheet(
+                "QPushButton {"
+                "  background: #3a3a3a; color: #ddd; border: 1px solid #555;"
+                "  padding: 6px; border-radius: 4px; font-size: 12px; font-weight: 600;"
+                "}"
+                "QPushButton:hover { border-color: #88e; }"
+                "QPushButton:checked { background: #6a5acd; color: white; border-color: #8a78ff; }"
+            )
+            b.clicked.connect(lambda _=False, k=key: self._on_brush_button(k))
+            self._brush_group.addButton(b)
+            self._brush_btns[key] = b
+            brush_row.addWidget(b)
+        bl.addLayout(brush_row)
+
+        # 画笔尺寸
+        bsize_row = QHBoxLayout()
+        bsize_lbl = QLabel(tr("height_brush_size"))
+        bsize_lbl.setStyleSheet(_LABEL_STYLE)
+        bsize_row.addWidget(bsize_lbl)
+        self._brush_size_label = QLabel("30px")
+        self._brush_size_label.setStyleSheet(_DIM_LABEL_STYLE)
+        bsize_row.addStretch()
+        bsize_row.addWidget(self._brush_size_label)
+        bl.addLayout(bsize_row)
+
+        self._brush_size_slider = QSlider(Qt.Orientation.Horizontal)
+        self._brush_size_slider.setRange(4, 200)
+        self._brush_size_slider.setValue(30)
+        self._brush_size_slider.setStyleSheet(_SLIDER_STYLE)
+        self._brush_size_slider.valueChanged.connect(self._on_brush_size)
+        bl.addWidget(self._brush_size_slider)
+
+        # 强度（每刷一下改变多少 / 平滑多快）
+        bstr_row = QHBoxLayout()
+        bstr_lbl = QLabel(tr("height_brush_strength"))
+        bstr_lbl.setStyleSheet(_LABEL_STYLE)
+        bstr_row.addWidget(bstr_lbl)
+        self._brush_strength_label = QLabel("5")
+        self._brush_strength_label.setStyleSheet(_DIM_LABEL_STYLE)
+        bstr_row.addStretch()
+        bstr_row.addWidget(self._brush_strength_label)
+        bl.addLayout(bstr_row)
+
+        self._brush_strength_slider = QSlider(Qt.Orientation.Horizontal)
+        self._brush_strength_slider.setRange(1, 20)
+        self._brush_strength_slider.setValue(5)
+        self._brush_strength_slider.setStyleSheet(_SLIDER_STYLE)
+        self._brush_strength_slider.valueChanged.connect(self._on_brush_strength)
+        bl.addWidget(self._brush_strength_slider)
+
+        lay.addWidget(brush_box)
 
         lay.addStretch()
 
@@ -297,3 +339,49 @@ class HeightPage(QWidget):
         """滑块变化时，如果确认按钮可见（预览中），请求刷新预览。"""
         if self._ridge_confirm_row.isVisible():
             self.ridge_preview_requested.emit()
+
+    def _on_ridge_toggled(self, on: bool) -> None:
+        """山脉画线开关：打开时关闭雕刻画笔（互斥）。"""
+        if on:
+            any_brush = any(b.isChecked() for b in getattr(self, '_brush_btns', {}).values())
+            if any_brush:
+                for b in self._brush_btns.values():
+                    b.blockSignals(True)
+                    b.setChecked(False)
+                    b.blockSignals(False)
+                self.height_brush_mode_changed.emit("off")
+        self.ridge_mode_toggled.emit(on)
+
+    # ── 雕刻画笔 ──
+    def _on_brush_button(self, key: str) -> None:
+        """点击画笔按钮：同按钮再点 = 关闭；其它按钮 = 切换到该模式。"""
+        clicked_btn = self._brush_btns[key]
+        # 取消其它画笔按钮勾选
+        for k, b in self._brush_btns.items():
+            if k != key and b.isChecked():
+                b.blockSignals(True)
+                b.setChecked(False)
+                b.blockSignals(False)
+        # 与山脉画线互斥：激活画笔时关闭山脉模式
+        if clicked_btn.isChecked() and self._ridge_btn.isChecked():
+            self._ridge_btn.setChecked(False)  # 触发 ridge_mode_toggled(False)
+        if clicked_btn.isChecked():
+            self.height_brush_mode_changed.emit(key)
+        else:
+            self.height_brush_mode_changed.emit("off")
+
+    def _on_brush_size(self, size: int) -> None:
+        self._brush_size_label.setText(f"{size}px")
+        self.height_brush_size_changed.emit(size)
+
+    def _on_brush_strength(self, s: int) -> None:
+        self._brush_strength_label.setText(str(s))
+        self.height_brush_strength_changed.emit(s)
+
+    def deactivate_brush(self) -> None:
+        """切走高度页时取消画笔激活状态。"""
+        for b in self._brush_btns.values():
+            b.blockSignals(True)
+            b.setChecked(False)
+            b.blockSignals(False)
+        self.height_brush_mode_changed.emit("off")

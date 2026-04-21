@@ -68,7 +68,8 @@ def export_full_mod(
         _tmp = _MD.__new__(_MD)
         _tmp.province_map = province_map
         _tmp.tile_map = tile_map
-        _tmp.compact_with_references(state_mgr=state_mgr, country_mgr=country_mgr)
+        _tmp.compact_with_references(state_mgr=state_mgr, country_mgr=country_mgr,
+                                     strategic_region_mgr=strategic_region_mgr)
     province_count = int(province_map.max())
 
     # 清理 < 8 像素的碎屑省份，合并到最大相邻省份（只改导出副本）
@@ -81,6 +82,15 @@ def export_full_mod(
     land_ids, sea_ids, lake_ids = _classify_provinces_fast(
         province_count, province_map, tile_map
     )
+
+    # === 同步 tile_map 到 province 分类 ===
+    # _classify_provinces_fast 按"像素多数表决"分类 province，必然有少量像素
+    # tile ≠ province type（例：60% LAND+40% SEA 的 province 被归为 land，但那
+    # 40% SEA 像素在 tile_map 里还是 SEA）。若不同步：
+    #   - buildings writer 坐标验证用 tile_map，找不到 LAND 像素 → 写错坐标
+    #   - HOI4 判 coastal 看 provinces.bmp + type，和 tile_map 判定分歧
+    # 同步后保证：tile_map[y,x] 类型 = pid_map[y,x] 所属 province 的 type
+    _sync_tile_with_province_class(tile_map, province_map, land_ids, sea_ids, lake_ids)
 
     # === BMP 文件 ===
     write_provinces_bmp(province_map, output_dir, colors)
@@ -171,8 +181,11 @@ def export_full_mod(
         _sync_terrain_with_tile(terrain_map, tile_map)
 
     # === 一次性计算海岸线（definition.csv + buildings.txt 共享）===
-    coastal_set, land_to_sea = _compute_coastal_once(
-        province_map, land_ids, sea_ids)
+    # **省级邻接**判定 — 和 HOI4 完全一致（按 definition.csv 的 type 字段判）
+    # 不能用 tile_map 像素级判定，因为 _classify_provinces_fast 按像素多数表决
+    # 分类，与 tile_map 像素级邻接不等价 → HOI4 判 coastal 但 buildings.txt 没
+    # 写 port → "Province X coastal but no port" → start_game 崩溃
+    coastal_set, land_to_sea = _compute_coastal_once(province_map, land_ids, sea_ids)
 
     # definition.csv 延后到 states 构建完成后写（coastal 必须与 buildings 对齐）
     _write_continent(output_dir, continent_mgr=continent_mgr)
@@ -246,10 +259,15 @@ def export_full_mod(
         all_state_pids = set()
         for provs in states.values():
             all_state_pids.update(provs)
-        # 过滤 coastal：只保留在 states 里的省份
-        # 注意：不能按像素大小过滤！HOI4 自己扫描像素邻接判定 coastal，
-        # 不管 definition.csv 怎么标，每个 coastal 省份必须有 naval_base
-        coastal_set = {p for p in coastal_set if p in all_state_pids}
+        # **孤儿 coastal 陆地省份转为海** — HOI4 的 coastal 判定靠 CSV 里
+        # land-adjacent-to-sea, 所以这些没 state 的陆地省份必须变海, 不然
+        # HOI4 会把它们识别为 coastal 但 buildings.txt 没港口 → 崩溃
+        orphan_coastal = {p for p in coastal_set if p not in all_state_pids}
+        if orphan_coastal:
+            land_ids = [p for p in land_ids if p not in orphan_coastal]
+            sea_ids = sorted(set(sea_ids) | orphan_coastal)
+            coastal_set -= orphan_coastal
+            print(f"  [coastal] 转换 {len(orphan_coastal)} 个无 state 的 coastal 省份为 sea 类型")
         land_to_sea = {p: s for p, s in land_to_sea.items() if p in coastal_set}
 
     # definition.csv 延后到 buildings 之后写（需要 buildings 的坐标验证结果）
@@ -301,8 +319,12 @@ def export_full_mod(
                          land_to_sea=land_to_sea,
                          pid_count=pid_count_g, sum_x=sum_x_g, sum_y=sum_y_g)
         if failed_coastal:
+            # 这些坐标不可靠的 coastal 省份必须从 CSV 的 land 改成 sea,
+            # 否则 HOI4 会重新检测出 coastal 但 buildings.txt 没 port → 崩溃
             coastal_set -= failed_coastal
-            print(f"  [coastal] 排除 {len(failed_coastal)} 个坐标不可靠的 coastal 省份")
+            land_ids = [p for p in land_ids if p not in failed_coastal]
+            sea_ids = sorted(set(sea_ids) | failed_coastal)
+            print(f"  [coastal] 转换 {len(failed_coastal)} 个坐标不可靠的 coastal 省份为 sea 类型")
 
         _write_definition_csv(province_count, colors, province_map, tile_map, output_dir,
                               land_ids, sea_ids, lake_ids, continent_mgr=continent_mgr,
@@ -987,6 +1009,39 @@ def _classify_provinces_fast(province_count, province_map, tile_map):
             sea_ids.append(pid)
 
     return land_ids, sea_ids, lake_ids
+
+
+def _sync_tile_with_province_class(
+    tile_map: np.ndarray,
+    province_map: np.ndarray,
+    land_ids: list[int],
+    sea_ids: list[int],
+    lake_ids: list[int],
+) -> None:
+    """就地同步 tile_map，使每个像素的 tile 类型 = 该像素所属 province 的类型。
+
+    _classify_provinces_fast 按像素多数表决分类 province：一个 60% LAND / 40% SEA
+    的 province 被归为 land，但那 40% SEA 像素在 tile_map 里仍是 SEA。这些"少数派"
+    像素会导致:
+      - HOI4 按 definition.csv 判该 province coastal 但 buildings writer 在 tile_map
+        里找不到 LAND 像素 → naval_base 坐标写到 SEA 上 → HOI4 "not over the land"
+        → port 被忽略 → coastal but no port → 崩溃
+    同步后保证 tile_map、provinces.bmp、definition.csv 三者一致。
+    """
+    n = int(province_map.max()) + 1
+    new_tile = np.zeros(n, dtype=np.uint8)
+    for pid in land_ids:
+        if 0 < pid < n:
+            new_tile[pid] = TILE_LAND
+    for pid in sea_ids:
+        if 0 < pid < n:
+            new_tile[pid] = TILE_SEA
+    for pid in lake_ids:
+        if 0 < pid < n:
+            new_tile[pid] = TILE_LAKE
+    # pid==0 是背景，保持原值
+    new_tile[0] = tile_map.ravel()[0] if tile_map.size else TILE_SEA
+    np.copyto(tile_map, new_tile[province_map])
 
 
 def _sync_terrain_with_tile(terrain_map: np.ndarray, tile_map: np.ndarray) -> None:

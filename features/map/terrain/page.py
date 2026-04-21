@@ -92,39 +92,77 @@ class TerrainPage(QWidget):
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(4)
 
-        # ═══════ 🎨 顶部：一键自动生成（推荐）═══════
-        from ui.styles import _ACCENT
-        auto_top_box = _make_section(tr("terrain_auto_top_section"))
-        auto_top_layout = auto_top_box.layout()
+        # ── 智能生成设置 ──
+        gen_box = _make_section(tr("terrain_section_auto_gen"))
+        gl = gen_box.layout()
 
-        auto_top_btn = QPushButton(tr("terrain_auto_top_btn"))
-        auto_top_btn.setMinimumHeight(44)
-        auto_top_btn.setStyleSheet(
-            f"QPushButton {{"
-            f"  background: {_ACCENT};"
-            f"  color: white;"
-            f"  border: none;"
-            f"  border-radius: 6px;"
-            f"  font-size: 15px;"
-            f"  font-weight: 600;"
-            f"  padding: 8px;"
-            f"}}"
-            f"QPushButton:hover {{"
-            f"  background: #9090ff;"
-            f"}}"
+        auto_btn = QPushButton(tr("terrain_btn_auto_gen"))
+        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        auto_btn.clicked.connect(self.auto_terrain_requested.emit)
+        gl.addWidget(auto_btn)
+
+        # 种子
+        seed_row = QHBoxLayout()
+        seed_lbl = QLabel(tr("terrain_label_seed"))
+        seed_lbl.setStyleSheet(_LABEL_STYLE)
+        seed_row.addWidget(seed_lbl)
+        self._seed_spin = QSpinBox()
+        self._seed_spin.setRange(0, 99999)
+        self._seed_spin.setValue(42)
+        self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
+        seed_row.addWidget(self._seed_spin)
+        rand_btn = QPushButton(tr("terrain_btn_random"))
+        rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        rand_btn.setMaximumWidth(60)
+        rand_btn.clicked.connect(self._randomize_seed)
+        seed_row.addWidget(rand_btn)
+        gl.addLayout(seed_row)
+
+        # 噪声强度
+        noise_row = QHBoxLayout()
+        noise_lbl = QLabel(tr("terrain_label_noise"))
+        noise_lbl.setStyleSheet(_LABEL_STYLE)
+        noise_row.addWidget(noise_lbl)
+        self._noise_label = QLabel("20")
+        self._noise_label.setStyleSheet(_DIM_LABEL_STYLE)
+        noise_row.addStretch()
+        noise_row.addWidget(self._noise_label)
+        gl.addLayout(noise_row)
+
+        self._noise_slider = QSlider(Qt.Orientation.Horizontal)
+        self._noise_slider.setRange(0, 50)
+        self._noise_slider.setValue(20)
+        self._noise_slider.setStyleSheet(_SLIDER_STYLE)
+        self._noise_slider.valueChanged.connect(
+            lambda v: self._noise_label.setText(str(v))
         )
-        auto_top_btn.setToolTip(tr("terrain_auto_top_tooltip"))
-        auto_top_btn.clicked.connect(self.auto_terrain_requested.emit)
-        auto_top_layout.addWidget(auto_top_btn)
+        gl.addWidget(self._noise_slider)
 
-        auto_top_tip = QLabel(tr("terrain_auto_top_tip"))
-        auto_top_tip.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 2px;")
-        auto_top_tip.setWordWrap(True)
-        auto_top_layout.addWidget(auto_top_tip)
+        # 散点密度
+        scatter_row = QHBoxLayout()
+        scatter_lbl = QLabel(tr("terrain_label_scatter"))
+        scatter_lbl.setStyleSheet(_LABEL_STYLE)
+        scatter_row.addWidget(scatter_lbl)
+        self._scatter_label = QLabel("65%")
+        self._scatter_label.setStyleSheet(_DIM_LABEL_STYLE)
+        scatter_row.addStretch()
+        scatter_row.addWidget(self._scatter_label)
+        gl.addLayout(scatter_row)
 
-        outer.addWidget(auto_top_box)
+        self._scatter_slider = QSlider(Qt.Orientation.Horizontal)
+        self._scatter_slider.setRange(0, 100)
+        self._scatter_slider.setValue(65)
+        self._scatter_slider.setStyleSheet(_SLIDER_STYLE)
+        self._scatter_slider.valueChanged.connect(
+            lambda v: self._scatter_label.setText(f"{v}%")
+        )
+        gl.addWidget(self._scatter_slider)
 
-        # 编辑模式切换: 按省份 vs 画笔
+        outer.addWidget(gen_box)
+
+        # ── 编辑模式 ──
+        mode_box = _make_section(tr("terrain_section_edit_mode"))
+        mode_lay = mode_box.layout()
         mode_row = QHBoxLayout()
         self._terrain_mode_group = QButtonGroup(self)
         self._terrain_mode_group.setExclusive(True)
@@ -142,7 +180,8 @@ class TerrainPage(QWidget):
         self._terrain_mode_group.addButton(brush_btn, 1)
         mode_row.addWidget(brush_btn)
         self._terrain_mode_group.idClicked.connect(self._on_mode_switched)
-        outer.addLayout(mode_row)
+        mode_lay.addLayout(mode_row)
+        outer.addWidget(mode_box)
 
         # 画笔控件 (画笔模式下可见)
         self._brush_box = _make_section(tr("terrain_section_brush"))
@@ -172,12 +211,6 @@ class TerrainPage(QWidget):
 
         self._brush_box.hide()  # 默认省份模式，隐藏画笔设置
         outer.addWidget(self._brush_box)
-
-        # 提示
-        hint = QLabel(tr("terrain_hint"))
-        hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 8px;")
-        hint.setWordWrap(True)
-        outer.addWidget(hint)
 
         # 可滚动区域
         scroll = QScrollArea()
@@ -259,74 +292,6 @@ class TerrainPage(QWidget):
         lay.addStretch()
         scroll.setWidget(scroll_content)
         outer.addWidget(scroll)
-
-        # ── 智能生成设置 ──
-        gen_box = _make_section(tr("terrain_section_auto_gen"))
-        gl = gen_box.layout()
-
-        # 种子
-        seed_row = QHBoxLayout()
-        seed_lbl = QLabel(tr("terrain_label_seed"))
-        seed_lbl.setStyleSheet(_LABEL_STYLE)
-        seed_row.addWidget(seed_lbl)
-        self._seed_spin = QSpinBox()
-        self._seed_spin.setRange(0, 99999)
-        self._seed_spin.setValue(42)
-        self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
-        seed_row.addWidget(self._seed_spin)
-        rand_btn = QPushButton(tr("terrain_btn_random"))
-        rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        rand_btn.setMaximumWidth(60)
-        rand_btn.clicked.connect(self._randomize_seed)
-        seed_row.addWidget(rand_btn)
-        gl.addLayout(seed_row)
-
-        # 噪声强度
-        noise_row = QHBoxLayout()
-        noise_lbl = QLabel(tr("terrain_label_noise"))
-        noise_lbl.setStyleSheet(_LABEL_STYLE)
-        noise_row.addWidget(noise_lbl)
-        self._noise_label = QLabel("20")
-        self._noise_label.setStyleSheet(_DIM_LABEL_STYLE)
-        noise_row.addStretch()
-        noise_row.addWidget(self._noise_label)
-        gl.addLayout(noise_row)
-
-        self._noise_slider = QSlider(Qt.Orientation.Horizontal)
-        self._noise_slider.setRange(0, 50)
-        self._noise_slider.setValue(20)
-        self._noise_slider.setStyleSheet(_SLIDER_STYLE)
-        self._noise_slider.valueChanged.connect(
-            lambda v: self._noise_label.setText(str(v))
-        )
-        gl.addWidget(self._noise_slider)
-
-        # 散点密度
-        scatter_row = QHBoxLayout()
-        scatter_lbl = QLabel(tr("terrain_label_scatter"))
-        scatter_lbl.setStyleSheet(_LABEL_STYLE)
-        scatter_row.addWidget(scatter_lbl)
-        self._scatter_label = QLabel("65%")
-        self._scatter_label.setStyleSheet(_DIM_LABEL_STYLE)
-        scatter_row.addStretch()
-        scatter_row.addWidget(self._scatter_label)
-        gl.addLayout(scatter_row)
-
-        self._scatter_slider = QSlider(Qt.Orientation.Horizontal)
-        self._scatter_slider.setRange(0, 100)
-        self._scatter_slider.setValue(65)
-        self._scatter_slider.setStyleSheet(_SLIDER_STYLE)
-        self._scatter_slider.valueChanged.connect(
-            lambda v: self._scatter_label.setText(f"{v}%")
-        )
-        gl.addWidget(self._scatter_slider)
-
-        auto_btn = QPushButton(tr("terrain_btn_auto_gen"))
-        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        auto_btn.clicked.connect(self.auto_terrain_requested.emit)
-        gl.addWidget(auto_btn)
-
-        outer.addWidget(gen_box)
 
     # ── 槽函数 ──
 

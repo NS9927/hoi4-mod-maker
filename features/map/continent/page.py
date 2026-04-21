@@ -6,7 +6,7 @@
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QInputDialog, QScrollArea,
+    QListWidget, QInputDialog, QScrollArea, QCheckBox,
 )
 
 from ui.i18n import tr
@@ -23,6 +23,7 @@ class ContinentPage(QWidget):
     continent_add_requested = pyqtSignal(str)
     continent_rename_requested = pyqtSignal(int, str)
     continent_remove_requested = pyqtSignal(int)
+    assign_by_state_changed = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -69,6 +70,11 @@ class ContinentPage(QWidget):
             lambda on: self.continent_pick_toggled.emit(on)
         )
         lay.addWidget(self._continent_pick_btn)
+
+        # 按 State 级别分配
+        self._by_state_cb = QCheckBox(tr("continent_assign_by_state"))
+        self._by_state_cb.toggled.connect(self.assign_by_state_changed.emit)
+        lay.addWidget(self._by_state_cb)
 
         self._continent_status = QLabel("")
         self._continent_status.setStyleSheet("color: #6c6cf0; font-size: 11px;")

@@ -192,6 +192,7 @@ class MapData:
         self,
         state_mgr=None,
         country_mgr=None,
+        strategic_region_mgr=None,
         tracked_pids: list[int] | None = None,
     ) -> dict[int, int]:
         """压实 province_map 的 ID，并同步更新所有引用省份 ID 的地方。
@@ -202,6 +203,7 @@ class MapData:
         参数：
             state_mgr: StateManager — 更新 state.provinces / victory_points / province_to_state
             country_mgr: CountryManager — 更新 country.capital
+            strategic_region_mgr: StrategicRegionManager — 更新 region.province_ids
             tracked_pids: 调用方想追踪的额外 pid 列表（如选中的省份）
 
         返回：
@@ -261,6 +263,17 @@ class MapData:
                     else:
                         # 首都被删了，清零
                         country.capital = 0
+
+        # 更新 strategic_region_mgr
+        if strategic_region_mgr is not None:
+            for region in strategic_region_mgr._regions.values():
+                seen = set()
+                new_provs = []
+                for p in region.province_ids:
+                    if p in mapping and mapping[p] != 0 and mapping[p] not in seen:
+                        seen.add(mapping[p])
+                        new_provs.append(mapping[p])
+                region.province_ids = new_provs
 
         return mapping
 

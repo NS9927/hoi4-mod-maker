@@ -13,6 +13,8 @@ HOI4 规则（Map modding §Continents）:
 
 from __future__ import annotations
 
+import numpy as np
+
 
 class ContinentManager:
     """管理大陆列表 + 省份→大陆映射"""
@@ -135,3 +137,105 @@ class ContinentManager:
         raw = data.get("province_continent", {})
         # JSON 会把 int key 转成 str, 这里兼容
         self._province_continent = {int(k): int(v) for k, v in raw.items()}
+
+    # ───────────── 可视化 ─────────────
+
+    def build_continent_color_map(
+        self,
+        province_map: np.ndarray,
+        tile_map: np.ndarray,
+        state_manager=None,
+    ) -> np.ndarray:
+        """生成大陆颜色图（用于显示）。
+
+        规则:
+        - 有指派的陆地省份 → 该大陆的专属颜色（鲜艳，按 continent index 确定性生成）
+        - 未指派的陆地省份 → state 色去饱和变暗（看清 state 边界）, 没 state 就深灰
+        - 海/湖省份 → 深蓝灰
+
+        参数:
+            province_map: (H, W) uint16 / uint32 省份 ID 图
+            tile_map: (H, W) uint8 地块类型（区分陆/海/湖）
+            state_manager: 可选, 用于给未指派省份上 state 色
+        """
+        from data.constants import TILE_LAND
+
+        max_pid = int(province_map.max())
+        # 初始: 全部设成海色
+        lut = np.full((max_pid + 1, 3), (30, 40, 70), dtype=np.uint8)
+
+        # 大陆颜色（确定性: 按 continent index 取固定色轮）
+        cont_palette = _generate_continent_palette(len(self._names))
+
+        # state 颜色（和 StateManager 同种子, 保证一致）
+        state_colors: dict[int, tuple[int, int, int]] = {}
+        if state_manager is not None:
+            rng = np.random.RandomState(123)
+            for sid in state_manager.states:
+                state_colors[sid] = (
+                    int(rng.randint(60, 220)),
+                    int(rng.randint(60, 220)),
+                    int(rng.randint(60, 220)),
+                )
+
+        # 识别每个省份的"主体类型": 用**多数决**而不是"有一个陆地像素就算陆地"
+        # 后者会把沾了几个陆地像素的海洋省误判成陆地 → 渲染成灰色块
+        h, w = province_map.shape
+        land_mask_flat = (tile_map == TILE_LAND).ravel()
+        pid_flat = province_map.ravel()
+        land_count = np.bincount(pid_flat, weights=land_mask_flat, minlength=max_pid + 1)
+        total_count = np.bincount(pid_flat, minlength=max_pid + 1)
+        # 陆地像素占比 > 50% 才算陆地省; 纯海/湖/混合沾边 都视为海
+        is_land = land_count * 2 > total_count
+
+        # 填 LUT
+        for pid in range(1, max_pid + 1):
+            if not is_land[pid]:
+                continue
+            ci = self._province_continent.get(pid)
+            if ci is not None and 0 <= ci < len(cont_palette):
+                lut[pid] = cont_palette[ci]
+            else:
+                # 未指派: 用 state 色去饱和
+                sid = None
+                if state_manager is not None:
+                    sid = state_manager.get_state_of_province(pid)
+                if sid and sid in state_colors:
+                    sr, sg, sb = state_colors[sid]
+                    gray = (sr + sg + sb) // 3
+                    mix = 0.6
+                    lut[pid] = (
+                        int((sr * (1 - mix) + gray * mix) * 0.6),
+                        int((sg * (1 - mix) + gray * mix) * 0.6),
+                        int((sb * (1 - mix) + gray * mix) * 0.6),
+                    )
+                else:
+                    lut[pid] = (70, 70, 70)
+
+        flat_clipped = np.clip(pid_flat, 0, max_pid)
+        rgb = lut[flat_clipped].reshape(h, w, 3)
+        return rgb
+
+
+def _generate_continent_palette(n: int) -> list[tuple[int, int, int]]:
+    """为 n 个大陆生成确定性的鲜艳色轮。"""
+    # 手选前几个大陆用 vanilla 感知友好的饱和色, 后面用 HSV 均分
+    preset = [
+        (90, 160, 220),   # 欧洲风 蓝
+        (220, 180, 110),  # 北美 沙金
+        (180, 210, 120),  # 南美 黄绿
+        (200, 140, 200),  # 澳洲 紫粉
+        (200, 120, 100),  # 非洲 橙红
+        (110, 200, 180),  # 亚洲 青
+    ]
+    if n <= len(preset):
+        return preset[:n]
+    # 多于 6 个: 延续色轮
+    import colorsys
+    out = list(preset)
+    extra = n - len(preset)
+    for i in range(extra):
+        h = (i / extra) * 0.83 + 0.08  # 避开已用的蓝色范围
+        r, g, b = colorsys.hsv_to_rgb(h, 0.55, 0.85)
+        out.append((int(r * 255), int(g * 255), int(b * 255)))
+    return out

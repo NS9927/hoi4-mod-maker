@@ -113,18 +113,56 @@ class CountryManager:
         self,
         province_map: np.ndarray,
         state_manager,  # StateManager 实例
+        tile_map: np.ndarray | None = None,
     ) -> np.ndarray:
-        """生成国家颜色图（用于显示）"""
-        max_pid = int(province_map.max())
-        lut = np.full((max_pid + 1, 3), 60, dtype=np.uint8)  # 未分配=深灰
+        """生成国家颜色图（用于显示）。
 
-        # 遍历每个 State，用所有者国家颜色填省份
+        未分配到国家的 state 使用 state 自己的颜色（**去饱和 + 变暗**），
+        避免和国家色混淆，同时让用户在国家模式下能看清 state 边界，
+        一眼知道还有哪些 state 需要分配。
+        """
+        from data.constants import TILE_LAND
+
+        max_pid = int(province_map.max())
+        # 默认：海/未归 state 的省 = 深蓝（和大陆模式一致，避免跟灰色陆地混淆）
+        lut = np.full((max_pid + 1, 3), (30, 40, 70), dtype=np.uint8)
+
+        # 识别陆地省份（多数决，避免沾边像素误判）—— 只有陆地省才会被涂国家色/state 色
+        is_land_arr: np.ndarray | None = None
+        if tile_map is not None:
+            pid_flat = province_map.ravel()
+            land_flat = (tile_map == TILE_LAND).ravel()
+            land_count = np.bincount(pid_flat, weights=land_flat, minlength=max_pid + 1)
+            total_count = np.bincount(pid_flat, minlength=max_pid + 1)
+            is_land_arr = land_count * 2 > total_count
+
+        # 和 state manager 同种子，保证 state 颜色稳定
+        rng = np.random.RandomState(123)
+        state_colors: dict[int, tuple[int, int, int]] = {}
+        for sid in state_manager.states:
+            state_colors[sid] = (
+                int(rng.randint(60, 220)),
+                int(rng.randint(60, 220)),
+                int(rng.randint(60, 220)),
+            )
+
         for sid, state in state_manager.states.items():
             tag = self._state_owner.get(sid, "")
             if tag and tag in self._countries:
                 color = self._countries[tag].color
-                for pid in state.provinces:
-                    if pid <= max_pid:
+            else:
+                sr, sg, sb = state_colors.get(sid, (100, 100, 100))
+                gray = (sr + sg + sb) // 3
+                mix = 0.6
+                color = (
+                    int((sr * (1 - mix) + gray * mix) * 0.7),
+                    int((sg * (1 - mix) + gray * mix) * 0.7),
+                    int((sb * (1 - mix) + gray * mix) * 0.7),
+                )
+            for pid in state.provinces:
+                if pid <= max_pid:
+                    # 只涂真陆地省; 海洋省误加进 state 也保持蓝
+                    if is_land_arr is None or is_land_arr[pid]:
                         lut[pid] = color
 
         flat = province_map.ravel()

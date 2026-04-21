@@ -74,31 +74,13 @@ class ProvincePage(QWidget):
         self._province_hint.setWordWrap(True)
         lay.addWidget(self._province_hint)
 
-        # ── 省份信息 ──
-        info_box = _make_section(tr("province_section_info"))
-        il = info_box.layout()
-
-        self._prov_labels: dict[str, QLabel] = {}
-        for key, display in [
-            ("id", tr("province_info_id")),
-            ("type", tr("province_info_type")),
-            ("terrain", tr("province_info_terrain")),
-            ("pixels", tr("province_info_pixels")),
-            ("coastal", tr("province_info_coastal")),
-        ]:
-            row = QHBoxLayout()
-            name_lbl = QLabel(f"{display}:")
-            name_lbl.setStyleSheet(_LABEL_STYLE)
-            val_lbl = QLabel("—")
-            val_lbl.setStyleSheet(_DIM_LABEL_STYLE)
-            val_lbl.setAlignment(Qt.AlignRight)
-            row.addWidget(name_lbl)
-            row.addStretch()
-            row.addWidget(val_lbl)
-            il.addLayout(row)
-            self._prov_labels[key] = val_lbl
-
-        lay.addWidget(info_box)
+        # ── 省份信息（单行紧凑） ──
+        self._prov_info_label = QLabel(tr("province_info_compact_default"))
+        self._prov_info_label.setStyleSheet(
+            f"color: #aaa; font-size: 11px; padding: 4px 8px;"
+            f" background: #1a1a22; border: 1px solid #2a2a3c; border-radius: 4px;"
+        )
+        lay.addWidget(self._prov_info_label)
 
         # ── 省份统计 ──
         self._stats_label = QLabel()
@@ -106,46 +88,47 @@ class ProvincePage(QWidget):
         self._stats_label.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 8px;")
         lay.addWidget(self._stats_label)
 
-        # ── 工具按钮 ──
+        # ── 工具按钮（横排） ──
         tools_box = _make_section(tr("province_section_tools"))
+        tools_row = QHBoxLayout()
 
-        # 合并按钮 (toggle)
         self._merge_btn = QPushButton(tr("province_btn_merge"))
         self._merge_btn.setCheckable(True)
         self._merge_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._merge_btn.setToolTip(tr("province_btn_merge_tip"))
-        tools_box.layout().addWidget(self._merge_btn)
+        tools_row.addWidget(self._merge_btn)
 
-        # 扩张按钮 (toggle)
         self._expand_btn = QPushButton(tr("province_btn_expand"))
         self._expand_btn.setCheckable(True)
         self._expand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._expand_btn.setToolTip(tr("province_btn_expand_tip"))
-        tools_box.layout().addWidget(self._expand_btn)
+        tools_row.addWidget(self._expand_btn)
 
-        # 切割按钮 (toggle)
         self._split_btn = QPushButton(tr("province_btn_split"))
         self._split_btn.setCheckable(True)
         self._split_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._split_btn.setToolTip(tr("province_btn_split_tip"))
-        tools_box.layout().addWidget(self._split_btn)
+        tools_row.addWidget(self._split_btn)
 
+        tools_box.layout().addLayout(tools_row)
         lay.addWidget(tools_box)
 
-        # ── 增量生成 ──
+        # ── 增量生成（横排） ──
         regen_box = _make_section(tr("province_section_regen"))
+        regen_row = QHBoxLayout()
 
         self._regen_btn = QPushButton(tr("province_btn_select_area"))
         self._regen_btn.setCheckable(True)
         self._regen_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._regen_btn.setToolTip(tr("province_btn_select_area_tip"))
-        regen_box.layout().addWidget(self._regen_btn)
+        regen_row.addWidget(self._regen_btn)
 
         self._regen_exec_btn = QPushButton(tr("province_btn_regen_exec"))
         self._regen_exec_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._regen_exec_btn.setToolTip(tr("province_btn_regen_exec_tip"))
-        regen_box.layout().addWidget(self._regen_exec_btn)
+        regen_row.addWidget(self._regen_exec_btn)
 
+        regen_box.layout().addLayout(regen_row)
         lay.addWidget(regen_box)
 
         # ── 信号连接 ──
@@ -225,12 +208,12 @@ class ProvincePage(QWidget):
     def update_province_info(
         self, pid: int, ptype: str, terrain: str, pixels: int, coastal: bool
     ) -> None:
-        """更新省份信息面板"""
-        self._prov_labels["id"].setText(str(pid))
-        self._prov_labels["type"].setText(ptype)
-        self._prov_labels["terrain"].setText(terrain)
-        self._prov_labels["pixels"].setText(str(pixels))
-        self._prov_labels["coastal"].setText(tr("province_coastal_yes") if coastal else tr("province_coastal_no"))
+        """更新省份信息面板（单行紧凑格式）"""
+        coast_str = tr("province_coastal_yes") if coastal else ""
+        parts = [f"ID: {pid}", ptype, terrain, f"{pixels}px"]
+        if coast_str:
+            parts.append(coast_str)
+        self._prov_info_label.setText(" | ".join(parts))
 
     def update_province_gaps(self, gap_ids: list[int]) -> None:
         """更新省份 ID 空洞提示。"""

@@ -334,8 +334,16 @@ def import_mod_map(mod_dir: str) -> dict[str, Any]:
         FileNotFoundError: provinces.bmp 不存在
         ValueError: BMP 格式错误
     """
+    mod_dir = os.path.normpath(mod_dir)
     map_dir = os.path.join(mod_dir, "map")
     provinces_path = os.path.join(map_dir, "provinces.bmp")
+
+    # 大小写不敏感查找（用户文件可能是 Provinces.bmp / PROVINCES.BMP）
+    if not os.path.isfile(provinces_path) and os.path.isdir(map_dir):
+        for f in os.listdir(map_dir):
+            if f.lower() == "provinces.bmp":
+                provinces_path = os.path.join(map_dir, f)
+                break
 
     if not os.path.isfile(provinces_path):
         raise FileNotFoundError(f"provinces.bmp 不存在: {provinces_path}")

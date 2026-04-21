@@ -5,7 +5,7 @@ from data.constants import (
     MAP_WIDTH, MAP_HEIGHT, TILE_LAND, TILE_SEA,
     VALID_3D_BUILDING_TYPES,
 )
-from domain.validators.province import get_coastal_provinces
+from domain.validators.province import get_coastal_provinces, build_coastal_land_to_sea
 
 
 from export.writers.map._coords import safe_coord as _safe_coord
@@ -31,31 +31,11 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
         sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
     # 使用预计算的 land_to_sea，或自行计算
+    # **关键**: 必须和 definition.csv 的 coastal 字段完全同步 — 任何被 CSV 标为
+    # coastal=true 的省，在这里都必须有 naval_base_spawn，否则 HOI4 进图崩溃
+    # (map.cpp:1628 "coastal but has no port building")
     if land_to_sea is None:
-        land_to_sea = {}
-        land_mask = (tile_map == TILE_LAND)
-        sea_mask = (tile_map == TILE_SEA)
-        is_land_arr = np.zeros(n, dtype=bool)
-        is_sea_arr = np.zeros(n, dtype=bool)
-        is_land_arr[province_map[land_mask].ravel()] = True
-        is_sea_arr[province_map[sea_mask].ravel()] = True
-        for land_pm, sea_pm in [
-            (province_map[:, :-1], province_map[:, 1:]),
-            (province_map[:, 1:], province_map[:, :-1]),
-            (province_map[:-1, :], province_map[1:, :]),
-            (province_map[1:, :], province_map[:-1, :]),
-        ]:
-            la = land_pm.ravel()
-            sa = sea_pm.ravel()
-            m = is_land_arr[la] & is_sea_arr[sa]
-            if m.any():
-                lp_hits = la[m]
-                sp_hits = sa[m]
-                _, first_idx = np.unique(lp_hits, return_index=True)
-                for i in first_idx:
-                    lp = int(lp_hits[i])
-                    if lp not in land_to_sea:
-                        land_to_sea[lp] = int(sp_hits[i])
+        land_to_sea = build_coastal_land_to_sea(tile_map, province_map)
 
     pid_to_state = {}
     for sid, provs in states.items():
@@ -100,7 +80,11 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
                 )
 
     # 只给真正沿海的省份写 naval_base_spawn
-    # 验证坐标确实在该省份像素上，否则 HOI4 无限循环崩溃
+    # 关键: HOI4 按 floor 方式把坐标转回像素索引判 "over the land"。若坐标刚好
+    # 落在像素边界（如 x=2778.93 → floor 到像素 2778，而 land 像素是 2779），
+    # 会被判到邻居 sea 像素 → "not over the land" → port 忽略 → 省 coastal
+    # 但无 port → HOI4 崩溃 (map.cpp:1628)
+    # 对策: 总是取**整数像素 + 0.5**（像素中心），让取整方向稳定。
     h_map, w_map = province_map.shape
     failed_coastal: set[int] = set()
     for land_pid, sea_pid in land_to_sea.items():
@@ -109,31 +93,27 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
             continue
         if land_pid >= n or pid_count[land_pid] == 0:
             continue
-        cx, cy = _safe_coord(land_pid, province_map, pid_count, sum_x, sum_y)
-        # 验证坐标在该省份的陆地像素上
-        iy, ix = round(cy), round(cx)
-        ok = (0 <= iy < h_map and 0 <= ix < w_map
-              and province_map[iy, ix] == land_pid
-              and tile_map[iy, ix] == TILE_LAND)
-        if not ok:
-            # 质心不在 LAND 像素 → 全省搜索 (province_map==pid AND tile_map==LAND) 的像素
-            # 这是 HOI4 报"Province X coastal but no port"崩溃的根因之一
-            valid_ys, valid_xs = np.where(
-                (province_map == land_pid) & (tile_map == TILE_LAND)
-            )
-            if len(valid_ys) > 0:
-                # 取距离原质心最近的合法像素
-                dist = (valid_ys.astype(float) - cy) ** 2 + (valid_xs.astype(float) - cx) ** 2
-                best = int(np.argmin(dist))
-                cy, cx = float(valid_ys[best]), float(valid_xs[best])
-                ok = True
-        if ok:
-            hoi4_y = MAP_HEIGHT - cy
-            lines.append(
-                f"{sid};naval_base_spawn;{cx:.2f};11.00;{hoi4_y:.2f};0.00;{sea_pid}"
-            )
-        else:
+        # 第一选择: 质心最近的合法 land 像素 (province_map==pid AND tile_map==LAND)
+        # 不直接用 _safe_coord 的质心，因为质心可能在海或边界上
+        valid_ys, valid_xs = np.where(
+            (province_map == land_pid) & (tile_map == TILE_LAND)
+        )
+        if len(valid_ys) == 0:
             failed_coastal.add(land_pid)
+            continue
+        cx_centroid, cy_centroid = _safe_coord(
+            land_pid, province_map, pid_count, sum_x, sum_y)
+        dist = (valid_ys.astype(float) - cy_centroid) ** 2 + \
+               (valid_xs.astype(float) - cx_centroid) ** 2
+        best = int(np.argmin(dist))
+        iy, ix = int(valid_ys[best]), int(valid_xs[best])
+        # 写坐标用**像素中心** (整数 + 0.5)，避免 HOI4 取整落到边界外
+        cx_out = ix + 0.5
+        cy_out = iy + 0.5
+        hoi4_y = MAP_HEIGHT - cy_out
+        lines.append(
+            f"{sid};naval_base_spawn;{cx_out:.2f};11.00;{hoi4_y:.2f};0.00;{sea_pid}"
+        )
 
     if not lines:
         lines.append("1;bunker;100.00;11.00;100.00;0.00;0")

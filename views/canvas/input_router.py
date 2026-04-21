@@ -107,8 +107,10 @@ class InputMixin:
                 event.accept()
                 return
 
-            # 高度模式 + 山脉画线：拖拽收集点
-            if self._display_mode == "height" and getattr(self, '_ridge_mode', False):
+            # 高度模式 + 山脉画线：拖拽收集点（但高度画笔优先级更高 — 用户点了画笔说明不想画山脉）
+            if (self._display_mode == "height"
+                    and getattr(self, '_ridge_mode', False)
+                    and getattr(self, '_height_brush_mode', 'off') == "off"):
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     self._is_drawing = True
@@ -131,6 +133,14 @@ class InputMixin:
                 sx, sy = self._scene_pos(event)
                 if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
                     pid = int(self._province_map[sy, sx])
+                    # 高度画笔模式：逐像素抬升/下沉/平滑（即使落在 pid=0 也处理，例如新陆地）
+                    if (self._display_mode == "height"
+                            and getattr(self, '_height_brush_mode', 'off') != "off"):
+                        self._is_drawing = True
+                        self.stroke_started.emit()
+                        self._paint_at(sx, sy)
+                        event.accept()
+                        return
                     if pid > 0:
                         # 地形画笔模式：逐像素绘制
                         if self._display_mode == "terrain" and self._terrain_brush_mode:
@@ -140,6 +150,10 @@ class InputMixin:
                             event.accept()
                             return
                         self.province_clicked.emit(pid)
+                        # 可拖拽分配的模式：开始拖拽
+                        if self._display_mode in ("state", "country", "strategic_region", "continent"):
+                            self._assign_dragging = True
+                            self._assign_drag_seen = {pid}
                 event.accept()
                 return
 
@@ -313,6 +327,16 @@ class InputMixin:
             event.accept()
             return
 
+        # 拖拽分配模式（大陆/州/国家/战略区）
+        if getattr(self, '_assign_dragging', False):
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
+                pid = int(self._province_map[int(sy), int(sx)])
+                if pid > 0 and pid not in self._assign_drag_seen:
+                    self._assign_drag_seen.add(pid)
+                    self.province_clicked.emit(pid)
+            event.accept()
+            return
+
         # 框架工具分发
         if self._is_drawing and self._framework_tool is not None:
             if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
@@ -346,6 +370,14 @@ class InputMixin:
             angle = math.atan2(sy - cy, sx - cx)
             self._split_angle = angle
             self._update_split_rotate_preview()
+            event.accept()
+            return
+
+        # 高度画笔拖拽
+        if (self._is_drawing and self._display_mode == "height"
+                and getattr(self, '_height_brush_mode', 'off') != "off"):
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
+                self._paint_at(sx, sy)
             event.accept()
             return
 
@@ -397,6 +429,13 @@ class InputMixin:
         if getattr(self, '_ref_dragging', False):
             self._ref_dragging = False
             self.setCursor(Qt.CursorShape.CrossCursor)
+            event.accept()
+            return
+
+        # 结束拖拽分配
+        if getattr(self, '_assign_dragging', False):
+            self._assign_dragging = False
+            self._assign_drag_seen = set()
             event.accept()
             return
 

@@ -271,7 +271,10 @@ class ToolPanel(QWidget):
     terrain_brush_size_changed = pyqtSignal(int)
     terrain_soft_edge_changed = pyqtSignal(bool)
     auto_height_requested = pyqtSignal()
-    smooth_height_requested = pyqtSignal()
+    import_heightmap_requested = pyqtSignal()
+    height_brush_mode_changed = pyqtSignal(str)
+    height_brush_size_changed = pyqtSignal(int)
+    height_brush_strength_changed = pyqtSignal(int)
     ridge_mode_toggled = pyqtSignal(bool)
     ridge_peak_changed = pyqtSignal(int)
     ridge_falloff_changed = pyqtSignal(int)
@@ -314,6 +317,7 @@ class ToolPanel(QWidget):
     continent_add_requested = pyqtSignal(str)
     continent_rename_requested = pyqtSignal(int, str)
     continent_remove_requested = pyqtSignal(int)
+    assign_by_state_changed = pyqtSignal(bool)
 
     # 战略区域信号
     strategic_region_auto_requested = pyqtSignal()
@@ -535,13 +539,16 @@ class ToolPanel(QWidget):
         p = self._height_page
         p.height_value_changed.connect(self.height_value_changed)
         p.auto_height_requested.connect(self.auto_height_requested)
-        p.smooth_height_requested.connect(self.smooth_height_requested)
+        p.import_heightmap_requested.connect(self.import_heightmap_requested)
         p.ridge_mode_toggled.connect(self.ridge_mode_toggled)
         p.ridge_peak_changed.connect(self.ridge_peak_changed)
         p.ridge_falloff_changed.connect(self.ridge_falloff_changed)
         p.ridge_preview_requested.connect(self.ridge_preview_requested)
         p.ridge_confirmed.connect(self.ridge_confirmed)
         p.ridge_cancelled.connect(self.ridge_cancelled)
+        p.height_brush_mode_changed.connect(self.height_brush_mode_changed)
+        p.height_brush_size_changed.connect(self.height_brush_size_changed)
+        p.height_brush_strength_changed.connect(self.height_brush_strength_changed)
 
     def _connect_river_signals(self) -> None:
         p = self._river_page
@@ -574,6 +581,7 @@ class ToolPanel(QWidget):
         p.continent_add_requested.connect(self.continent_add_requested)
         p.continent_rename_requested.connect(self.continent_rename_requested)
         p.continent_remove_requested.connect(self.continent_remove_requested)
+        p.assign_by_state_changed.connect(self.assign_by_state_changed)
 
     def _connect_strategic_region_signals(self) -> None:
         p = self._strategic_region_page
@@ -802,7 +810,7 @@ class ToolPanel(QWidget):
         """更新省份信息面板"""
         self._province_page.update_province_info(pid, ptype, terrain, pixels, coastal)
 
-    def update_state_list(self, states: list[tuple[int, str]]) -> None:
+    def update_state_list(self, states: list[tuple[int, str, int]]) -> None:
         """刷新 State 列表"""
         self._state_page.update_state_list(states)
 

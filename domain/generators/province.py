@@ -245,7 +245,8 @@ def _poisson_disk_sample(
             densities = density_map[pixel_ys, pixel_xs].astype(np.float64)
             densities = np.maximum(densities, 0.01)
             probs = densities / densities.sum()
-            extra = np.random.choice(n_pixels, size=min(deficit, n_pixels),
+            n_candidates = len(pixel_ys)
+            extra = np.random.choice(n_candidates, size=min(deficit, n_candidates),
                                      replace=False, p=probs)
         else:
             extra = np.random.choice(n_pixels, size=min(deficit, n_pixels), replace=False)

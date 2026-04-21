@@ -96,8 +96,8 @@ PAINTABLE_RIVER_TYPES = RIVER_MARKER_TYPES + RIVER_WIDTH_TYPES
 VALID_RIVER_VALUES = set(range(0, 12))
 
 
-def validate_rivers(river_map: np.ndarray) -> list[str]:
-    """验证河流数据，返回问题列表。
+def validate_rivers(river_map: np.ndarray, lang: str = "zh") -> list[str]:
+    """验证河流数据，返回问题列表（双语）。
     检查：
     1. 每条连通河流有且仅有一个绿色源头 (index 0)
     2. 河流是否为 1 像素宽
@@ -105,6 +105,7 @@ def validate_rivers(river_map: np.ndarray) -> list[str]:
     """
     from scipy.ndimage import label
 
+    en = lang == "en"
     warnings: list[str] = []
 
     # 河流像素 mask (非背景的所有像素)
@@ -113,7 +114,7 @@ def validate_rivers(river_map: np.ndarray) -> list[str]:
         river_mask |= (river_map == v)
 
     if not np.any(river_mask):
-        return ["没有河流数据"]
+        return ["No river data" if en else "没有河流数据"]
 
     # 用 8 连通标记找出每条河流
     struct_8conn = np.ones((3, 3), dtype=int)
@@ -126,21 +127,22 @@ def validate_rivers(river_map: np.ndarray) -> list[str]:
         # 检查源头数量
         source_count = int(((river_map == RIVER_SOURCE) & rmask).sum())
         if source_count == 0:
-            warnings.append(f"河流 #{river_id} ({pixel_count}px): 缺少源头标记(绿色)")
-        elif source_count > 1:
-            warnings.append(f"河流 #{river_id} ({pixel_count}px): 有 {source_count} 个源头，应为 1 个")
+            if en:
+                warnings.append(f"River #{river_id} ({pixel_count}px): missing source marker (green)")
+            else:
+                warnings.append(f"河流 #{river_id} ({pixel_count}px): 缺少源头标记(绿色)")
 
     # 检查宽度：河流像素中不应有 2x2 的实心块
-    wide_count = 0
     rm = river_mask.astype(np.uint8)
-    # 检测 2x2 block
     block_sum = (rm[:-1, :-1] + rm[:-1, 1:] + rm[1:, :-1] + rm[1:, 1:])
     wide_pixels = int((block_sum >= 4).sum())
     if wide_pixels > 0:
-        warnings.append(f"河流中有 {wide_pixels} 处宽度超过 1 像素 (2x2 实心块)")
+        if en:
+            warnings.append(f"{wide_pixels} places where river is wider than 1 pixel (2x2 solid block)")
+        else:
+            warnings.append(f"河流中有 {wide_pixels} 处宽度超过 1 像素 (2x2 实心块)")
 
-    # 检查对角线连接 (无共享水平/垂直邻居的纯对角连接)
-    # 仅做简单统计：对角相邻但无共享正交邻居
+    # 检查对角线连接
     diag_count = 0
     ys, xs = np.where(river_mask)
     h, w = river_map.shape
@@ -148,21 +150,21 @@ def validate_rivers(river_map: np.ndarray) -> list[str]:
         ny, nx = ys + dy, xs + dx
         valid = (ny >= 0) & (ny < h) & (nx >= 0) & (nx < w)
         has_diag = valid & river_mask[np.clip(ny, 0, h-1), np.clip(nx, 0, w-1)]
-        # 检查是否有共享的正交邻居
-        # 对角 (dy,dx) 的两个正交邻居是 (dy,0) 和 (0,dx)
         n1y, n1x = ys + dy, xs
         n2y, n2x = ys, xs + dx
         v1 = (n1y >= 0) & (n1y < h) & (n1x >= 0) & (n1x < w)
         v2 = (n2y >= 0) & (n2y < h) & (n2x >= 0) & (n2x < w)
         has_n1 = v1 & river_mask[np.clip(n1y, 0, h-1), np.clip(n1x, 0, w-1)]
         has_n2 = v2 & river_mask[np.clip(n2y, 0, h-1), np.clip(n2x, 0, w-1)]
-        # 纯对角 = 有对角邻居但两个正交邻居都没有
         pure_diag = has_diag & ~has_n1 & ~has_n2
         diag_count += int(pure_diag.sum())
     if diag_count > 0:
-        warnings.append(f"河流中有 {diag_count // 2} 处对角线连接 (应为正交)")
+        if en:
+            warnings.append(f"{diag_count // 2} diagonal connections found (should be orthogonal)")
+        else:
+            warnings.append(f"河流中有 {diag_count // 2} 处对角线连接 (应为正交)")
 
     if not warnings:
-        warnings.append("河流验证通过 ✓")
+        warnings.append("River validation passed ✓" if en else "河流验证通过 ✓")
 
     return warnings
