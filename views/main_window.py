@@ -288,6 +288,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
             lambda s: setattr(self._canvas, '_density_soft_edge', s / 100.0))
         tp.density_clear_requested.connect(self._on_density_clear)
         tp.auto_terrain_requested.connect(self._on_auto_terrain)
+        tp.downgrade_mountain_requested.connect(self._on_downgrade_mountain)
         tp.terrain_brush_size_changed.connect(
             lambda s: setattr(self._controllers["terrain"], "brush_size", s)
         )

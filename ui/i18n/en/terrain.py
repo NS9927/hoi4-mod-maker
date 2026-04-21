@@ -5,6 +5,14 @@ terrain — en 翻译
 """
 
 STRINGS: dict[str, str] = {
+    # Mountain amount / downgrade
+    "terrain_label_mountain_amount": "Mountain Amount",
+    "terrain_mountain_less": "less",
+    "terrain_mountain_default": "default",
+    "terrain_mountain_more": "more",
+    "terrain_btn_downgrade": "Downgrade Mountains (Snow→Mtn→Hills→Plains)",
+    "terrain_btn_downgrade_tip": "On current terrain: snow becomes mountain, mountain becomes hills, hills become plains.\nAlso cleans isolated mountain patches smaller than 120 pixels. Ctrl+Z to undo.",
+    "status_downgrade_done": "Mountains downgraded (Ctrl+Z to undo)",
     "gt_desert": "Desert",
     "gt_desert_12": "Desert (rocky)",
     "gt_desert_hills": "Desert Hills",

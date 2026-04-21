@@ -61,6 +61,12 @@ class TerrainGenConfig:
     scatter_scale: float = 12.0      # 散点尺度 (越小越碎)
     scatter_strength: float = 0.65   # 散点阈值 (越低越多斑点)
 
+    # 阈值整体偏移 (用户控制"山脉多少")
+    # -50 = 所有阈值抬高 50 → 更多平原/丘陵, 更少山地/雪山
+    # 0 = 默认
+    # +50 = 阈值降低 50 → 多山地雪山
+    threshold_offset: int = 0
+
     # 种子
     seed: int = 42
 
@@ -117,11 +123,18 @@ def smart_auto_terrain(
     # sea = 显式海洋 或 "陆地但高度<海平面"的不一致像素
     sea = (tile_map == TILE_SEA) | ((tile_map == TILE_LAND) & (height_map < SEA_LEVEL))
 
+    # 阈值整体偏移 (用户"山脉多少"滑块)
+    # offset > 0 → 阈值下调 → 更多山; offset < 0 → 阈值上调 → 更少山
+    off = int(config.threshold_offset)
+    plains_max_eff = config.plains_max - off
+    mountain_min_eff = config.mountain_min - off
+    snow_min_eff = config.snow_min - off
+
     # 纬度参数
     y_ratio = np.linspace(0, 1, h, dtype=np.float32)[:, None]  # (h, 1)
 
     # 平原层
-    is_low = perturbed < config.plains_max
+    is_low = perturbed < plains_max_eff
     plains_mask = land & is_low
 
     # 森林: 平原中噪声较高的区域
@@ -140,18 +153,18 @@ def smart_auto_terrain(
     is_plains = is_plains & ~is_desert
 
     # 丘陵层
-    is_mid = (perturbed >= config.plains_max) & (perturbed < config.mountain_min)
+    is_mid = (perturbed >= plains_max_eff) & (perturbed < mountain_min_eff)
     is_hills = land & is_mid
 
     # 山地层
-    is_high = (perturbed >= config.mountain_min) & (perturbed < config.snow_min)
+    is_high = (perturbed >= mountain_min_eff) & (perturbed < snow_min_eff)
     is_mountain = land & is_high
 
     # 雪山层
-    is_snow = land & (perturbed >= config.snow_min)
+    is_snow = land & (perturbed >= snow_min_eff)
 
     # 沼泽: 低海拔 + 特定噪声区域 (少量点缀)
-    is_marsh = is_plains & (scatter_noise > 0.7) & (perturbed < config.plains_max - 10)
+    is_marsh = is_plains & (scatter_noise > 0.7) & (perturbed < plains_max_eff - 10)
     is_plains = is_plains & ~is_marsh
 
     # 4. 分配基础 palette index

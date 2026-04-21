@@ -82,6 +82,7 @@ class TerrainPage(QWidget):
     terrain_brush_size_changed = pyqtSignal(int)
     terrain_soft_edge_changed = pyqtSignal(bool)
     auto_terrain_requested = pyqtSignal()
+    downgrade_mountain_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -157,6 +158,35 @@ class TerrainPage(QWidget):
             lambda v: self._scatter_label.setText(f"{v}%")
         )
         gl.addWidget(self._scatter_slider)
+
+        # 山脉多少（阈值偏移）— 负数少山，正数多山
+        off_row = QHBoxLayout()
+        off_lbl = QLabel(tr("terrain_label_mountain_amount"))
+        off_lbl.setStyleSheet(_LABEL_STYLE)
+        off_row.addWidget(off_lbl)
+        self._mountain_amount_label = QLabel("0")
+        self._mountain_amount_label.setStyleSheet(_DIM_LABEL_STYLE)
+        off_row.addStretch()
+        off_row.addWidget(self._mountain_amount_label)
+        gl.addLayout(off_row)
+
+        self._mountain_amount_slider = QSlider(Qt.Orientation.Horizontal)
+        self._mountain_amount_slider.setRange(-50, 50)
+        self._mountain_amount_slider.setValue(0)
+        self._mountain_amount_slider.setStyleSheet(_SLIDER_STYLE)
+        self._mountain_amount_slider.valueChanged.connect(
+            lambda v: self._mountain_amount_label.setText(
+                f"{v:+d}  ({tr('terrain_mountain_less') if v < 0 else tr('terrain_mountain_more') if v > 0 else tr('terrain_mountain_default')})"
+            )
+        )
+        gl.addWidget(self._mountain_amount_slider)
+
+        # 一键降级山脉按钮
+        self._downgrade_btn = QPushButton(tr("terrain_btn_downgrade"))
+        self._downgrade_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._downgrade_btn.setToolTip(tr("terrain_btn_downgrade_tip"))
+        self._downgrade_btn.clicked.connect(self.downgrade_mountain_requested.emit)
+        gl.addWidget(self._downgrade_btn)
 
         outer.addWidget(gen_box)
 
@@ -314,5 +344,6 @@ class TerrainPage(QWidget):
         return TerrainGenConfig(
             noise_amplitude=float(self._noise_slider.value()),
             scatter_strength=self._scatter_slider.value() / 100.0,
+            threshold_offset=int(self._mountain_amount_slider.value()),
             seed=self._seed_spin.value(),
         )

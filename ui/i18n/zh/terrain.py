@@ -5,6 +5,14 @@ terrain — zh 翻译
 """
 
 STRINGS: dict[str, str] = {
+    # 山脉多少 / 一键降级
+    "terrain_label_mountain_amount": "山脉多少",
+    "terrain_mountain_less": "少山",
+    "terrain_mountain_default": "默认",
+    "terrain_mountain_more": "多山",
+    "terrain_btn_downgrade": "一键降级山脉（雪→山→丘→平原）",
+    "terrain_btn_downgrade_tip": "对当前地形图：雪山变山地, 山地变丘陵, 丘陵变平原。\n同时清理小于 120 像素的孤立山地斑块。支持 Ctrl+Z 撤销。",
+    "status_downgrade_done": "已降级山脉（Ctrl+Z 可撤销）",
     "gt_desert": "沙漠",
     "gt_desert_12": "沙漠(岩地)",
     "gt_desert_hills": "沙漠丘陵",

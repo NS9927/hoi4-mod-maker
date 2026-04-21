@@ -655,6 +655,20 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             tr("status_auto_terrain_done") + tr("status_auto_terrain_synced", len(new_dict))
         )
 
+    def _on_downgrade_mountain(self) -> None:
+        """一键把当前地形图的山脉降一级 (雪→山→丘→平原), 并清理小山地斑块。"""
+        from commands.map.downgrade_mountain import DowngradeMountainCommand
+        map_data = self._project.map_data
+        cmd = DowngradeMountainCommand(map_data)
+        self._cmd_history.execute(cmd)
+        self._canvas.terrain_map = map_data.terrain_map
+        self._canvas._full_render()
+        self._project.mark_dirty()
+        self._project.mark_assets_dirty(
+            "map/terrain/colormap_rgb_cityemissivemask_a.dds",
+        )
+        self._status_info.setText(tr("status_downgrade_done"))
+
     def _on_auto_height(self) -> None:
         from services.terrain_service import smart_auto_height
         self._status_info.setText(tr("status_auto_height"))
