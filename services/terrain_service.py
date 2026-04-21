@@ -496,3 +496,160 @@ def compute_provincial_terrain_from_bmp(
             result[pid] = ptype
 
     return result
+
+
+# ── 局部精修高度图 ──────────────────────────────────────────
+
+FEATHER_RADIUS = 20  # 边界羽化像素宽度
+
+
+def refine_heightmap_region(
+    height_map: np.ndarray,
+    mask: np.ndarray,
+    tile_map: np.ndarray,
+    strength: float = 0.5,
+    enable_ridge: bool = True,
+    enable_erosion: bool = True,
+    enable_noise: bool = False,
+    seed: int = 42,
+) -> np.ndarray:
+    """局部精修高度图。
+
+    以用户画的 height_map 为基础，在 mask 选区内叠加山脊/侵蚀/噪声。
+    保留用户意图（哪高哪低不变），只在其上加装饰。
+    边界 FEATHER_RADIUS 像素羽化，避免硬边。
+
+    参数:
+        height_map: (H, W) uint8, 原高度图
+        mask: (H, W) bool, 选区
+        tile_map: (H, W) uint8, 陆/海/湖判定（只处理陆地）
+        strength: 0..1, 精修强度
+        enable_ridge: 山脊尖锐化
+        enable_erosion: 侵蚀沟壑
+        enable_noise: 高度相关噪声
+        seed: 随机种子
+
+    返回:
+        (H, W) uint8 新高度图。非 mask 区域 === 输入原图。
+    """
+    from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
+
+    if strength <= 0 or not (enable_ridge or enable_erosion or enable_noise):
+        return height_map.copy()
+
+    strength = float(np.clip(strength, 0.0, 1.0))
+    result = height_map.copy()
+    land_mask = tile_map == TILE_LAND
+    work_mask = mask & land_mask
+    if not np.any(work_mask):
+        return result
+
+    # 1) 边界羽化权重（mask 内从边界向中心 0→1 渐变，然后乘 strength）
+    # distance_transform_edt 计算"True 像素到最近 False 像素的距离"
+    dist_in = distance_transform_edt(mask).astype(np.float32)
+    feather = np.minimum(dist_in / FEATHER_RADIUS, 1.0)
+    w = feather * strength  # 最终权重
+
+    # 在 float32 上工作，避免 uint8 溢出
+    hm = result.astype(np.float32)
+
+    # 2) 山脊尖锐化
+    if enable_ridge:
+        # 找局部极大值（山脊特征）
+        local_max = maximum_filter(hm, size=5)
+        ridge_pix = (
+            (hm == local_max)
+            & (hm > SEA_LEVEL + 20)
+            & land_mask
+        )
+        # 沿脊线抬升 15 单位，高斯扩散到邻域
+        ridge_boost = gaussian_filter(
+            ridge_pix.astype(np.float32) * 15.0, sigma=2.0
+        )
+        hm = hm + ridge_boost * w
+
+    # 3) 侵蚀沟壑（简化：从随机点沿最陡下坡走 30 步，削低路径）
+    if enable_erosion:
+        erosion = _simulate_erosion(
+            hm, work_mask, seed=seed, iterations=30
+        )
+        # 羽化权重乘进去
+        hm = hm - erosion * w * 10.0
+
+    # 4) 高度相关噪声（高处岩石质感，低处平原柔和）
+    if enable_noise:
+        rng = np.random.default_rng(seed)
+        noise = rng.standard_normal(hm.shape).astype(np.float32) * 4.0
+        noise = gaussian_filter(noise, sigma=1.5)
+        height_factor = np.clip((hm - SEA_LEVEL) / 100.0, 0.0, 1.0)
+        hm = hm + noise * height_factor * w
+
+    # 5) 合成 & 守底线（陆地不能 < SEA_LEVEL+1，避免陆变海）
+    changed = work_mask
+    new_values = np.clip(hm[changed], SEA_LEVEL + 1, 255)
+    result[changed] = new_values.astype(np.uint8)
+    return result
+
+
+def _simulate_erosion(
+    hm: np.ndarray,
+    work_mask: np.ndarray,
+    seed: int,
+    iterations: int = 30,
+) -> np.ndarray:
+    """极简水力侵蚀：从随机起点沿最陡下坡走 N 步，沿路累积侵蚀量。
+
+    返回 (H, W) float32 侵蚀图，调用方乘以权重后从 hm 减去。
+    只在 work_mask 内产生侵蚀。
+    """
+    h, w = hm.shape
+    erosion = np.zeros_like(hm, dtype=np.float32)
+
+    # 起点数量：选区面积 × 0.005（经验值，够出效果又不爆炸）
+    area = int(work_mask.sum())
+    n_starts = max(20, min(area // 200, 5000))
+
+    rng = np.random.default_rng(seed)
+    ys_all, xs_all = np.where(work_mask)
+    if len(ys_all) == 0:
+        return erosion
+    idx = rng.integers(0, len(ys_all), size=n_starts)
+    start_ys = ys_all[idx]
+    start_xs = xs_all[idx]
+
+    # 3x3 邻居偏移
+    neighbors = [
+        (-1, -1), (-1, 0), (-1, 1),
+        (0, -1),           (0, 1),
+        (1, -1),  (1, 0),  (1, 1),
+    ]
+
+    for sy, sx in zip(start_ys, start_xs):
+        y, x = int(sy), int(sx)
+        for _ in range(iterations):
+            if not (0 <= y < h and 0 <= x < w):
+                break
+            if not work_mask[y, x]:
+                break
+            # 找最低邻居
+            cur = hm[y, x]
+            best_dy, best_dx = 0, 0
+            best_h = cur
+            for dy, dx in neighbors:
+                ny, nx = y + dy, x + dx
+                if not (0 <= ny < h and 0 <= nx < w):
+                    continue
+                if hm[ny, nx] < best_h:
+                    best_h = hm[ny, nx]
+                    best_dy, best_dx = dy, dx
+            if best_dy == 0 and best_dx == 0:
+                break  # 局部最低，停
+            erosion[y, x] += 0.1
+            y += best_dy
+            x += best_dx
+            erosion[y, x] += 0.3
+
+    # 稍微平滑，避免单像素沟壑
+    from scipy.ndimage import gaussian_filter
+    erosion = gaussian_filter(erosion, sigma=0.8)
+    return erosion

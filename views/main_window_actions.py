@@ -782,6 +782,71 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._canvas._split_line_item.setVisible(False)
         self._status_info.setText(tr("status_ridge_mode_on"))
 
+    # ── 局部精修（套索选区） ──
+
+    def _on_refine_lasso_mode(self, enabled: bool) -> None:
+        """切换局部精修套索模式 — 同步到 canvas。"""
+        self._canvas._refine_lasso_mode = enabled
+        if enabled:
+            self._status_info.setText(tr("status_refine_mode"))
+        else:
+            self._canvas._refine_lasso_item.setVisible(False)
+
+    def _on_refine_lasso_drawn(self, points: list) -> None:
+        """canvas 套索完成 → mask → 弹参数对话框 → 执行 Command。"""
+        import numpy as np
+        from features.map.height.refine_dialog import RefineDialog
+        from commands.map.refine_height_region import RefineHeightRegionCommand
+        from PyQt5.QtWidgets import QMessageBox
+
+        # 把 [(y,x), ...] 转成闭合多边形 mask
+        map_data = self._project.map_data
+        h, w = map_data.height_map.shape
+        mask = _polygon_to_mask(points, h, w)
+
+        # 面积太小（<20x20 = 400）直接拒绝
+        if mask.sum() < 400:
+            QMessageBox.information(
+                self, tr("refine_dlg_title"), tr("refine_dlg_area_too_small")
+            )
+            self._tool_panel._height_page.reset_refine_button()
+            return
+
+        # 备份原图供对话框预览使用
+        original = map_data.height_map.copy()
+
+        dlg = RefineDialog(
+            self,
+            height_map=original,
+            mask=mask,
+            tile_map=map_data.tile_map,
+        )
+        # 预览：实时把 new_height 灌回 canvas
+        def _update_preview(new_hm: np.ndarray) -> None:
+            map_data.height_map[:] = new_hm
+            self._canvas.height_map = map_data.height_map
+            self._canvas._full_render()
+        dlg.preview_updated.connect(_update_preview)
+
+        accepted = dlg.exec_() == dlg.DialogCode.Accepted
+
+        # 对话框结束后先恢复原图（一致起点），再按需 push command
+        map_data.height_map[:] = original
+        self._canvas.height_map = map_data.height_map
+
+        if accepted:
+            cmd = RefineHeightRegionCommand(map_data, mask, dlg.params)
+            self._cmd_history.execute(cmd)
+            self._canvas.height_map = map_data.height_map
+            self._canvas._full_render()
+            self._project.mark_dirty()
+            self._status_info.setText(tr("status_refine_done"))
+        else:
+            self._canvas._full_render()
+            self._status_info.setText(tr("status_ready"))
+
+        self._tool_panel._height_page.reset_refine_button()
+
     # ═══════════════════════ Continent ═══════════════════════
 
     def _on_continent_pick_toggled(self, on: bool) -> None:
@@ -1054,3 +1119,59 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             self, tr("action_about"),
             tr("dlg_about_body"),
         )
+
+
+def _polygon_to_mask(points: list, h: int, w: int):
+    """把 [(y,x), ...] 闭合多边形转成 (h,w) bool mask。
+
+    用 matplotlib.path.Path 的 contains_points — 比手写扫描线稳，已在项目
+    requirements.txt 里的 Pillow/NumPy 生态中可用替代。这里用纯 numpy + 射线法。
+    """
+    import numpy as np
+    if len(points) < 3:
+        return np.zeros((h, w), dtype=bool)
+
+    ys = np.array([p[0] for p in points], dtype=np.float32)
+    xs = np.array([p[1] for p in points], dtype=np.float32)
+
+    # 包围盒加速
+    y_min = max(0, int(ys.min()) - 1)
+    y_max = min(h, int(ys.max()) + 2)
+    x_min = max(0, int(xs.min()) - 1)
+    x_max = min(w, int(xs.max()) + 2)
+
+    mask = np.zeros((h, w), dtype=bool)
+    if y_max <= y_min or x_max <= x_min:
+        return mask
+
+    # 射线法（向右发射），逐行扫描 bbox 内像素
+    # 对多边形每条边 (y0,x0)->(y1,x1)，看当前扫描行 y 是否穿过该边，
+    # 穿过则算交点 x_cross，统计 x_cross < 当前列 x 的次数
+    # 奇数次 → 在多边形内
+    n = len(points)
+    for y in range(y_min, y_max):
+        x_crossings = []
+        for i in range(n):
+            y0, x0 = ys[i], xs[i]
+            y1, x1 = ys[(i + 1) % n], xs[(i + 1) % n]
+            # 检查这条边是否穿过水平线 y + 0.5
+            y_line = y + 0.5
+            if (y0 <= y_line) == (y1 <= y_line):
+                continue
+            # 线性插值 x
+            if y1 == y0:
+                continue
+            t = (y_line - y0) / (y1 - y0)
+            x_cross = x0 + t * (x1 - x0)
+            x_crossings.append(x_cross)
+        if not x_crossings:
+            continue
+        x_crossings.sort()
+        row = mask[y]
+        # 成对填充
+        for i in range(0, len(x_crossings) - 1, 2):
+            xa = max(x_min, int(np.ceil(x_crossings[i])))
+            xb = min(x_max, int(np.floor(x_crossings[i + 1])) + 1)
+            if xb > xa:
+                row[xa:xb] = True
+    return mask

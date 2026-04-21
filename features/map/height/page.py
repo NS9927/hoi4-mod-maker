@@ -31,6 +31,8 @@ class HeightPage(QWidget):
     ridge_preview_requested = pyqtSignal()       # 请求刷新预览
     ridge_confirmed = pyqtSignal()               # 确认应用山脉
     ridge_cancelled = pyqtSignal()               # 取消山脉
+    # 局部精修（套索选区 + 算法精修）
+    refine_lasso_mode_toggled = pyqtSignal(bool)
     # 手动微调画笔
     height_brush_mode_changed = pyqtSignal(str)   # "off" | "raise" | "lower" | "smooth"
     height_brush_size_changed = pyqtSignal(int)
@@ -203,6 +205,24 @@ class HeightPage(QWidget):
 
         lay.addWidget(ridge_box)
 
+        # ── 局部精修（套索选区 → 山脊/侵蚀/噪声） ──
+        refine_box = _make_section(tr("height_section_refine"))
+        rfl = refine_box.layout()
+
+        self._refine_btn = QPushButton(tr("height_btn_refine"))
+        self._refine_btn.setCheckable(True)
+        self._refine_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        self._refine_btn.setToolTip(tr("height_btn_refine_tip"))
+        self._refine_btn.toggled.connect(self.refine_lasso_mode_toggled.emit)
+        rfl.addWidget(self._refine_btn)
+
+        refine_hint = QLabel(tr("height_refine_hint"))
+        refine_hint.setStyleSheet(f"color: {_DIM}; font-size: 12px; padding: 4px 2px;")
+        refine_hint.setWordWrap(True)
+        rfl.addWidget(refine_hint)
+
+        lay.addWidget(refine_box)
+
         # ── 手动微调 ──
         brush_box = _make_section(tr("height_section_manual"))
         bl = brush_box.layout()
@@ -341,7 +361,7 @@ class HeightPage(QWidget):
             self.ridge_preview_requested.emit()
 
     def _on_ridge_toggled(self, on: bool) -> None:
-        """山脉画线开关：打开时关闭雕刻画笔（互斥）。"""
+        """山脉画线开关：打开时关闭雕刻画笔 + 精修套索（三者互斥）。"""
         if on:
             any_brush = any(b.isChecked() for b in getattr(self, '_brush_btns', {}).values())
             if any_brush:
@@ -350,7 +370,16 @@ class HeightPage(QWidget):
                     b.setChecked(False)
                     b.blockSignals(False)
                 self.height_brush_mode_changed.emit("off")
+            if hasattr(self, "_refine_btn") and self._refine_btn.isChecked():
+                self._refine_btn.setChecked(False)  # emit refine_lasso_mode_toggled(False)
         self.ridge_mode_toggled.emit(on)
+
+    def reset_refine_button(self) -> None:
+        """外部调用：套索完成后自动取消按钮勾选（避免用户再画一次）。"""
+        if hasattr(self, "_refine_btn") and self._refine_btn.isChecked():
+            self._refine_btn.blockSignals(True)
+            self._refine_btn.setChecked(False)
+            self._refine_btn.blockSignals(False)
 
     # ── 雕刻画笔 ──
     def _on_brush_button(self, key: str) -> None:

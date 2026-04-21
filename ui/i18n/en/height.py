@@ -5,6 +5,22 @@ height — en 翻译
 """
 
 STRINGS: dict[str, str] = {
+    # Local refine
+    "height_section_refine": "Local Refine",
+    "height_btn_refine": "Local Refine (Lasso)",
+    "height_btn_refine_tip": "Draw a loop around an area; enhance your painted heights with ridges/erosion/noise",
+    "height_refine_hint": "When enabled, drag a loop; on release a parameters dialog opens. Keeps your shape, only adds detail.",
+    "refine_dlg_title": "Refine Height Locally",
+    "refine_dlg_strength": "Refine Strength",
+    "refine_dlg_ridge": "Add Ridges (Sharpen peaks)",
+    "refine_dlg_erosion": "Add Erosion (Carve valleys)",
+    "refine_dlg_noise": "Add Noise (Rocky texture)",
+    "refine_dlg_seed": "Seed",
+    "refine_dlg_randomize": "Randomize",
+    "refine_dlg_preview": "Live Preview",
+    "refine_dlg_area_too_small": "Selection too small (need at least 20x20 pixels)",
+    "status_refine_mode": "Refine mode: draw a loop to select the area",
+    "status_refine_done": "Local refine applied (Ctrl+Z to undo)",
     "height_auto_top_btn": "🏔 Smart Generate Heightmap",
     "height_auto_top_section": "🏔 One-Click Heightmap (Recommended)",
     "height_auto_top_tip": "Click after editing land/sea. Advanced params below for fine-tuning.",

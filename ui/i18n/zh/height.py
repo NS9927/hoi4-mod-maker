@@ -5,6 +5,22 @@ height — zh 翻译
 """
 
 STRINGS: dict[str, str] = {
+    # 局部精修
+    "height_section_refine": "局部精修",
+    "height_btn_refine": "局部精修（套索选区）",
+    "height_btn_refine_tip": "画一个圈框住想精修的区域，在你画的高度基础上加山脊/侵蚀/噪声",
+    "height_refine_hint": "开启后拖拽画一个圈，松手后弹出参数对话框。保留你画的形状，只加装饰。",
+    "refine_dlg_title": "局部精修高度",
+    "refine_dlg_strength": "精修强度",
+    "refine_dlg_ridge": "加山脊（让山更尖）",
+    "refine_dlg_erosion": "加侵蚀（加沟壑）",
+    "refine_dlg_noise": "加噪声（岩石质感）",
+    "refine_dlg_seed": "种子",
+    "refine_dlg_randomize": "随机",
+    "refine_dlg_preview": "实时预览",
+    "refine_dlg_area_too_small": "选区太小（需要至少 20×20 像素）",
+    "status_refine_mode": "局部精修模式：画一个圈框住要精修的区域",
+    "status_refine_done": "局部精修完成（Ctrl+Z 可撤销）",
     "height_auto_top_btn": "🏔 智能生成高度图",
     "height_auto_top_section": "🏔 一键生成高度图（推荐）",
     "height_auto_top_tip": "画完陆海就点这个，自动生成合理高度。下方参数可调细节。",

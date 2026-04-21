@@ -54,6 +54,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     stroke_started = pyqtSignal()     # 画笔操作开始
     stroke_ended = pyqtSignal()       # 画笔操作结束
     ridge_drawn = pyqtSignal(list)    # 山脉画线完成, [(y,x), ...]
+    refine_lasso_drawn = pyqtSignal(list)  # 局部精修套索完成, [(y,x), ...]
     split_line_drawn = pyqtSignal(int, list)  # 切割线完成, (pid, [(y,x), ...])
     province_gaps_detected = pyqtSignal(list)  # 省份 ID 空洞, [gap_id, ...]
 
@@ -255,6 +256,16 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._lasso_overlay.setZValue(9)
         self._lasso_overlay.setVisible(False)
         self._scene.addItem(self._lasso_overlay)
+
+        # 局部精修套索预览（蓝色虚线多边形）
+        self._refine_lasso_item = QGraphicsPathItem()
+        refine_pen = QPen(QColor(80, 150, 255, 240), 2)
+        refine_pen.setStyle(Qt.PenStyle.DashLine)
+        refine_pen.setCosmetic(True)
+        self._refine_lasso_item.setPen(refine_pen)
+        self._refine_lasso_item.setZValue(12)
+        self._refine_lasso_item.setVisible(False)
+        self._scene.addItem(self._refine_lasso_item)
 
         # VP 标记叠加层 (Feature 10)
         self._vp_overlay_item = QGraphicsPixmapItem()

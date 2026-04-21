@@ -126,6 +126,24 @@ class InputMixin:
                 event.accept()
                 return
 
+            # 高度模式 + 局部精修套索：拖拽收集闭合多边形
+            if (self._display_mode == "height"
+                    and getattr(self, '_refine_lasso_mode', False)
+                    and getattr(self, '_height_brush_mode', 'off') == "off"):
+                sx, sy = self._scene_pos(event)
+                if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
+                    self._is_drawing = True
+                    self._refine_lasso_drawing = True
+                    self._refine_lasso_path = [(int(sy), int(sx))]
+                    from PyQt5.QtGui import QPainterPath
+                    path = QPainterPath()
+                    path.moveTo(sx, sy)
+                    self._refine_lasso_item.setPath(path)
+                    self._refine_lasso_item.setVisible(True)
+                    self.stroke_started.emit()
+                event.accept()
+                return
+
             # 地形/高度/State/Country/后勤/战略区/属性地形 模式：点击省份 → 委托 controller 处理
             if self._display_mode in ("terrain", "height", "state", "country",
                                        "province_terrain", "logistics", "strategic_region",
@@ -363,6 +381,16 @@ class InputMixin:
             event.accept()
             return
 
+        # 局部精修套索拖拽中
+        if getattr(self, '_refine_lasso_drawing', False) and self._is_drawing:
+            if 0 <= sx < self.map_w and 0 <= sy < self.map_h:
+                self._refine_lasso_path.append((int(sy), int(sx)))
+                current_path = self._refine_lasso_item.path()
+                current_path.lineTo(sx, sy)
+                self._refine_lasso_item.setPath(current_path)
+            event.accept()
+            return
+
         # 切割旋转线 — 鼠标移动更新角度
         if getattr(self, '_split_ready', False):
             import math
@@ -459,6 +487,23 @@ class InputMixin:
                     if len(path) >= 2:
                         self.ridge_drawn.emit(path)
                     self._ridge_path = []
+                    self.stroke_ended.emit()
+                    event.accept()
+                    return
+
+                # 局部精修套索释放 → 闭合多边形 → 发信号给 MainWindow
+                if getattr(self, '_refine_lasso_drawing', False):
+                    self._refine_lasso_drawing = False
+                    path = getattr(self, '_refine_lasso_path', [])
+                    # 闭合：把最后一点连回起点
+                    if len(path) >= 3:
+                        current_path = self._refine_lasso_item.path()
+                        current_path.lineTo(path[0][1], path[0][0])
+                        self._refine_lasso_item.setPath(current_path)
+                    self._refine_lasso_item.setVisible(False)
+                    if len(path) >= 3:
+                        self.refine_lasso_drawn.emit(path)
+                    self._refine_lasso_path = []
                     self.stroke_ended.emit()
                     event.accept()
                     return
