@@ -15,6 +15,8 @@ STRINGS: dict[str, str] = {
     "refine_dlg_ridge": "加山脊（让山更尖）",
     "refine_dlg_erosion": "加侵蚀（加沟壑）",
     "refine_dlg_noise": "加噪声（岩石质感）",
+    "refine_dlg_shrink": "收缩山脉（把画大了的山脉拉小）",
+    "refine_dlg_shrink_distance": "收缩影响距离",
     "refine_dlg_seed": "种子",
     "refine_dlg_randomize": "随机",
     "refine_dlg_preview": "实时预览",

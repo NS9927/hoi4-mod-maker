@@ -48,10 +48,10 @@ class RefineDialog(QDialog):
         self.setMinimumWidth(360)
         self._init_ui()
 
-        # debounce 预览刷新
+        # debounce 预览刷新（250ms，避免拖滑块时把自己卡住）
         self._preview_timer = QTimer(self)
         self._preview_timer.setSingleShot(True)
-        self._preview_timer.setInterval(80)
+        self._preview_timer.setInterval(250)
         self._preview_timer.timeout.connect(self._refresh_preview)
 
         # 初次展开就跑一次
@@ -98,6 +98,39 @@ class RefineDialog(QDialog):
         self._cb_noise.setChecked(False)
         self._cb_noise.toggled.connect(self._on_param_changed)
         lay.addWidget(self._cb_noise)
+
+        # 收缩山脉（把画太大的山脉拉小）
+        self._cb_shrink = QCheckBox(tr("refine_dlg_shrink"))
+        self._cb_shrink.setChecked(False)
+        self._cb_shrink.toggled.connect(self._on_param_changed)
+        self._cb_shrink.toggled.connect(self._update_shrink_row_visible)
+        lay.addWidget(self._cb_shrink)
+
+        # 收缩距离（仅 shrink 开启时可见）
+        self._shrink_row = QHBoxLayout()
+        sd_label = QLabel(tr("refine_dlg_shrink_distance"))
+        sd_label.setStyleSheet(_LABEL_STYLE)
+        self._shrink_row.addWidget(sd_label)
+        self._shrink_dist_label = QLabel("25px")
+        self._shrink_dist_label.setStyleSheet(_DIM_LABEL_STYLE)
+        self._shrink_row.addStretch()
+        self._shrink_row.addWidget(self._shrink_dist_label)
+        lay.addLayout(self._shrink_row)
+
+        self._shrink_slider = QSlider(Qt.Orientation.Horizontal)
+        self._shrink_slider.setRange(5, 100)
+        self._shrink_slider.setValue(25)
+        self._shrink_slider.setStyleSheet(_SLIDER_STYLE)
+        self._shrink_slider.valueChanged.connect(
+            lambda v: self._shrink_dist_label.setText(f"{v}px")
+        )
+        self._shrink_slider.valueChanged.connect(self._on_param_changed)
+        lay.addWidget(self._shrink_slider)
+        # 默认隐藏（只有勾上才显示）
+        self._shrink_slider.setVisible(False)
+        self._shrink_dist_label.setVisible(False)
+        sd_label.setVisible(False)
+        self._shrink_labels = [sd_label]
 
         # 种子
         seed_row = QHBoxLayout()
@@ -149,6 +182,12 @@ class RefineDialog(QDialog):
     def _schedule_preview(self) -> None:
         self._preview_timer.start()
 
+    def _update_shrink_row_visible(self, on: bool) -> None:
+        self._shrink_slider.setVisible(on)
+        self._shrink_dist_label.setVisible(on)
+        for lbl in self._shrink_labels:
+            lbl.setVisible(on)
+
     def _refresh_preview(self) -> None:
         self._new_height = refine_heightmap_region(
             height_map=self._original,
@@ -158,6 +197,8 @@ class RefineDialog(QDialog):
             enable_ridge=self._cb_ridge.isChecked(),
             enable_erosion=self._cb_erosion.isChecked(),
             enable_noise=self._cb_noise.isChecked(),
+            enable_shrink=self._cb_shrink.isChecked(),
+            shrink_distance=float(self._shrink_slider.value()),
             seed=int(self._seed_spin.value()),
         )
         self.preview_updated.emit(self._new_height)
@@ -171,6 +212,8 @@ class RefineDialog(QDialog):
             enable_ridge=self._cb_ridge.isChecked(),
             enable_erosion=self._cb_erosion.isChecked(),
             enable_noise=self._cb_noise.isChecked(),
+            enable_shrink=self._cb_shrink.isChecked(),
+            shrink_distance=float(self._shrink_slider.value()),
             seed=int(self._seed_spin.value()),
         )
 

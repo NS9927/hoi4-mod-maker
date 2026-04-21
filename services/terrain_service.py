@@ -511,13 +511,17 @@ def refine_heightmap_region(
     enable_ridge: bool = True,
     enable_erosion: bool = True,
     enable_noise: bool = False,
+    enable_shrink: bool = False,
+    shrink_distance: float = 25.0,
     seed: int = 42,
 ) -> np.ndarray:
     """局部精修高度图。
 
-    以用户画的 height_map 为基础，在 mask 选区内叠加山脊/侵蚀/噪声。
-    保留用户意图（哪高哪低不变），只在其上加装饰。
+    以用户画的 height_map 为基础，在 mask 选区内叠加山脊/侵蚀/噪声/收缩。
+    保留用户意图（哪高哪低不变），只在其上加装饰；或把画大了的山脉收紧。
     边界 FEATHER_RADIUS 像素羽化，避免硬边。
+
+    所有计算仅在 mask bbox 内进行（+padding），支持 5632×2048 大图小选区不卡。
 
     参数:
         height_map: (H, W) uint8, 原高度图
@@ -527,6 +531,8 @@ def refine_heightmap_region(
         enable_ridge: 山脊尖锐化
         enable_erosion: 侵蚀沟壑
         enable_noise: 高度相关噪声
+        enable_shrink: 收缩山脉形状（把画大了的山脉边缘拉低）
+        shrink_distance: 收缩影响距离（像素），越大收缩越狠
         seed: 随机种子
 
     返回:
@@ -534,60 +540,78 @@ def refine_heightmap_region(
     """
     from scipy.ndimage import distance_transform_edt, gaussian_filter, maximum_filter
 
-    if strength <= 0 or not (enable_ridge or enable_erosion or enable_noise):
-        return height_map.copy()
-
-    strength = float(np.clip(strength, 0.0, 1.0))
     result = height_map.copy()
-    land_mask = tile_map == TILE_LAND
-    work_mask = mask & land_mask
-    if not np.any(work_mask):
+    if strength <= 0 or not (
+        enable_ridge or enable_erosion or enable_noise or enable_shrink
+    ):
         return result
 
-    # 1) 边界羽化权重（mask 内从边界向中心 0→1 渐变，然后乘 strength）
-    # distance_transform_edt 计算"True 像素到最近 False 像素的距离"
-    dist_in = distance_transform_edt(mask).astype(np.float32)
-    feather = np.minimum(dist_in / FEATHER_RADIUS, 1.0)
-    w = feather * strength  # 最终权重
+    strength = float(np.clip(strength, 0.0, 1.0))
+    land_mask = tile_map == TILE_LAND
+    work_mask_full = mask & land_mask
+    if not np.any(work_mask_full):
+        return result
 
-    # 在 float32 上工作，避免 uint8 溢出
-    hm = result.astype(np.float32)
+    # —— 只在 mask 的 bbox 内计算（带 padding 给羽化+邻域算子）——
+    ys, xs = np.where(mask)
+    y0, y1 = int(ys.min()), int(ys.max()) + 1
+    x0, x1 = int(xs.min()), int(xs.max()) + 1
+    H, W = height_map.shape
+    pad = FEATHER_RADIUS + 6  # 留羽化距离 + 邻域算子 footprint
+    y0 = max(0, y0 - pad); y1 = min(H, y1 + pad)
+    x0 = max(0, x0 - pad); x1 = min(W, x1 + pad)
+
+    mask_sub = mask[y0:y1, x0:x1]
+    land_sub = land_mask[y0:y1, x0:x1]
+    work_sub = work_mask_full[y0:y1, x0:x1]
+    hm_sub = result[y0:y1, x0:x1].astype(np.float32)
+
+    # 1) 羽化权重
+    dist_in = distance_transform_edt(mask_sub).astype(np.float32)
+    feather = np.minimum(dist_in / FEATHER_RADIUS, 1.0)
+    w = feather * strength
 
     # 2) 山脊尖锐化
     if enable_ridge:
-        # 找局部极大值（山脊特征）
-        local_max = maximum_filter(hm, size=5)
-        ridge_pix = (
-            (hm == local_max)
-            & (hm > SEA_LEVEL + 20)
-            & land_mask
-        )
-        # 沿脊线抬升 15 单位，高斯扩散到邻域
+        local_max = maximum_filter(hm_sub, size=5)
+        ridge_pix = (hm_sub == local_max) & (hm_sub > SEA_LEVEL + 20) & land_sub
         ridge_boost = gaussian_filter(
             ridge_pix.astype(np.float32) * 15.0, sigma=2.0
         )
-        hm = hm + ridge_boost * w
+        hm_sub = hm_sub + ridge_boost * w
 
-    # 3) 侵蚀沟壑（简化：从随机点沿最陡下坡走 30 步，削低路径）
+    # 3) 侵蚀沟壑
     if enable_erosion:
-        erosion = _simulate_erosion(
-            hm, work_mask, seed=seed, iterations=30
-        )
-        # 羽化权重乘进去
-        hm = hm - erosion * w * 10.0
+        erosion = _simulate_erosion(hm_sub, work_sub, seed=seed, iterations=30)
+        hm_sub = hm_sub - erosion * w * 10.0
 
-    # 4) 高度相关噪声（高处岩石质感，低处平原柔和）
+    # 4) 高度相关噪声
     if enable_noise:
         rng = np.random.default_rng(seed)
-        noise = rng.standard_normal(hm.shape).astype(np.float32) * 4.0
+        noise = rng.standard_normal(hm_sub.shape).astype(np.float32) * 4.0
         noise = gaussian_filter(noise, sigma=1.5)
-        height_factor = np.clip((hm - SEA_LEVEL) / 100.0, 0.0, 1.0)
-        hm = hm + noise * height_factor * w
+        height_factor = np.clip((hm_sub - SEA_LEVEL) / 100.0, 0.0, 1.0)
+        hm_sub = hm_sub + noise * height_factor * w
 
-    # 5) 合成 & 守底线（陆地不能 < SEA_LEVEL+1，避免陆变海）
-    changed = work_mask
-    new_values = np.clip(hm[changed], SEA_LEVEL + 1, 255)
-    result[changed] = new_values.astype(np.uint8)
+    # 5) 收缩山脉形状（把画大了的山脉边缘拉向海平面）
+    if enable_shrink:
+        # 找"高地"：> SEA_LEVEL+30 且 land
+        high_mask = (hm_sub > SEA_LEVEL + 30) & land_sub
+        # 对"非高地"做 distance transform → 每个高地像素到最近低地的距离
+        # 距离近的被拉低（边缘），距离远的（深山中心）不动
+        if np.any(high_mask) and np.any(~high_mask):
+            dist_from_low = distance_transform_edt(high_mask).astype(np.float32)
+            pull = np.clip(1.0 - dist_from_low / max(shrink_distance, 1.0), 0.0, 1.0)
+            # 仅作用在高地像素
+            pull_effective = pull * high_mask.astype(np.float32) * w
+            # 把高度拉向 SEA_LEVEL + 1
+            hm_sub = hm_sub - (hm_sub - (SEA_LEVEL + 1)) * pull_effective
+
+    # 6) 守底线（陆地不能 < SEA_LEVEL+1，避免陆变海）
+    clipped = np.clip(hm_sub, SEA_LEVEL + 1, 255)
+    sub_result = result[y0:y1, x0:x1]
+    sub_result[work_sub] = clipped[work_sub].astype(np.uint8)
+    result[y0:y1, x0:x1] = sub_result
     return result
 
 

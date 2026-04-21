@@ -19,6 +19,8 @@ class RefineParams:
     enable_ridge: bool = True
     enable_erosion: bool = True
     enable_noise: bool = False
+    enable_shrink: bool = False
+    shrink_distance: float = 25.0
     seed: int = 42
 
 
@@ -50,6 +52,8 @@ class RefineHeightRegionCommand(Command):
             enable_ridge=self._params.enable_ridge,
             enable_erosion=self._params.enable_erosion,
             enable_noise=self._params.enable_noise,
+            enable_shrink=self._params.enable_shrink,
+            shrink_distance=self._params.shrink_distance,
             seed=self._params.seed,
         )
         # 把 mask 内新值写回（mask 外已和原图相同）

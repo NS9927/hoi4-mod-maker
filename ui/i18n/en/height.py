@@ -15,6 +15,8 @@ STRINGS: dict[str, str] = {
     "refine_dlg_ridge": "Add Ridges (Sharpen peaks)",
     "refine_dlg_erosion": "Add Erosion (Carve valleys)",
     "refine_dlg_noise": "Add Noise (Rocky texture)",
+    "refine_dlg_shrink": "Shrink Mountain (pull oversized mountains tighter)",
+    "refine_dlg_shrink_distance": "Shrink Reach",
     "refine_dlg_seed": "Seed",
     "refine_dlg_randomize": "Randomize",
     "refine_dlg_preview": "Live Preview",
