@@ -153,8 +153,11 @@ class StateManager:
         if not land_ids:
             return
 
-        # 向量化计算省份质心
-        ys_all, xs_all = np.mgrid[0:MAP_HEIGHT, 0:MAP_WIDTH]
+        # 向量化计算省份质心 — 用 province_map 的真实 shape，
+        # 不信模块级 MAP_WIDTH/MAP_HEIGHT（那是首次 import 时绑定的常量，
+        # set_map_size 改不到这里；若项目非原版尺寸会 bincount 长度不匹配崩）
+        map_h, map_w = province_map.shape
+        ys_all, xs_all = np.mgrid[0:map_h, 0:map_w]
         flat_ys = ys_all.ravel().astype(np.float64)
         flat_xs = xs_all.ravel().astype(np.float64)
 
@@ -177,8 +180,8 @@ class StateManager:
         for pid in land_ids:
             cy, cx = centers[pid]
             iy, ix = int(cy), int(cx)
-            iy = min(max(iy, 0), MAP_HEIGHT - 1)
-            ix = min(max(ix, 0), MAP_WIDTH - 1)
+            iy = min(max(iy, 0), map_h - 1)
+            ix = min(max(ix, 0), map_w - 1)
             lm = int(labeled_land[iy, ix])
             if lm == 0:
                 # 中心点不在陆地上（边缘情况），找该省份任意陆地像素
@@ -196,14 +199,43 @@ class StateManager:
                 landmass_groups[lm] = []
             landmass_groups[lm].append(pid)
 
-        # 在每个陆块内部按坐标排序分组
+        # 在每个陆块内部用 K-means 聚类质心 → 紧凑 blob，避免横向条带和跨海拉省
+        from scipy.cluster.vq import kmeans2
+        rng_seed = 42  # 固定种子保证同一项目重复生成结果一致
         for lm_id, group_pids in landmass_groups.items():
-            sorted_pids = sorted(
-                group_pids,
-                key=lambda p: (centers[p][0] // 100, centers[p][1])
+            n_pids = len(group_pids)
+            if n_pids == 0:
+                continue
+            # 目标 state 数 = ceil(n_pids / per_state)；至少 1 个
+            n_states = max(1, (n_pids + per_state - 1) // per_state)
+            # 单 state 或 单点：直接成组
+            if n_states == 1 or n_pids <= 2:
+                state = self.create_state(group_pids)
+                state.manpower = n_pids * 50000
+                continue
+
+            # 准备质心矩阵 (n_pids, 2): [y, x]
+            pts = np.array(
+                [[centers[p][0], centers[p][1]] for p in group_pids],
+                dtype=np.float64,
             )
-            for i in range(0, len(sorted_pids), per_state):
-                chunk = sorted_pids[i:i + per_state]
+            # 'points' init = 从样本里随机挑 n_states 个点做种子。
+            # 用 np.random.seed 固定种子，保证同一项目重复生成结果一致
+            # （scipy 不同版本的 seed/rng 关键字名不同，这种方式最兼容）
+            np.random.seed(rng_seed)
+            try:
+                _, labels = kmeans2(pts, n_states, iter=20, minit='points')
+            except Exception:
+                # 退化场景（如同点过多）—— 兜底为按顺序切块
+                labels = np.array([i * n_states // n_pids for i in range(n_pids)])
+
+            # 按 cluster 标签分组建 state
+            cluster_to_pids: dict[int, list[int]] = {}
+            for pid, lab in zip(group_pids, labels):
+                cluster_to_pids.setdefault(int(lab), []).append(pid)
+            for chunk in cluster_to_pids.values():
+                if not chunk:
+                    continue
                 state = self.create_state(chunk)
                 state.manpower = len(chunk) * 50000
 

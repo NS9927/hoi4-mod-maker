@@ -403,6 +403,8 @@ class ApplicationController:
             prop = event.data.get("property", "")
             if prop in ("", "provinces", "assign"):
                 self._refresh_state_colors()
+                # 列表项里的省份计数 [id] name (N) 也要跟着刷，否则点了分配不更新
+                self._refresh_state_list()
         elif action == "selected":
             sid = event.data.get("state_id", 0)
             state = self._project.state_mgr.get_state(sid)

@@ -100,13 +100,26 @@ def write_localisation_simple(mod_name, tag, states, output_dir, region_count=24
         f.write(f' OTHER_BOOKMARK_DESC:0 "Other nations"\n')
 
 
+def _open_yml(dir_path: str, safe: str, topic: str, lang: str):
+    """打开一个按主题分的 yml 文件，已写好 `l_<lang>:` 头。调用方负责 close。"""
+    path = os.path.join(dir_path, f"{safe}_{topic}_l_{lang}.yml")
+    f = open(path, "w", encoding="utf-8-sig")
+    f.write(f"l_{lang}:\n")
+    return f
+
+
 def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir,
                              region_count=24, region_mgr=None):
-    """完整本地化。生成英文 + 简中两份 yml（HOI4 按语言加载对应 yml）。
+    """完整本地化。按主题拆成多个 yml（对齐 vanilla HOI4 风格），方便查找和编辑：
 
-    每个 key 的英文/中文内容独立计算（不再两份文件同内容）:
-    - english yml 用 obj.name_en 或默认 'State {id}' / 'Region {id}'
-    - simp_chinese yml 用 obj.name（可中文）或回退到 name_en
+      <mod>_states_l_<lang>.yml             STATE_* / VICTORY_POINTS_*
+      <mod>_strategic_regions_l_<lang>.yml  STRATEGICREGION_* / SUPPLYAREA_*
+      <mod>_countries_l_<lang>.yml          {TAG} / {TAG}_DEF / {TAG}_ADJ / {TAG}_BOOKMARK_DESC
+      <mod>_leaders_l_<lang>.yml            {TAG}_leader_* / field_marshal / general / admiral
+      <mod>_ideas_l_<lang>.yml              national_spirit id / id_desc
+      <mod>_bookmarks_l_<lang>.yml          bookmark / bookmark_desc / other_bookmark_desc
+
+    英/中两份各一套，引擎会自动合并，效果和单文件等价。
     """
     d = os.path.join(output_dir, "localisation")
     os.makedirs(d, exist_ok=True)
@@ -115,10 +128,9 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
     def _write_yml(lang: str):
         """lang: 'english' or 'simp_chinese'"""
         is_en = (lang == "english")
-        with open(os.path.join(d, f"{safe}_l_{lang}.yml"), "w", encoding="utf-8-sig") as f:
-            f.write(f"l_{lang}:\n")
 
-            # ── State + VP 城市 ──
+        # ── states + VP 城市 ──
+        with _open_yml(d, safe, "states", lang) as f:
             if state_mgr and state_mgr.states:
                 for sid, s in state_mgr.states.items():
                     name = _state_name_en(s, sid) if is_en else _state_name_local(s, sid)
@@ -134,48 +146,8 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
                     default = f"State {sid}" if is_en else f"状态 {sid}"
                     f.write(f' STATE_{sid}:0 "{default}"\n')
 
-            # ── 国家 ──
-            if country_mgr and country_mgr.countries:
-                for tag, c in country_mgr.countries.items():
-                    cname = _escape_yml(c.name or tag)
-                    f.write(f' {tag}:0 "{cname}"\n')
-                    f.write(f' {tag}_DEF:0 "{cname}"\n')
-                    f.write(f' {tag}_ADJ:0 "{cname}"\n')
-                    play_as = f"Play as {cname}" if is_en else f"扮演 {cname}"
-                    f.write(f' {tag}_BOOKMARK_DESC:0 "{play_as}"\n')
-                    leader = f"{cname} Leader" if is_en else f"{cname} 领袖"
-                    f.write(f' {tag}_leader_despotism:0 "{leader}"\n')
-                    f.write(f' {tag}_leader_conservatism:0 "{leader}"\n')
-                    f.write(f' {tag}_leader_nazism:0 "{leader}"\n')
-                    f.write(f' {tag}_leader_marxism:0 "{leader}"\n')
-                    marshal = f"{cname} Marshal" if is_en else f"{cname} 元帅"
-                    general = f"{cname} General" if is_en else f"{cname} 将军"
-                    admiral = f"{cname} Admiral" if is_en else f"{cname} 海军上将"
-                    f.write(f' {tag}_field_marshal_1:0 "{marshal}"\n')
-                    f.write(f' {tag}_general_1:0 "{general}"\n')
-                    f.write(f' {tag}_admiral_1:0 "{admiral}"\n')
-                    for spirit in c.national_spirits:
-                        nm = _escape_yml(spirit.name)
-                        ds = _escape_yml(spirit.desc or spirit.name)
-                        f.write(f' {spirit.id}:0 "{nm}"\n')
-                        f.write(f' {spirit.id}_desc:0 "{ds}"\n')
-            else:
-                tag = "AAA"
-                cname = "Fantasy Country" if is_en else "奇幻国度"
-                f.write(f' {tag}:0 "{cname}"\n')
-                f.write(f' {tag}_DEF:0 "{cname}"\n')
-                f.write(f' {tag}_ADJ:0 "{cname}"\n')
-                f.write(f' {tag}_BOOKMARK_DESC:0 "Play as {cname}"\n')
-                f.write(f' {tag}_leader_despotism:0 "{cname} Leader"\n')
-                f.write(f' {tag}_leader_conservatism:0 "{cname} Leader"\n')
-                f.write(f' {tag}_leader_nazism:0 "{cname} Leader"\n')
-                f.write(f' {tag}_leader_marxism:0 "{cname} Leader"\n')
-                f.write(f' {tag}_field_marshal_1:0 "{cname} Marshal"\n')
-                f.write(f' {tag}_general_1:0 "{cname} General"\n')
-                f.write(f' {tag}_admiral_1:0 "{cname} Admiral"\n')
-
-            # ── 战略区 ──
-            # region_mgr 优先（用户编辑的 name/name_en），没 manager 就用 Region N 默认
+        # ── strategic regions + supply area ──
+        with _open_yml(d, safe, "strategic_regions", lang) as f:
             if region_mgr is not None and region_mgr.regions:
                 for rid, r in sorted(region_mgr.regions.items()):
                     name = _region_name_en(r, rid) if is_en else _region_name_local(r, rid)
@@ -184,10 +156,57 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
                 for rid in range(1, region_count + 1):
                     default = f"Region {rid}" if is_en else f"战区 {rid}"
                     f.write(f' STRATEGICREGION_{rid}:0 "{default}"\n')
-
-            # ── 其他 ──
             supply_name = f"{mod_name} Supply" if is_en else f"{mod_name} 补给"
             f.write(f' SUPPLYAREA_1:0 "{_escape_yml(supply_name)}"\n')
+
+        # ── countries + leaders + ideas ──
+        f_countries = _open_yml(d, safe, "countries", lang)
+        f_leaders = _open_yml(d, safe, "leaders", lang)
+        f_ideas = _open_yml(d, safe, "ideas", lang)
+        try:
+            if country_mgr and country_mgr.countries:
+                for tag, c in country_mgr.countries.items():
+                    cname = _escape_yml(c.name or tag)
+                    f_countries.write(f' {tag}:0 "{cname}"\n')
+                    f_countries.write(f' {tag}_DEF:0 "{cname}"\n')
+                    f_countries.write(f' {tag}_ADJ:0 "{cname}"\n')
+                    play_as = f"Play as {cname}" if is_en else f"扮演 {cname}"
+                    f_countries.write(f' {tag}_BOOKMARK_DESC:0 "{play_as}"\n')
+
+                    leader = f"{cname} Leader" if is_en else f"{cname} 领袖"
+                    for ideology in ("despotism", "conservatism", "nazism", "marxism"):
+                        f_leaders.write(f' {tag}_leader_{ideology}:0 "{leader}"\n')
+                    marshal = f"{cname} Marshal" if is_en else f"{cname} 元帅"
+                    general = f"{cname} General" if is_en else f"{cname} 将军"
+                    admiral = f"{cname} Admiral" if is_en else f"{cname} 海军上将"
+                    f_leaders.write(f' {tag}_field_marshal_1:0 "{marshal}"\n')
+                    f_leaders.write(f' {tag}_general_1:0 "{general}"\n')
+                    f_leaders.write(f' {tag}_admiral_1:0 "{admiral}"\n')
+
+                    for spirit in c.national_spirits:
+                        nm = _escape_yml(spirit.name)
+                        ds = _escape_yml(spirit.desc or spirit.name)
+                        f_ideas.write(f' {spirit.id}:0 "{nm}"\n')
+                        f_ideas.write(f' {spirit.id}_desc:0 "{ds}"\n')
+            else:
+                tag = "AAA"
+                cname = "Fantasy Country" if is_en else "奇幻国度"
+                f_countries.write(f' {tag}:0 "{cname}"\n')
+                f_countries.write(f' {tag}_DEF:0 "{cname}"\n')
+                f_countries.write(f' {tag}_ADJ:0 "{cname}"\n')
+                f_countries.write(f' {tag}_BOOKMARK_DESC:0 "Play as {cname}"\n')
+                for ideology in ("despotism", "conservatism", "nazism", "marxism"):
+                    f_leaders.write(f' {tag}_leader_{ideology}:0 "{cname} Leader"\n')
+                f_leaders.write(f' {tag}_field_marshal_1:0 "{cname} Marshal"\n')
+                f_leaders.write(f' {tag}_general_1:0 "{cname} General"\n')
+                f_leaders.write(f' {tag}_admiral_1:0 "{cname} Admiral"\n')
+        finally:
+            f_countries.close()
+            f_leaders.close()
+            f_ideas.close()
+
+        # ── bookmarks ──
+        with _open_yml(d, safe, "bookmarks", lang) as f:
             bm_safe = mod_name.replace(" ", "_").upper()
             f.write(f' {bm_safe}_BOOKMARK:0 "{_escape_yml(mod_name)}"\n')
             desc = f"A world of {mod_name} awaits." if is_en else f"{mod_name} 的世界正等待着你。"

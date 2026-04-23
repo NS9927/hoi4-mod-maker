@@ -188,29 +188,17 @@ class ContinentManager:
         # 陆地像素占比 > 50% 才算陆地省; 纯海/湖/混合沾边 都视为海
         is_land = land_count * 2 > total_count
 
-        # 填 LUT
+        # 填 LUT — 未显式指派的陆地省份默认属于 continent 0 (default_continent)
+        # 与 get_province_continent 的语义一致；docstring 明确规定"默认指向 0"。
         for pid in range(1, max_pid + 1):
             if not is_land[pid]:
                 continue
-            ci = self._province_continent.get(pid)
-            if ci is not None and 0 <= ci < len(cont_palette):
+            ci = self._province_continent.get(pid, 0)
+            if 0 <= ci < len(cont_palette):
                 lut[pid] = cont_palette[ci]
             else:
-                # 未指派: 用 state 色去饱和
-                sid = None
-                if state_manager is not None:
-                    sid = state_manager.get_state_of_province(pid)
-                if sid and sid in state_colors:
-                    sr, sg, sb = state_colors[sid]
-                    gray = (sr + sg + sb) // 3
-                    mix = 0.6
-                    lut[pid] = (
-                        int((sr * (1 - mix) + gray * mix) * 0.6),
-                        int((sg * (1 - mix) + gray * mix) * 0.6),
-                        int((sb * (1 - mix) + gray * mix) * 0.6),
-                    )
-                else:
-                    lut[pid] = (70, 70, 70)
+                # 索引越界（理论不应发生）: 灰色兜底
+                lut[pid] = (70, 70, 70)
 
         flat_clipped = np.clip(pid_flat, 0, max_pid)
         rgb = lut[flat_clipped].reshape(h, w, 3)
