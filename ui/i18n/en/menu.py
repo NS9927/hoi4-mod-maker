@@ -25,6 +25,8 @@ STRINGS: dict[str, str] = {
     "action_shortcut_settings": "Shortcut Settings...",
     "action_show_grid": "Show Grid",
     "action_show_ref": "Show Reference Image",
+    "action_show_country_state_overlay": "Show Country / State",
+    "action_show_country_state_overlay_tip": "Semi-transparent country fill + white state borders, keeps the current view (terrain / height / provinces / ...) unchanged",
     "action_test_export": "Test Export (Minimal MOD)",
     "action_undo": "Undo",
     "action_validate": "Validate Provinces",

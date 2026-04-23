@@ -37,7 +37,7 @@ from domain.managers.river import (
 )
 
 from views.canvas.ref_images import RefImageMixin
-from views.canvas.overlays import OverlayMixin
+from views.canvas.overlays import OverlayMixin, CS_OVERLAY_ALLOWED_MODES
 from views.canvas.input_router import InputMixin
 
 
@@ -80,6 +80,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
 
         # 地形画笔模式: False=按省份(默认), True=逐像素画笔
         self._terrain_brush_mode = False
+        self._terrain_brush_size = 20  # 独立的地形画笔尺寸，与通用 _brush_size 分离
 
         # 高度画笔: "off"(按省份) / "raise" / "lower" / "smooth"
         self._height_brush_mode = "off"
@@ -230,6 +231,15 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._state_border_overlay.setVisible(False)
         self._scene.addItem(self._state_border_overlay)
 
+        # 地形视图下的国家/州叠加层（半透明国家色 + 白色州边界）
+        self._terrain_context_overlay = QGraphicsPixmapItem()
+        self._terrain_context_overlay.setZValue(6)
+        self._terrain_context_overlay.setVisible(False)
+        self._scene.addItem(self._terrain_context_overlay)
+        self._terrain_context_visible = False
+        self._terrain_ctx_country_mgr = None
+        self._terrain_ctx_state_mgr = None
+
         # 套索路径反馈（黄色虚线）
         self._lasso_path_item = QGraphicsPathItem()
         pen = QPen(QColor(255, 230, 0, 230), 2)
@@ -329,6 +339,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self.new_land_mask = np.zeros((h, w), dtype=bool)
         self._display_buffer = np.zeros((h, w, 4), dtype=np.uint8)
         self._scene.setSceneRect(0, 0, w, h)
+        # map_data 换了，地形上下文 overlay 的 pixmap 尺寸不匹配，重建
+        if getattr(self, '_terrain_context_visible', False):
+            self.refresh_terrain_context_overlay()
 
     @property
     def map_data(self):
@@ -421,6 +434,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         if self._display_mode == "province":
             self._full_render()
         self._render_province_overlay()
+        # 地形视图的国家/州 overlay pixmap 尺寸和内容都要跟着省份图重建
+        if getattr(self, '_terrain_context_visible', False):
+            self.refresh_terrain_context_overlay()
 
     @property
     def terrain_map(self) -> np.ndarray:
@@ -472,6 +488,15 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         if mode == self._display_mode:
             return
         self._display_mode = mode
+        # 国家/州归属 overlay — 全局开关，仅在基础视图本身不按国家/州染色的模式下显示，
+        # 避免在 state/country/continent/strategic_region 模式下双层染色造成混乱。
+        overlay = getattr(self, '_terrain_context_overlay', None)
+        if overlay is not None:
+            if getattr(self, '_terrain_context_visible', False) \
+                    and mode in CS_OVERLAY_ALLOWED_MODES:
+                self.refresh_terrain_context_overlay()
+            else:
+                overlay.setVisible(False)
         self._full_render()
         # 后勤模式不再需要 overlay（改用着色图）
         if mode != "logistics" and self._lasso_overlay.isVisible():
@@ -498,6 +523,10 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
     def set_terrain_brush_mode(self, brush_mode: bool) -> None:
         """切换地形编辑模式: True=画笔逐像素, False=按省份(默认)"""
         self._terrain_brush_mode = brush_mode
+
+    def set_terrain_brush_size(self, size: int) -> None:
+        """地形画笔尺寸 (与通用画笔解耦)."""
+        self._terrain_brush_size = max(1, min(200, int(size)))
 
     def set_height_value(self, value: int) -> None:
         self._current_height_value = max(0, min(255, value))
@@ -1164,16 +1193,31 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         elif mode == "terrain":
             if not self._terrain_brush_mode:
                 return
+            # 用独立的地形画笔尺寸，忽略通用 brush_size
+            tr = self._terrain_brush_size // 2
+            if tr < 1:
+                tr = 1
+            ty0 = max(0, cy - tr)
+            ty1 = min(self.map_h, cy + tr + 1)
+            tx0 = max(0, cx - tr)
+            tx1 = min(self.map_w, cx + tr + 1)
+            if ty0 >= ty1 or tx0 >= tx1:
+                return
+            yy_t, xx_t = np.ogrid[ty0:ty1, tx0:tx1]
+            dist_sq_t = (yy_t - cy) ** 2 + (xx_t - cx) ** 2
+            t_circle = dist_sq_t <= tr * tr
+            # 海/湖保护：视觉地形不改海和湖
+            sub_tile = self._tile_map[ty0:ty1, tx0:tx1]
+            t_circle = t_circle & (sub_tile == TILE_LAND)
+            if not np.any(t_circle):
+                self._mark_dirty(tx0, ty0, tx1, ty1)
+                return
             if self._current_tool == "eraser":
-                if circle is not None:
-                    self._terrain_map[y0:y1, x0:x1][circle] = 0
-                else:
-                    self._terrain_map[y0:y1, x0:x1] = 0
+                self._terrain_map[ty0:ty1, tx0:tx1][t_circle] = 0
             elif self._current_tool == "brush":
-                if circle is not None:
-                    self._terrain_map[y0:y1, x0:x1][circle] = self._current_terrain_index
-                else:
-                    self._terrain_map[y0:y1, x0:x1] = self._current_terrain_index
+                self._terrain_map[ty0:ty1, tx0:tx1][t_circle] = self._current_terrain_index
+            self._mark_dirty(tx0, ty0, tx1, ty1)
+            return
 
         elif mode == "height":
             if self._height_brush_mode == "off":
@@ -1192,9 +1236,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
             dist_sq = (yy_h - cy) ** 2 + (xx_h - cx) ** 2
             r_sq = hr * hr
             disk = dist_sq <= r_sq
-            # 只改陆地像素 (tile_map != TILE_SEA)，海里不动
+            # 只改陆地像素（海和湖都不动）
             sub_tile = self._tile_map[hy0:hy1, hx0:hx1]
-            disk = disk & (sub_tile != TILE_SEA)
+            disk = disk & (sub_tile == TILE_LAND)
             if not np.any(disk):
                 return
             # 距离衰减（0..1, 中心最强, 边缘最弱）

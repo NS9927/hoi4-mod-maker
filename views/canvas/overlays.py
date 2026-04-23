@@ -8,6 +8,13 @@ from PyQt5.QtGui import (
     QImage, QPixmap, QPainter, QColor, QPen, QPainterPath, QBrush,
 )
 
+# 国家/州归属 overlay 允许显示的模式（基础视图本身不按国家/州染色的那些）。
+# state/country/continent/strategic_region 自身已按归属染色，叠加会双层染色，故排除。
+CS_OVERLAY_ALLOWED_MODES = frozenset({
+    "land", "terrain", "height", "river", "province",
+    "logistics", "colormap", "default_map", "province_terrain",
+})
+
 class OverlayMixin:
     """叠加层相关方法。假设 self 拥有:
     - _province_pixmap_item, _province_map, _selected_province_id
@@ -145,6 +152,79 @@ class OverlayMixin:
         borders[:, 1:]  |= state_map[:, :-1] != state_map[:, 1:]
         rgba[borders] = (255, 255, 255, 220)  # 白色边界
 
+        img = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_ARGB32)
+        img._ref = rgba
+        overlay.setPixmap(QPixmap.fromImage(img))
+        overlay.setVisible(True)
+
+    def show_terrain_context_overlay(
+        self, visible: bool, country_mgr=None, state_mgr=None,
+    ) -> None:
+        """开关"半透明国家色 + 白色州边界"叠加层（全局视图开关，非地形专属）。"""
+        self._terrain_context_visible = bool(visible)
+        if country_mgr is not None:
+            self._terrain_ctx_country_mgr = country_mgr
+        if state_mgr is not None:
+            self._terrain_ctx_state_mgr = state_mgr
+        self.refresh_terrain_context_overlay()
+
+    def refresh_terrain_context_overlay(self) -> None:
+        """根据缓存 mgrs 重建 overlay pixmap；不改 visible 开关，只按当前模式决定显隐。"""
+        overlay = getattr(self, '_terrain_context_overlay', None)
+        if overlay is None:
+            return
+        visible = getattr(self, '_terrain_context_visible', False)
+        if not visible or self._display_mode not in CS_OVERLAY_ALLOWED_MODES:
+            overlay.setVisible(False)
+            return
+        country_mgr = getattr(self, '_terrain_ctx_country_mgr', None)
+        state_mgr = getattr(self, '_terrain_ctx_state_mgr', None)
+        if country_mgr is None or state_mgr is None:
+            overlay.setVisible(False)
+            return
+        pm_max = int(self._province_map.max()) if self._province_map is not None else 0
+        if pm_max <= 0:
+            overlay.setVisible(False)
+            return
+
+        h, w = self._province_map.shape
+        max_pid = pm_max
+
+        # pid → (state_id, bgra 颜色) 两张 LUT
+        pid_to_sid = np.zeros(max_pid + 1, dtype=np.int32)
+        pid_to_color = np.zeros((max_pid + 1, 4), dtype=np.uint8)  # BGRA
+        countries = getattr(country_mgr, "countries", {}) or {}
+        states = getattr(state_mgr, "states", {}) or {}
+        get_owner = getattr(country_mgr, "get_state_owner", lambda _sid: "")
+        for sid, state in states.items():
+            owner_tag = get_owner(sid)
+            if owner_tag and owner_tag in countries:
+                c = countries[owner_tag].color
+                r, g, b = int(c[0]) & 0xFF, int(c[1]) & 0xFF, int(c[2]) & 0xFF
+                bgra = (b, g, r, 110)
+            else:
+                bgra = (90, 90, 90, 55)  # 未分配国家：淡灰
+            for pid in state.provinces:
+                if 0 < pid <= max_pid:
+                    pid_to_sid[pid] = sid
+                    pid_to_color[pid] = bgra
+
+        pm = np.clip(self._province_map, 0, max_pid)
+        rgba = pid_to_color[pm]           # 填色 (H, W, 4) BGRA
+        state_map = pid_to_sid[pm]        # (H, W) int32
+
+        # 州边界（白色亮线）: 用 !=右 与 !=下 两个方向，覆盖到左右上下 4 边
+        borders = np.zeros((h, w), dtype=bool)
+        diff_v = state_map[:-1, :] != state_map[1:, :]
+        diff_h = state_map[:, :-1] != state_map[:, 1:]
+        borders[:-1, :] |= diff_v
+        borders[1:, :]  |= diff_v
+        borders[:, :-1] |= diff_h
+        borders[:, 1:]  |= diff_h
+        rgba[borders] = (255, 255, 255, 220)
+
+        # ascontiguousarray 保证 QImage 拿到的 buffer 连续 (fancy-index 已经连续,这里是防御性)
+        rgba = np.ascontiguousarray(rgba)
         img = QImage(rgba.data, w, h, w * 4, QImage.Format.Format_ARGB32)
         img._ref = rgba
         overlay.setPixmap(QPixmap.fromImage(img))

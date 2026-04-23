@@ -429,12 +429,31 @@ def auto_height(tile_map: np.ndarray) -> np.ndarray:
     return smart_auto_height(tile_map)
 
 
-def smooth_height(height_map: np.ndarray, sigma: float = 4.0) -> np.ndarray:
-    """高斯平滑现有 heightmap."""
+def smooth_height(
+    height_map: np.ndarray,
+    tile_map: np.ndarray | None = None,
+    sigma: float = 4.0,
+) -> np.ndarray:
+    """高斯平滑 heightmap — 只处理陆地像素，海/湖保持原值。
+
+    实现方式：对 land_mask*height 做高斯模糊，再除以 land_mask 的高斯模糊，
+    得到仅用陆地像素计算出的加权平均（避免海面 0 值拖低海岸高度）。
+    """
     from scipy.ndimage import gaussian_filter
-    hm = height_map.astype(np.float32)
-    hm = gaussian_filter(hm, sigma=sigma)
-    return np.clip(hm, 0, 255).astype(np.uint8)
+    from data.constants import TILE_LAND
+
+    if tile_map is None:
+        hm = height_map.astype(np.float32)
+        return np.clip(gaussian_filter(hm, sigma=sigma), 0, 255).astype(np.uint8)
+
+    land_mask = (tile_map == TILE_LAND).astype(np.float32)
+    hm_land = height_map.astype(np.float32) * land_mask
+    blurred = gaussian_filter(hm_land, sigma=sigma)
+    weight = gaussian_filter(land_mask, sigma=sigma)
+    out = height_map.astype(np.float32).copy()
+    valid = (tile_map == TILE_LAND) & (weight > 1e-6)
+    out[valid] = blurred[valid] / weight[valid]
+    return np.clip(out, 0, 255).astype(np.uint8)
 
 
 def compute_provincial_terrain_from_bmp(

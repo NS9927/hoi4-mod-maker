@@ -25,6 +25,8 @@ STRINGS: dict[str, str] = {
     "action_shortcut_settings": "快捷键设置...",
     "action_show_grid": "显示网格",
     "action_show_ref": "显示参考图",
+    "action_show_country_state_overlay": "显示国家/州归属",
+    "action_show_country_state_overlay_tip": "半透明国家色 + 白色州边界，不改变当前视图的地形/高度/省份等内容",
     "action_test_export": "测试导出（最小MOD）",
     "action_undo": "撤销",
     "action_validate": "验证省份",

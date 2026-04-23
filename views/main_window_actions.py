@@ -682,6 +682,53 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         else:
             self._canvas._refine_lasso_item.setVisible(False)
 
+    def _on_terrain_context_overlay(self, enabled: bool) -> None:
+        """地形视图下显示/隐藏 国家色 + 州边界 叠加层。
+
+        开启时：缓存 mgrs + 订阅 state_changed/country_changed → 自动重绘（去抖 80ms）。
+        关闭时：取消订阅 + 隐藏。
+        """
+        if enabled:
+            self._canvas.show_terrain_context_overlay(
+                True,
+                country_mgr=self._project.country_mgr,
+                state_mgr=self._project.state_mgr,
+            )
+            bus = getattr(self._project, "event_bus", None)
+            if bus is not None:
+                bus.subscribe("state_changed", self._on_terrain_ctx_data_changed)
+                bus.subscribe("country_changed", self._on_terrain_ctx_data_changed)
+                bus.subscribe("province_map_changed", self._on_terrain_ctx_data_changed)
+        else:
+            self._canvas.show_terrain_context_overlay(False)
+            bus = getattr(self._project, "event_bus", None)
+            if bus is not None:
+                bus.unsubscribe("state_changed", self._on_terrain_ctx_data_changed)
+                bus.unsubscribe("country_changed", self._on_terrain_ctx_data_changed)
+                bus.unsubscribe("province_map_changed", self._on_terrain_ctx_data_changed)
+
+    def _on_terrain_ctx_data_changed(self, _event) -> None:
+        """State/Country 数据变化 → 去抖刷新 overlay (避免拖拽批量修改时卡顿)。"""
+        from PyQt5.QtCore import QTimer
+        timer = getattr(self, "_terrain_ctx_refresh_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(80)
+            timer.timeout.connect(self._refresh_terrain_ctx_overlay_now)
+            self._terrain_ctx_refresh_timer = timer
+        timer.start()
+
+    def _refresh_terrain_ctx_overlay_now(self) -> None:
+        """实际执行 overlay 刷新（被 QTimer 触发）。"""
+        if getattr(self._canvas, "_terrain_context_visible", False):
+            # 项目可能已重新加载，重新缓存 mgrs
+            self._canvas.show_terrain_context_overlay(
+                True,
+                country_mgr=self._project.country_mgr,
+                state_mgr=self._project.state_mgr,
+            )
+
     def _on_downgrade_lasso_drawn(self, points: list) -> None:
         """套索画完 → 多边形转 mask → 调 _on_downgrade_mountain(mask)。"""
         from PyQt5.QtWidgets import QMessageBox
@@ -721,7 +768,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
 
     def _on_smooth_height(self) -> None:
         from services.terrain_service import smooth_height
-        self._canvas.height_map = smooth_height(self._canvas.height_map)
+        self._canvas.height_map = smooth_height(
+            self._canvas.height_map, self._canvas.tile_map
+        )
         self._status_info.setText(tr("status_height_smoothed"))
 
     def _on_import_heightmap(self) -> None:

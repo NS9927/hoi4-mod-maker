@@ -188,6 +188,14 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         act_ref.setChecked(True)
         act_ref.triggered.connect(self._canvas.toggle_ref_image)
         view_menu.addAction(act_ref)
+        # 国家/州 归属叠加层 —— 全局开关，任意模式下都能看
+        act_cs = QAction(tr("action_show_country_state_overlay"), self)
+        act_cs.setCheckable(True)
+        act_cs.setChecked(False)
+        act_cs.setToolTip(tr("action_show_country_state_overlay_tip"))
+        act_cs.triggered.connect(self._on_terrain_context_overlay)
+        view_menu.addAction(act_cs)
+        self._act_country_state_overlay = act_cs
 
         # 工具
         tools_menu = menubar.addMenu(tr("menu_tools"))
@@ -243,7 +251,14 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.tile_type_changed.connect(cv.set_tile_type)
         tp.brush_size_changed.connect(cv.set_brush_size)
         tp.terrain_index_changed.connect(cv.set_terrain_index)
+        # 按省份生成走 controller.on_province_clicked，必须同步 current_terrain_index
+        tp.terrain_index_changed.connect(
+            lambda idx: setattr(self._controllers["terrain"], "current_terrain_index", idx)
+        )
         tp.terrain_brush_mode_changed.connect(cv.set_terrain_brush_mode)
+        tp.terrain_brush_mode_changed.connect(
+            lambda on: setattr(self._controllers["terrain"], "brush_mode", on)
+        )
         tp.height_value_changed.connect(cv.set_height_value)
         # 属性地形选择 → 属性地形 controller
         tp.province_terrain_type_changed.connect(
@@ -291,6 +306,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.downgrade_mountain_requested.connect(self._on_downgrade_mountain)
         tp.downgrade_lasso_mode_toggled.connect(self._on_downgrade_lasso_mode)
         cv.downgrade_lasso_drawn.connect(self._on_downgrade_lasso_drawn)
+        tp.terrain_brush_size_changed.connect(cv.set_terrain_brush_size)
         tp.terrain_brush_size_changed.connect(
             lambda s: setattr(self._controllers["terrain"], "brush_size", s)
         )
