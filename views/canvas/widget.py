@@ -590,16 +590,23 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         """
         self._country_color_rgb = rgb
         self._country_assigned_mask = assigned_mask
-        # rgb 变了 → 边界 cache 失效
+        # rgb 变了 → country renderer 边界 cache 和 state renderer 国家边界 cache 都失效
         self._country_borders_cache = None
-        if self._display_mode == "country":
+        self._state_country_borders_cache = None
+        # state 模式也叠加国家边界 → 改国家归属时需要刷新
+        if self._display_mode in ("country", "state"):
             self._full_render()
 
     def set_highlight_country(self, rgb: tuple[int, int, int] | None) -> None:
-        """设置选中国家的 RGB (用于 country mode 下高亮显示). 传 None 取消."""
+        """设置选中国家的 RGB.
+
+        country mode 下: 该国边界 2 像素红描边.
+        state mode 下: 该国全部像素叠加暖黄, 一眼看清同 owner 还有哪些州.
+        传 None 取消.
+        """
         self._highlight_country_rgb = rgb
-        # 高亮变了不需要重算白边 (cache 中只缓存白边), 只需重绘红边
-        if self._display_mode == "country":
+        # 高亮不影响国家边界 cache, 只需重绘
+        if self._display_mode in ("country", "state"):
             self._full_render()
 
     def set_terrain_underlay_visible(self, visible: bool) -> None:

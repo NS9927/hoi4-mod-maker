@@ -133,8 +133,15 @@ class ApplicationController:
         # 按模式刷新颜色图
         if mode == "state":
             self._refresh_state_colors()
+            # state 模式叠加国家边界 + owner 高亮, 需要 country_rgb + assigned_mask
+            self._refresh_country_colors()
+            # 进 state 模式时清掉残留的国家高亮 (从 country mode 切过来时)
+            self._canvas.set_highlight_country(None)
         elif mode == "country":
             self._refresh_country_colors()
+        elif self._canvas._highlight_country_rgb is not None:
+            # 离开 state / country 模式时清掉国家高亮
+            self._canvas.set_highlight_country(None)
         elif mode == "strategic_region":
             self._refresh_sr_colors()
         elif mode == "logistics":
@@ -418,8 +425,16 @@ class ApplicationController:
                 self._canvas.set_batch_selection_pids(list(state.provinces))
                 # 在列表中选中对应行 + 更新 page 的 _current_state_id
                 self._panel.select_state_in_list(sid)
+                # 在画布上高亮该 state 的 owner 那一国 (state 模式渲染会叠暖黄)
+                owner = self._project.country_mgr.get_state_owner(sid)
+                country = self._project.country_mgr.get_country(owner) if owner else None
+                if country is not None:
+                    self._canvas.set_highlight_country(tuple(country.color))
+                else:
+                    self._canvas.set_highlight_country(None)
             else:
                 self._canvas.set_batch_selection_pids([])
+                self._canvas.set_highlight_country(None)
 
     def _on_country_changed(self, event) -> None:
         """Country 数据变化 → 刷新 UI。"""
