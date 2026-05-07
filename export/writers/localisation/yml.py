@@ -88,10 +88,11 @@ def write_localisation_simple(mod_name, tag, states, output_dir, region_count=24
     with open(os.path.join(d, f"{safe}_l_english.yml"), "w", encoding="utf-8-sig") as f:
         f.write("l_english:\n")
         for sid in states:
-            f.write(f' STATE_{sid}:0 "State {sid}"\n')
+            # BUG-6: 用 WT_ 前缀避开 vanilla key
+            f.write(f' STATE_WT_{sid}:0 "State {sid}"\n')
         for rid in range(1, region_count + 1):
-            f.write(f' STRATEGICREGION_{rid}:0 "Region {rid}"\n')
-        f.write(f' SUPPLYAREA_1:0 "Fantasy Supply"\n')
+            f.write(f' STRATEGICREGION_WT_{rid}:0 "Region {rid}"\n')
+        f.write(f' SUPPLYAREA_WT_1:0 "Fantasy Supply"\n')
         f.write(f' FANTASY_BOOKMARK:0 "Fantasy World"\n')
         f.write(f' FANTASY_BOOKMARK_DESC:0 "A fantasy world awaits."\n')
         f.write(f' {tag}:0 "Fantasy Country"\n')
@@ -135,11 +136,12 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
         is_en = (lang == "english")
 
         # ── states + VP 城市 ──
+        # BUG-6: 用 WT_ 前缀避开 vanilla 命名空间 (STATE_142 撞 vanilla "Krakow" 等)
         with _open_yml(d, safe, "states", lang) as f:
             if state_mgr and state_mgr.states:
                 for sid, s in state_mgr.states.items():
                     name = _state_name_en(s, sid) if is_en else _state_name_local(s, sid)
-                    f.write(f' STATE_{sid}:0 "{_escape_yml(name)}"\n')
+                    f.write(f' STATE_WT_{sid}:0 "{_escape_yml(name)}"\n')
                     for vp_idx, vpid in enumerate(s.victory_points.keys()):
                         if is_en:
                             city = _city_name_en(s, vpid, _state_name_en(s, sid), vp_idx)
@@ -149,20 +151,20 @@ def write_localisation_full(mod_name, state_mgr, country_mgr, states, output_dir
             else:
                 for sid in states:
                     default = f"State {sid}" if is_en else f"状态 {sid}"
-                    f.write(f' STATE_{sid}:0 "{default}"\n')
+                    f.write(f' STATE_WT_{sid}:0 "{default}"\n')
 
         # ── strategic regions + supply area ──
         with _open_yml(d, safe, "strategic_regions", lang) as f:
             if region_mgr is not None and region_mgr.regions:
                 for rid, r in sorted(region_mgr.regions.items()):
                     name = _region_name_en(r, rid) if is_en else _region_name_local(r, rid)
-                    f.write(f' STRATEGICREGION_{rid}:0 "{_escape_yml(name)}"\n')
+                    f.write(f' STRATEGICREGION_WT_{rid}:0 "{_escape_yml(name)}"\n')
             else:
                 for rid in range(1, region_count + 1):
                     default = f"Region {rid}" if is_en else f"战区 {rid}"
-                    f.write(f' STRATEGICREGION_{rid}:0 "{default}"\n')
+                    f.write(f' STRATEGICREGION_WT_{rid}:0 "{default}"\n')
             supply_name = f"{mod_name} Supply" if is_en else f"{mod_name} 补给"
-            f.write(f' SUPPLYAREA_1:0 "{_escape_yml(supply_name)}"\n')
+            f.write(f' SUPPLYAREA_WT_1:0 "{_escape_yml(supply_name)}"\n')
 
         # ── countries + leaders + ideas ──
         f_countries = _open_yml(d, safe, "countries", lang)

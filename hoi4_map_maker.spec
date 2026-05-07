@@ -26,6 +26,7 @@ a = Analysis(
     datas=[
         ('resources', 'resources'),
         ('data/atlas_tiles', 'data/atlas_tiles'),
+        ('ui/i18n', 'ui/i18n'),
     ],
     hiddenimports=[
         # features 是动态加载的, PyInstaller 抓不到, 显式列出

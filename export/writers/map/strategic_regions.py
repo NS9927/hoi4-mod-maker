@@ -90,10 +90,10 @@ def write_strategic_regions(province_map, tile_map, output_dir,
             continue
         region_list.append((new_id, provs))
 
-        with open(os.path.join(d, f"{new_id}-strategic_region.txt"), "w") as f:
+        with open(os.path.join(d, f"{new_id}-strategic_region.txt"), "w", encoding="utf-8") as f:
             f.write("strategic_region={\n")
             f.write(f"\tid={new_id}\n")
-            f.write(f'\tname="STRATEGICREGION_{new_id}"\n')
+            f.write(f'\tname="STRATEGICREGION_WT_{new_id}"\n')
             f.write("\tprovinces={\n\t\t")
             f.write(" ".join(str(p) for p in provs))
             f.write("\n\t}\n")
@@ -137,12 +137,12 @@ def write_strategic_regions_from_mgr(region_mgr, output_dir):
         preset = region.weather_preset or "temperate"
         periods = WEATHER_PRESETS.get(preset, WEATHER_PRESETS["temperate"])
 
-        with open(os.path.join(d, f"{new_id}-strategic_region.txt"), "w") as f:
+        with open(os.path.join(d, f"{new_id}-strategic_region.txt"), "w", encoding="utf-8") as f:
             f.write("strategic_region={\n")
             f.write(f"\tid={new_id}\n")
             # 永远写 key，绝不写 region.name — 用户可能输入中文，HOI4 parser 遇
             # 到非 ASCII 直接崩游戏。显示名走 localisation yml。
-            f.write(f'\tname="STRATEGICREGION_{new_id}"\n')
+            f.write(f'\tname="STRATEGICREGION_WT_{new_id}"\n')
             if region.naval_terrain:
                 f.write(f"\tnaval_terrain={region.naval_terrain}\n")
             f.write("\tprovinces={\n\t\t")
@@ -188,7 +188,7 @@ def write_weatherpositions(region_list, province_map, output_dir):
     sum_y = np.bincount(flat_pm, weights=ys_grid.ravel().astype(np.float64), minlength=n)
     sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
-    with open(os.path.join(d, "weatherpositions.txt"), "w") as f:
+    with open(os.path.join(d, "weatherpositions.txt"), "w", encoding="utf-8") as f:
         for rid, provs in region_list:
             # 用 region 内所有省份像素加权平均
             total_pix = 0

@@ -182,10 +182,10 @@ def write_country(tag, capital_state_id, output_dir):
     # 生成 80 个 dynamic countries（HOI4 强制要求，否则崩溃）
     write_dynamic_countries(output_dir)
 
-    with open(os.path.join(output_dir, "common", "country_tags", "02_worldtest_countries.txt"), "w") as f:
+    with open(os.path.join(output_dir, "common", "country_tags", "02_worldtest_countries.txt"), "w", encoding="utf-8") as f:
         f.write(f'{tag} = "countries/{tag}.txt"\n')
 
-    with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w") as f:
+    with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w", encoding="utf-8") as f:
         f.write("graphical_culture = western_european_gfx\n")
         f.write("graphical_culture_2d = western_european_2d\n")
         f.write("color = { 100 100 200 }\n")
@@ -199,7 +199,7 @@ def write_country(tag, capital_state_id, output_dir):
     # 生成国家颜色（地图上显示）
     write_country_colors(tag, (100, 100, 200), output_dir)
 
-    with open(os.path.join(output_dir, "history", "countries", f"{tag} - Fantasy.txt"), "w") as f:
+    with open(os.path.join(output_dir, "history", "countries", f"{tag} - Fantasy.txt"), "w", encoding="utf-8") as f:
         f.write(f"capital = {capital_state_id}\n")
         f.write(f'oob = "{tag}_1936"\n')
         f.write("set_research_slots = 3\n")
@@ -214,7 +214,7 @@ def write_country(tag, capital_state_id, output_dir):
         # 这里 set_popularities 已经是最后一个，所以本身就符合要求
         f.write("\n# end of country history\n")
 
-    with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w") as f:
+    with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w", encoding="utf-8") as f:
         f.write("units = { }\n\n")
 
 
@@ -243,13 +243,13 @@ def write_countries_from_mgr(country_mgr, output_dir, states):
     write_dynamic_countries(output_dir)
 
     # country_tags
-    with open(os.path.join(output_dir, "common", "country_tags", "02_worldtest_countries.txt"), "w") as f:
+    with open(os.path.join(output_dir, "common", "country_tags", "02_worldtest_countries.txt"), "w", encoding="utf-8") as f:
         for tag in country_mgr.countries:
             f.write(f'{tag} = "countries/{tag}.txt"\n')
 
     for tag, c in country_mgr.countries.items():
         r, g, b = c.color
-        with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w") as f:
+        with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w", encoding="utf-8") as f:
             f.write("graphical_culture = western_european_gfx\n")
             f.write("graphical_culture_2d = western_european_2d\n")
             f.write(f"color = {{ {r} {g} {b} }}\n")
@@ -321,7 +321,7 @@ def write_countries_from_mgr(country_mgr, output_dir, states):
             first_state = states.get(country_states[0]) if isinstance(states, dict) else None
             if first_state:
                 any_land_prov = first_state[0]
-        with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w") as f:
+        with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w", encoding="utf-8") as f:
             f.write("division_template = {\n")
             f.write(f'\tname = "Infantry Division"\n')
             f.write("\tregiments = {\n")
@@ -403,7 +403,7 @@ def write_bookmark(mod_name, country_tags, output_dir):
 
     # --- 1. 屏蔽原版 bookmark（必须有完整结构，不能空块） ---
     for bm_file in ("the_gathering_storm.txt", "blitzkrieg.txt"):
-        with open(os.path.join(d, bm_file), "w") as f:
+        with open(os.path.join(d, bm_file), "w", encoding="utf-8") as f:
             f.write("bookmarks = {\n")
             f.write("\tbookmark = {\n")
             f.write(f'\t\tname = "DISABLED_{bm_file.replace(".txt", "").upper()}"\n')
@@ -418,7 +418,7 @@ def write_bookmark(mod_name, country_tags, output_dir):
     safe_file = mod_name.replace(" ", "_").lower()
     bm_name_key = f"{safe}_BOOKMARK"
     bm_desc_key = f"{safe}_BOOKMARK_DESC"
-    with open(os.path.join(d, f"z_{safe_file}.txt"), "w") as f:
+    with open(os.path.join(d, f"z_{safe_file}.txt"), "w", encoding="utf-8") as f:
         f.write("bookmarks = {\n")
         f.write("\tbookmark = {\n")
         f.write(f'\t\tname = {bm_name_key}\n')

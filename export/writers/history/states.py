@@ -97,10 +97,11 @@ def write_states_from_mgr(
         extra_cores = list(getattr(state, "extra_cores", []) or [])
         claims = list(getattr(state, "claims", []) or [])
 
-        with open(os.path.join(d, f"{sid}-{safe_name}.txt"), "w") as f:
+        with open(os.path.join(d, f"{sid}-{safe_name}.txt"), "w", encoding="utf-8") as f:
             f.write("state = {\n")
             f.write(f"\tid = {sid}\n")
-            f.write(f'\tname = "STATE_{sid}"\n')
+            # BUG-6: 用 WT_ 前缀避开 vanilla 的 STATE_X 命名空间 (否则 "热那亚→Krakow")
+            f.write(f'\tname = "STATE_WT_{sid}"\n')
             f.write(f"\tmanpower = {state.manpower}\n")
             f.write(f"\tstate_category = {state.category}\n")
             if impassable:
@@ -203,10 +204,11 @@ def write_states_fallback(states: dict, tag: str, province_map, output_dir: str)
     for sid, provs in states.items():
         first = provs[0]
         manpower = len(provs) * 50000
-        with open(os.path.join(d, f"{sid}-STATE_{sid}.txt"), "w") as f:
+        with open(os.path.join(d, f"{sid}-STATE_{sid}.txt"), "w", encoding="utf-8") as f:
             f.write("state = {\n")
             f.write(f"\tid = {sid}\n")
-            f.write(f'\tname = "STATE_{sid}"\n')
+            # BUG-6: 用 WT_ 前缀避开 vanilla 的 STATE_X 命名空间
+            f.write(f'\tname = "STATE_WT_{sid}"\n')
             f.write(f"\tmanpower = {manpower}\n")
             f.write("\tstate_category = town\n\n")
             f.write("\thistory = {\n")

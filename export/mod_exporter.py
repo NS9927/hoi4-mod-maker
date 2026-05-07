@@ -56,6 +56,11 @@ def export_full_mod(
     if int(province_map.max()) == 0:
         raise ValueError("没有省份数据，请先生成省份")
 
+    # 防御性刷新全局尺寸：用户可能加载了非默认尺寸项目但没触发 set_map_size,
+    # 或某些 writer 在文件顶部 import MAP_* 已绑定旧值（lazy import 的会刷新）
+    from data.constants import set_map_size as _set_map_size
+    _set_map_size(province_map.shape[1], province_map.shape[0])
+
     # scope 默认全部开启
     if scope is None:
         scope = {}
@@ -108,7 +113,7 @@ def export_full_mod(
     else:
         write_terrain_bmp(_gen_terrain(tile_map), output_dir)
 
-    write_rivers_bmp(output_dir, river_map)
+    write_rivers_bmp(output_dir, river_map, shape=tile_map.shape)
     # trees.bmp: 从 terrain_map 自动生成树木分布 (A8)
     from export.writers.map.trees_bmp import (
         write_trees_bmp as _write_trees_new,
@@ -531,7 +536,7 @@ def _write_definition_csv(count, colors, pm, tm, output_dir,
     dominant_terrain = _batch_resolve_terrain(
         count, pm, terrain_map, provincial_terrain)
 
-    with open(os.path.join(d, "definition.csv"), "w") as f:
+    with open(os.path.join(d, "definition.csv"), "w", encoding="utf-8") as f:
         f.write("0;0;0;0;sea;false;ocean;0\n")
         for pid in range(1, count + 1):
             r, g, b = colors.get(pid, (1, 1, 1))
@@ -622,7 +627,7 @@ def _write_continent(output_dir, continent_mgr=None):
         if n not in seen:
             seen.add(n)
             names.append(n)
-    with open(os.path.join(d, "continent.txt"), "w") as f:
+    with open(os.path.join(d, "continent.txt"), "w", encoding="utf-8") as f:
         f.write("continents = {\n")
         for n in names:
             f.write(f"\t{n}\n")
@@ -634,7 +639,7 @@ def _write_continent(output_dir, continent_mgr=None):
 def _write_adjacencies(output_dir):
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "adjacencies.csv"), "w") as f:
+    with open(os.path.join(d, "adjacencies.csv"), "w", encoding="utf-8") as f:
         f.write("From;To;Type;Through;start_x;start_y;stop_x;stop_y;adjacency_rule_name;Comment\n")
         # vanilla 末行格式：-1;-1;;-1;-1;-1;-1;-1;-1
         f.write("-1;-1;;-1;-1;-1;-1;-1;-1\n")
@@ -644,7 +649,7 @@ def _write_seasons_txt(output_dir):
     """写 map/seasons.txt — 季节视觉（颜色/树叶变化）。用 vanilla 默认值。"""
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "seasons.txt"), "w") as f:
+    with open(os.path.join(d, "seasons.txt"), "w", encoding="utf-8") as f:
         f.write("""winter = {
 \tstart_date=00.12.01
 \tend_date=00.02.10

@@ -233,11 +233,11 @@ def write_empty_files(output_dir: str) -> None:
     os.makedirs(map_dir, exist_ok=True)
 
     # positions.txt — 空文件
-    with open(os.path.join(map_dir, "positions.txt"), "w") as f:
+    with open(os.path.join(map_dir, "positions.txt"), "w", encoding="utf-8") as f:
         pass
 
     # adjacency_rules.txt — 空文件
-    with open(os.path.join(map_dir, "adjacency_rules.txt"), "w") as f:
+    with open(os.path.join(map_dir, "adjacency_rules.txt"), "w", encoding="utf-8") as f:
         pass
 
     # ambient_object.txt — 由 ambient_object writer 单独生成，这里不覆盖
@@ -250,19 +250,19 @@ def write_empty_files(output_dir: str) -> None:
         import shutil
         shutil.copy2(vanilla_seasons, os.path.join(map_dir, "seasons.txt"))
     else:
-        with open(os.path.join(map_dir, "seasons.txt"), "w") as f:
+        with open(os.path.join(map_dir, "seasons.txt"), "w", encoding="utf-8") as f:
             f.write(_FALLBACK_SEASONS)
 
     # weatherpositions.txt — 空文件
-    with open(os.path.join(map_dir, "weatherpositions.txt"), "w") as f:
+    with open(os.path.join(map_dir, "weatherpositions.txt"), "w", encoding="utf-8") as f:
         pass
 
     # unitstacks.txt — 空文件
-    with open(os.path.join(map_dir, "unitstacks.txt"), "w") as f:
+    with open(os.path.join(map_dir, "unitstacks.txt"), "w", encoding="utf-8") as f:
         pass
 
     # rocket_sites.txt — 空文件
-    with open(os.path.join(map_dir, "rocket_sites.txt"), "w") as f:
+    with open(os.path.join(map_dir, "rocket_sites.txt"), "w", encoding="utf-8") as f:
         pass
 
 
@@ -275,13 +275,13 @@ def write_supply_files(output_dir: str, first_land_province: int) -> None:
     os.makedirs(map_dir, exist_ok=True)
 
     # supply_nodes.txt — 至少一个等级1节点
-    with open(os.path.join(map_dir, "supply_nodes.txt"), "w") as f:
+    with open(os.path.join(map_dir, "supply_nodes.txt"), "w", encoding="utf-8") as f:
         f.write(f"1 {first_land_province}\n")
 
     # railways.txt — 至少一条等级1铁路
     # 格式: 等级 省份数量 省份ID1 省份ID2 ...
     # 需要至少两个省份，这里用同一个省份占位（最小可用）
-    with open(os.path.join(map_dir, "railways.txt"), "w") as f:
+    with open(os.path.join(map_dir, "railways.txt"), "w", encoding="utf-8") as f:
         f.write(f"1 2 {first_land_province} {first_land_province}\n")
 
 
@@ -292,7 +292,7 @@ def write_buildings_txt(output_dir: str, first_land_province: int) -> None:
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
 
-    with open(os.path.join(map_dir, "buildings.txt"), "w") as f:
+    with open(os.path.join(map_dir, "buildings.txt"), "w", encoding="utf-8") as f:
         # StateID;建筑类型;X;Y;Z;旋转;相邻海省ID
         # 注意：infrastructure 不是 3D 建筑，不能出现在 buildings.txt 里；用 bunker 占位
         f.write(f"1;bunker;100.0;10.0;100.0;0.0;0\n")
@@ -310,7 +310,7 @@ def write_strategic_region(
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("strategic_region = {\n")
         f.write("    id = 1\n")
-        f.write('    name = "STRATEGICREGION_1"\n')
+        f.write('    name = "STRATEGICREGION_WT_1"\n')
         f.write("    provinces = {\n")
         # 每行最多 20 个ID
         for i in range(0, len(province_ids), 20):
@@ -350,7 +350,7 @@ def write_state_file(
     with open(file_path, "w", encoding="utf-8") as f:
         f.write("state = {\n")
         f.write(f"    id = {state_id}\n")
-        f.write(f'    name = "STATE_{state_id}"\n')
+        f.write(f'    name = "STATE_WT_{state_id}"\n')
         f.write(f"    manpower = {manpower}\n")
         f.write("    state_category = town\n\n")
         f.write("    history = {\n")
@@ -374,13 +374,13 @@ def write_country_files(output_dir: str, tag: str = "AAA") -> None:
     tags_dir = os.path.join(output_dir, "common", "country_tags")
     os.makedirs(tags_dir, exist_ok=True)
     # 用 02_worldtest_ 前缀避免覆盖 vanilla 00_countries.txt（country_tags 不再 replace）
-    with open(os.path.join(tags_dir, "02_worldtest_countries.txt"), "w") as f:
+    with open(os.path.join(tags_dir, "02_worldtest_countries.txt"), "w", encoding="utf-8") as f:
         f.write(f'{tag} = "countries/{tag}.txt"\n')
 
     # country 文件
     countries_dir = os.path.join(output_dir, "common", "countries")
     os.makedirs(countries_dir, exist_ok=True)
-    with open(os.path.join(countries_dir, f"{tag}.txt"), "w") as f:
+    with open(os.path.join(countries_dir, f"{tag}.txt"), "w", encoding="utf-8") as f:
         f.write("graphical_culture = western_european_gfx\n")
         f.write("graphical_culture_2d = western_european_2d\n")
         f.write("color = { 100 100 200 }\n")
@@ -388,7 +388,7 @@ def write_country_files(output_dir: str, tag: str = "AAA") -> None:
     # history 文件
     history_dir = os.path.join(output_dir, "history", "countries")
     os.makedirs(history_dir, exist_ok=True)
-    with open(os.path.join(history_dir, f"{tag} - FantasyCountry.txt"), "w") as f:
+    with open(os.path.join(history_dir, f"{tag} - FantasyCountry.txt"), "w", encoding="utf-8") as f:
         f.write("capital = 1\n")
         f.write(f'oob = "{tag}_1936"\n')
         f.write("set_politics = {\n")
@@ -407,7 +407,7 @@ def write_country_files(output_dir: str, tag: str = "AAA") -> None:
     # OOB（空的部队编制）
     oob_dir = os.path.join(output_dir, "history", "units")
     os.makedirs(oob_dir, exist_ok=True)
-    with open(os.path.join(oob_dir, f"{tag}_1936.txt"), "w") as f:
+    with open(os.path.join(oob_dir, f"{tag}_1936.txt"), "w", encoding="utf-8") as f:
         f.write("units = { }\n")
 
 

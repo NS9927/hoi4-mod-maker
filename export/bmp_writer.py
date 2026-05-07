@@ -36,6 +36,9 @@ def write_provinces_bmp(
     if colors is None:
         colors = generate_province_colors(province_count)
 
+    # 用实际数组形状,不能用全局 MAP_WIDTH/HEIGHT (用户可能选 2048×1024 等其他尺寸)
+    H, W = province_map.shape
+
     # 确保输出目录存在
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
@@ -44,13 +47,13 @@ def write_provinces_bmp(
 
     # 构建像素数据
     # BMP 24位格式：每像素 3 字节 (B, G, R)，注意是 BGR 顺序
-    row_bytes = MAP_WIDTH * 3
+    row_bytes = W * 3
     # 每行需要 4 字节对齐
     padding = (4 - (row_bytes % 4)) % 4
     padded_row_bytes = row_bytes + padding
 
     # 像素数据大小
-    pixel_data_size = padded_row_bytes * MAP_HEIGHT
+    pixel_data_size = padded_row_bytes * H
 
     # 文件总大小
     file_size = 14 + 40 + pixel_data_size  # BITMAPFILEHEADER + BITMAPINFOHEADER + 像素
@@ -64,8 +67,8 @@ def write_provinces_bmp(
 
         # === BITMAPINFOHEADER (40 bytes) ===
         f.write(struct.pack("<I", 40))           # header 大小
-        f.write(struct.pack("<i", MAP_WIDTH))    # 宽度
-        f.write(struct.pack("<i", MAP_HEIGHT))   # 高度（正值 = bottom-up）
+        f.write(struct.pack("<i", W))            # 宽度
+        f.write(struct.pack("<i", H))            # 高度（正值 = bottom-up）
         f.write(struct.pack("<HH", 1, 24))       # 色彩平面数=1, 位深=24
         f.write(struct.pack("<I", 0))            # 压缩方式=0 (BI_RGB)
         f.write(struct.pack("<I", pixel_data_size))  # 像素数据大小
@@ -86,7 +89,7 @@ def write_provinces_bmp(
                 lut[pid] = [b, g, r]  # BMP 是 BGR 顺序
 
         # 从最后一行开始写（bottom-up）
-        for y in range(MAP_HEIGHT - 1, -1, -1):
+        for y in range(H - 1, -1, -1):
             row_ids = province_map[y, :]
             # 将ID为0的像素映射为0（lut[0]=(1,1,1)，不是黑色）
             row_bgr = lut[row_ids]  # (W, 3)
@@ -109,18 +112,21 @@ def write_heightmap_bmp(
     - 256 色灰度调色板
     - bottom-up
     """
+    # 用实际数组形状,不能用全局 MAP_WIDTH/HEIGHT
+    H, W = heightmap.shape
+
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
 
     file_path = os.path.join(map_dir, "heightmap.bmp")
 
-    row_bytes = MAP_WIDTH
+    row_bytes = W
     padding = (4 - (row_bytes % 4)) % 4
     padded_row_bytes = row_bytes + padding
 
     # 调色板大小：256 个 RGBQUAD (4 bytes each)
     palette_size = 256 * 4
-    pixel_data_size = padded_row_bytes * MAP_HEIGHT
+    pixel_data_size = padded_row_bytes * H
     pixel_offset = 14 + 40 + palette_size
     file_size = pixel_offset + pixel_data_size
 
@@ -133,8 +139,8 @@ def write_heightmap_bmp(
 
         # === BITMAPINFOHEADER ===
         f.write(struct.pack("<I", 40))
-        f.write(struct.pack("<i", MAP_WIDTH))
-        f.write(struct.pack("<i", MAP_HEIGHT))
+        f.write(struct.pack("<i", W))
+        f.write(struct.pack("<i", H))
         f.write(struct.pack("<HH", 1, 8))       # 8位
         f.write(struct.pack("<I", 0))
         f.write(struct.pack("<I", pixel_data_size))
@@ -149,7 +155,7 @@ def write_heightmap_bmp(
 
         # === 像素数据 ===
         pad_bytes = b"\x00" * padding
-        for y in range(MAP_HEIGHT - 1, -1, -1):
+        for y in range(H - 1, -1, -1):
             f.write(heightmap[y, :].tobytes())
             if padding:
                 f.write(pad_bytes)
@@ -165,18 +171,21 @@ def write_terrain_bmp(
     """
     from data.constants import DEFAULT_HOI4_PATH
 
+    # 用实际数组形状,不能用全局 MAP_WIDTH/HEIGHT
+    H, W = terrain_map.shape
+
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
     file_path = os.path.join(map_dir, "terrain.bmp")
 
-    row_bytes = MAP_WIDTH
+    row_bytes = W
     padding = (4 - (row_bytes % 4)) % 4
 
     # 原版 terrain.bmp: ncolors=255, offset=1074
     # 策略：从原版只读调色板，自己生成正确的文件头（避免文件大小不匹配）
     n_colors = 255
     palette_size = n_colors * 4
-    pixel_data_size = (row_bytes + padding) * MAP_HEIGHT
+    pixel_data_size = (row_bytes + padding) * H
     pixel_offset = 14 + 40 + palette_size
     file_size = pixel_offset + pixel_data_size
 
@@ -197,8 +206,8 @@ def write_terrain_bmp(
         f.write(struct.pack("<HH", 0, 0))
         f.write(struct.pack("<I", pixel_offset))
         f.write(struct.pack("<I", 40))
-        f.write(struct.pack("<i", MAP_WIDTH))
-        f.write(struct.pack("<i", MAP_HEIGHT))
+        f.write(struct.pack("<i", W))
+        f.write(struct.pack("<i", H))
         f.write(struct.pack("<HH", 1, 8))
         f.write(struct.pack("<I", 0))
         f.write(struct.pack("<I", pixel_data_size))
@@ -222,28 +231,41 @@ def write_terrain_bmp(
 
         # 像素数据
         pad_bytes = b"\x00" * padding
-        for y in range(MAP_HEIGHT - 1, -1, -1):
+        for y in range(H - 1, -1, -1):
             f.write(terrain_map[y, :].tobytes())
             if padding:
                 f.write(pad_bytes)
 
 
-def write_rivers_bmp(output_dir: str, river_map: np.ndarray | None = None) -> None:
+def write_rivers_bmp(
+    output_dir: str,
+    river_map: np.ndarray | None = None,
+    shape: tuple[int, int] | None = None,
+) -> None:
     """
     写入 rivers.bmp — 8 位索引色 BMP。
     如果 river_map 不为 None，使用实际河流数据；否则生成全白空白文件。
+    shape 用于 river_map=None 时指定尺寸 (H, W)，避免使用全局 MAP_*。
     """
     from domain.managers.river import RIVER_PALETTE
+
+    # 用实际数组形状或外部指定尺寸,不能用全局 MAP_WIDTH/HEIGHT
+    if river_map is not None:
+        H, W = river_map.shape
+    elif shape is not None:
+        H, W = shape
+    else:
+        H, W = MAP_HEIGHT, MAP_WIDTH  # fallback,旧行为
 
     map_dir = os.path.join(output_dir, "map")
     os.makedirs(map_dir, exist_ok=True)
     file_path = os.path.join(map_dir, "rivers.bmp")
 
-    row_bytes = MAP_WIDTH
+    row_bytes = W
     padding = (4 - (row_bytes % 4)) % 4
     padded_row_bytes = row_bytes + padding
     palette_size = 256 * 4
-    pixel_data_size = padded_row_bytes * MAP_HEIGHT
+    pixel_data_size = padded_row_bytes * H
     pixel_offset = 14 + 40 + palette_size
     file_size = pixel_offset + pixel_data_size
 
@@ -256,8 +278,8 @@ def write_rivers_bmp(output_dir: str, river_map: np.ndarray | None = None) -> No
 
         # BITMAPINFOHEADER
         f.write(struct.pack("<I", 40))
-        f.write(struct.pack("<i", MAP_WIDTH))
-        f.write(struct.pack("<i", MAP_HEIGHT))
+        f.write(struct.pack("<i", W))
+        f.write(struct.pack("<i", H))
         f.write(struct.pack("<HH", 1, 8))
         f.write(struct.pack("<I", 0))
         f.write(struct.pack("<I", pixel_data_size))
@@ -278,14 +300,14 @@ def write_rivers_bmp(output_dir: str, river_map: np.ndarray | None = None) -> No
         # 像素数据（bottom-up）
         pad_bytes = b"\x00" * padding
         if river_map is not None:
-            for y in range(MAP_HEIGHT - 1, -1, -1):
+            for y in range(H - 1, -1, -1):
                 f.write(river_map[y].tobytes())
                 if padding:
                     f.write(pad_bytes)
         else:
             # 索引 255 = 陆地无河流背景（白色）
-            empty_row = b"\xff" * MAP_WIDTH
-            for _ in range(MAP_HEIGHT):
+            empty_row = b"\xff" * W
+            for _ in range(H):
                 f.write(empty_row)
                 if padding:
                     f.write(pad_bytes)

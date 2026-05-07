@@ -60,7 +60,7 @@ def write_replace_path_dirs(output_dir: str) -> None:
     for empty_dir in ("history/general", "common/strategic_locations"):
         d = os.path.join(output_dir, empty_dir.replace("/", os.sep))
         if os.path.isdir(d) and not os.listdir(d):
-            with open(os.path.join(d, "00_placeholder.txt"), "w") as f:
+            with open(os.path.join(d, "00_placeholder.txt"), "w", encoding="utf-8") as f:
                 f.write("# Empty\n")
 
     # common/on_actions: 必须 replace (vanilla 引用已删 decisions 会 access violation 崩溃),
@@ -68,7 +68,7 @@ def write_replace_path_dirs(output_dir: str) -> None:
     on_act_dir = os.path.join(output_dir, "common", "on_actions")
     os.makedirs(on_act_dir, exist_ok=True)
     if not os.listdir(on_act_dir):
-        with open(os.path.join(on_act_dir, "00_placeholder_on_actions.txt"), "w") as f:
+        with open(os.path.join(on_act_dir, "00_placeholder_on_actions.txt"), "w", encoding="utf-8") as f:
             f.write("# Placeholder — vanilla on_actions 引用已删 decisions, 必须空块代替\n")
             f.write("on_actions = {\n}\n")
 
@@ -128,7 +128,7 @@ def write_replace_path_dirs(output_dir: str) -> None:
                     _sh.copy2(sp, dp)
                     _scrub_file(dp)
         if not os.listdir(dst):
-            with open(os.path.join(dst, "00_placeholder.txt"), "w") as f:
+            with open(os.path.join(dst, "00_placeholder.txt"), "w", encoding="utf-8") as f:
                 f.write(f"# Empty — no vanilla generic files for {sub}\n")
 
     # 2026-04-09: scripted_effects / scripted_triggers / dynamic_modifiers
@@ -361,7 +361,7 @@ generic_strike_force = { objective_type = strike_force_objective
     apd = os.path.join(output_dir, "common", "ai_peace")
     os.makedirs(apd, exist_ok=True)
     if not os.listdir(apd):
-        with open(os.path.join(apd, "00_placeholder.txt"), "w") as f:
+        with open(os.path.join(apd, "00_placeholder.txt"), "w", encoding="utf-8") as f:
             f.write("# Empty — vanilla has no generic ai_peace\n")
 
     # common/units/names* 必须 replace 掉 vanilla — 提供单一全局 fallback.

@@ -21,12 +21,14 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
     os.makedirs(d, exist_ok=True)
 
     n = int(province_map.max()) + 1
+    # 用实际数组形状, 不能用全局 MAP_WIDTH/HEIGHT (用户可能选其他尺寸)
+    map_h, map_w = province_map.shape
 
     # 使用预计算数据，或自行计算质心
     if pid_count is None:
         flat_pm = province_map.ravel()
         pid_count = np.bincount(flat_pm, minlength=n)
-        ys_grid, xs_grid = np.mgrid[0:MAP_HEIGHT, 0:MAP_WIDTH]
+        ys_grid, xs_grid = np.mgrid[0:map_h, 0:map_w]
         sum_y = np.bincount(flat_pm, weights=ys_grid.ravel().astype(np.float64), minlength=n)
         sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
@@ -64,20 +66,37 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
     for sid, provs in states.items():
         if not provs:
             continue
-        pid = provs[0]
-        if pid >= n or pid_count[pid] == 0:
-            continue
-        cx, cy = _safe_coord(pid, province_map, pid_count, sum_x, sum_y)
-        hoi4_y = MAP_HEIGHT - cy
-        for btype in REQUIRED_STATE_ENTITIES:
-            lines.append(
-                f"{sid};{btype};{cx:.2f};11.00;{hoi4_y:.2f};0.00;0"
-            )
+
+        # BUG-5 修复 v2: 分散建筑到 state 内不同 land province 中心
+        # (v1 用螺旋偏移把建筑推到邻 state / 海里, mapbuildings.cpp:716/679 报错 → 已回滚)
+        # 收集该 state 内所有合法 land province 的安全中心坐标
+        valid_centroids: list[tuple[float, float]] = []
+        for p in provs:
+            if p < n and pid_count[p] > 0:
+                cx_p, cy_p = _safe_coord(p, province_map, pid_count, sum_x, sum_y)
+                iy, ix = int(round(cy_p)), int(round(cx_p))
+                # 严格校验坐标落在 LAND 像素上 (避免 mapbuildings.cpp:679 not over land)
+                if 0 <= iy < map_h and 0 <= ix < map_w and tile_map[iy, ix] == TILE_LAND:
+                    valid_centroids.append((cx_p, cy_p))
+
+        # 没有合法 land 中心: 退回到老逻辑 (provs[0] 中心, 不分散但保证有坐标)
+        if not valid_centroids:
+            pid = provs[0]
+            if pid >= n or pid_count[pid] == 0:
+                continue
+            cx, cy = _safe_coord(pid, province_map, pid_count, sum_x, sum_y)
+            valid_centroids = [(cx, cy)]
+
+        btypes = list(REQUIRED_STATE_ENTITIES)
         if sid in coastal_states:
-            for btype in COASTAL_STATE_ENTITIES:
-                lines.append(
-                    f"{sid};{btype};{cx:.2f};11.00;{hoi4_y:.2f};0.00;0"
-                )
+            btypes.extend(COASTAL_STATE_ENTITIES)
+        # 每个建筑轮流分配到一个 land province 的中心 (不跨 state, 不入海)
+        for i, btype in enumerate(btypes):
+            cx_b, cy_b = valid_centroids[i % len(valid_centroids)]
+            hoi4_y = map_h - cy_b
+            lines.append(
+                f"{sid};{btype};{cx_b:.2f};11.00;{hoi4_y:.2f};0.00;0"
+            )
 
     # 只给真正沿海的省份写 naval_base_spawn
     # 关键: HOI4 按 floor 方式把坐标转回像素索引判 "over the land"。若坐标刚好
@@ -110,7 +129,7 @@ def write_buildings(states, province_map, tile_map, output_dir, sea_ids=None,
         # 写坐标用**像素中心** (整数 + 0.5)，避免 HOI4 取整落到边界外
         cx_out = ix + 0.5
         cy_out = iy + 0.5
-        hoi4_y = MAP_HEIGHT - cy_out
+        hoi4_y = map_h - cy_out
         lines.append(
             f"{sid};naval_base_spawn;{cx_out:.2f};11.00;{hoi4_y:.2f};0.00;{sea_pid}"
         )

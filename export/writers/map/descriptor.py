@@ -9,7 +9,7 @@ def write_descriptor(mod_name, output_dir):
     rp = "\n".join(f'replace_path="{p}"' for p in REPLACE_PATHS)
 
     # 内部 descriptor.mod（MOD目录内）
-    with open(os.path.join(output_dir, "descriptor.mod"), "w") as f:
+    with open(os.path.join(output_dir, "descriptor.mod"), "w", encoding="utf-8") as f:
         f.write(f'version="{DEFAULT_MOD_VERSION}"\n')
         f.write('tags={\n\t"Alternative History"\n\t"Map"\n\t"Total Conversion"\n}\n')
         f.write(f'name="{mod_name}"\n')
@@ -19,7 +19,7 @@ def write_descriptor(mod_name, output_dir):
     # 外层 .mod 文件（MOD目录旁边，启动器需要）
     mod_dir_name = os.path.basename(output_dir)
     outer_mod = os.path.join(os.path.dirname(output_dir), f"{mod_dir_name}.mod")
-    with open(outer_mod, "w") as f:
+    with open(outer_mod, "w", encoding="utf-8") as f:
         f.write(f'version="{DEFAULT_MOD_VERSION}"\n')
         f.write('tags={\n\t"Alternative History"\n\t"Map"\n\t"Total Conversion"\n}\n')
         f.write(f'name="{mod_name}"\n')

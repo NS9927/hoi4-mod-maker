@@ -329,8 +329,8 @@ class WelcomePage(QWidget):
             except Exception:
                 pass
         config["language"] = lang
-        with open(config_path, "w") as f:
-            json.dump(config, f)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False)
         self.language_changed.emit(lang)
 
     def retranslateUi(self) -> None:

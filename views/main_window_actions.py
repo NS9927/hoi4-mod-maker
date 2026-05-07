@@ -1300,13 +1300,13 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         config = {}
         if os.path.exists(config_path):
             try:
-                with open(config_path, "r") as f:
+                with open(config_path, "r", encoding="utf-8") as f:
                     config = json.load(f)
             except Exception:
                 pass
         config["language"] = new_lang
-        with open(config_path, "w") as f:
-            json.dump(config, f)
+        with open(config_path, "w", encoding="utf-8") as f:
+            json.dump(config, f, ensure_ascii=False)
 
         # 立即刷新 UI
         self._retranslate_ui()

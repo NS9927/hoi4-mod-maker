@@ -117,7 +117,7 @@ def _write_map_files(output_dir, province_map, colors, province_count,
 
     # === definition.csv — 必须自己生成 ===
     coastal = get_coastal_provinces(tile_map, province_map)
-    with open(os.path.join(map_dir, "definition.csv"), "w") as f:
+    with open(os.path.join(map_dir, "definition.csv"), "w", encoding="utf-8") as f:
         f.write("0;0;0;0;sea;false;ocean;0\n")
         for pid in range(1, province_count + 1):
             r, g, b = colors.get(pid, (1, 1, 1))
@@ -133,7 +133,7 @@ def _write_map_files(output_dir, province_map, colors, province_count,
             f.write(f"{pid};{r};{g};{b};{ptype};{c};{terrain};{cont}\n")
 
     # === default.map — 必须自己生成 ===
-    with open(os.path.join(map_dir, "default.map"), "w") as f:
+    with open(os.path.join(map_dir, "default.map"), "w", encoding="utf-8") as f:
         f.write('definitions = "definition.csv"\n')
         f.write('provinces = "provinces.bmp"\n')
         f.write('positions = "positions.txt"\n')
@@ -154,11 +154,11 @@ def _write_map_files(output_dir, province_map, colors, province_count,
     _copy_vanilla("ambient_object.txt", map_dir)
 
     # continent.txt — 自己生成（简化为1个大陆）
-    with open(os.path.join(map_dir, "continent.txt"), "w") as f:
+    with open(os.path.join(map_dir, "continent.txt"), "w", encoding="utf-8") as f:
         f.write("continents = {\n\teurope\n}\n")
 
     # adjacencies.csv — 空但格式正确
-    with open(os.path.join(map_dir, "adjacencies.csv"), "w") as f:
+    with open(os.path.join(map_dir, "adjacencies.csv"), "w", encoding="utf-8") as f:
         f.write("From;To;Type;Through;start_x;start_y;stop_x;stop_y;adjacency_rule_name;Comment\n")
         f.write(";;;;;;;;;\n")
 
@@ -170,15 +170,15 @@ def _write_map_files(output_dir, province_map, colors, province_count,
     open(os.path.join(map_dir, "positions.txt"), "w").close()
 
     # supply 文件 — Lv1 也需要存在（wiki说不编辑会崩溃）
-    with open(os.path.join(map_dir, "supply_nodes.txt"), "w") as f:
+    with open(os.path.join(map_dir, "supply_nodes.txt"), "w", encoding="utf-8") as f:
         f.write(f"1 {min(land_ids) if land_ids else 1}\n")
-    with open(os.path.join(map_dir, "railways.txt"), "w") as f:
+    with open(os.path.join(map_dir, "railways.txt"), "w", encoding="utf-8") as f:
         land_sorted = sorted(land_ids)
         if len(land_sorted) >= 2:
             f.write(f"1 2 {land_sorted[0]} {land_sorted[1]}\n")
         else:
             f.write(f"1 1 {land_sorted[0] if land_sorted else 1}\n")
-    with open(os.path.join(map_dir, "buildings.txt"), "w") as f:
+    with open(os.path.join(map_dir, "buildings.txt"), "w", encoding="utf-8") as f:
         f.write("1;infrastructure;500.00;11.00;1000.00;0.00;0\n")
 
 
@@ -214,10 +214,10 @@ def _write_states(states, tag, output_dir):
     for sid, provs in states.items():
         if not provs:
             continue
-        with open(os.path.join(d, f"{sid}-STATE_{sid}.txt"), "w") as f:
+        with open(os.path.join(d, f"{sid}-STATE_{sid}.txt"), "w", encoding="utf-8") as f:
             f.write("state = {\n")
             f.write(f"\tid = {sid}\n")
-            f.write(f'\tname = "STATE_{sid}"\n')
+            f.write(f'\tname = "STATE_WT_{sid}"\n')
             f.write(f"\tmanpower = {len(provs) * 50000}\n")
             f.write("\tstate_category = town\n\n")
             f.write("\thistory = {\n")
@@ -242,12 +242,12 @@ def _write_country(tag, name, color, capital, output_dir, append_tag=False):
         f.write(f'{tag} = "countries/{tag}.txt"\n')
 
     r, g, b = color
-    with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w") as f:
+    with open(os.path.join(output_dir, "common", "countries", f"{tag}.txt"), "w", encoding="utf-8") as f:
         f.write("graphical_culture = western_european_gfx\n")
         f.write("graphical_culture_2d = western_european_2d\n")
         f.write(f"color = {{ {r} {g} {b} }}\n")
 
-    with open(os.path.join(output_dir, "history", "countries", f"{tag} - {name}.txt"), "w") as f:
+    with open(os.path.join(output_dir, "history", "countries", f"{tag} - {name}.txt"), "w", encoding="utf-8") as f:
         f.write(f"capital = {capital}\n")
         f.write(f'oob = "{tag}_1936"\n')
         f.write("set_research_slots = 3\n")
@@ -257,7 +257,7 @@ def _write_country(tag, name, color, capital, output_dir, append_tag=False):
         f.write("set_popularities = {\n\tdemocratic = 10\n\tfascism = 5\n")
         f.write("\tcommunism = 5\n\tneutrality = 80\n}\n\n")
 
-    with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w") as f:
+    with open(os.path.join(output_dir, "history", "units", f"{tag}_1936.txt"), "w", encoding="utf-8") as f:
         f.write("units = { }\n\n")
 
 
@@ -265,13 +265,13 @@ def _write_supply(states, province_map, output_dir):
     d = os.path.join(output_dir, "map")
     nodes = []
     state_list = [(sid, provs) for sid, provs in states.items() if provs]
-    with open(os.path.join(d, "supply_nodes.txt"), "w") as f:
+    with open(os.path.join(d, "supply_nodes.txt"), "w", encoding="utf-8") as f:
         for i, (sid, provs) in enumerate(state_list):
             if i % 5 == 0:
                 f.write(f"1 {provs[0]}\n")
                 nodes.append(provs[0])
 
-    with open(os.path.join(d, "railways.txt"), "w") as f:
+    with open(os.path.join(d, "railways.txt"), "w", encoding="utf-8") as f:
         for i in range(len(nodes) - 1):
             f.write(f"1 2 {nodes[i]} {nodes[i+1]}\n")
         if len(nodes) < 2:
@@ -285,7 +285,7 @@ def _write_supply(states, province_map, output_dir):
     sum_y = np.bincount(flat_pm, weights=ys.ravel().astype(np.float64), minlength=n)
     sum_x = np.bincount(flat_pm, weights=xs.ravel().astype(np.float64), minlength=n)
 
-    with open(os.path.join(d, "buildings.txt"), "w") as f:
+    with open(os.path.join(d, "buildings.txt"), "w", encoding="utf-8") as f:
         for sid, provs in states.items():
             if not provs:
                 continue
@@ -299,9 +299,9 @@ def _write_supply(states, province_map, output_dir):
     # supplyareas
     sa_dir = os.path.join(d, "supplyareas")
     os.makedirs(sa_dir, exist_ok=True)
-    with open(os.path.join(sa_dir, "1-SupplyArea.txt"), "w") as f:
+    with open(os.path.join(sa_dir, "1-SupplyArea.txt"), "w", encoding="utf-8") as f:
         f.write("supply_area={\n\tid=1\n")
-        f.write('\tname="SUPPLYAREA_1"\n\tvalue=5\n')
+        f.write('\tname="SUPPLYAREA_WT_1"\n\tvalue=5\n')
         f.write("\tstates={\n\t\t" + " ".join(str(s) for s in states) + "\n\t}\n}\n")
 
 
@@ -309,10 +309,10 @@ def _write_strategic_regions(province_count, output_dir):
     """单一战略区域包含所有省份"""
     d = os.path.join(output_dir, "map", "strategicregions")
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "1-strategic_region.txt"), "w") as f:
+    with open(os.path.join(d, "1-strategic_region.txt"), "w", encoding="utf-8") as f:
         f.write("strategic_region={\n")
         f.write("\tid=1\n")
-        f.write('\tname="STRATEGICREGION_1"\n')
+        f.write('\tname="STRATEGICREGION_WT_1"\n')
         f.write("\tprovinces={\n\t\t")
         f.write(" ".join(str(p) for p in range(1, province_count + 1)))
         f.write("\n\t}\n")
@@ -336,7 +336,7 @@ def _write_strategic_regions(province_count, output_dir):
 def _write_bookmark(tags, output_dir):
     d = os.path.join(output_dir, "common", "bookmarks")
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "the_gathering_storm.txt"), "w") as f:
+    with open(os.path.join(d, "the_gathering_storm.txt"), "w", encoding="utf-8") as f:
         f.write("bookmarks = {\n\tbookmark = {\n")
         f.write('\t\tname = FANTASY_BOOKMARK\n')
         f.write('\t\tdesc = FANTASY_BOOKMARK_DESC\n')
@@ -379,7 +379,7 @@ def _write_ideologies(output_dir):
         ("neutrality", "{ 125 127 126 }", ["despotism", "oligarchism", "moderatism", "centrism"],
          "ai_neutral", "1.0", "0.5"),
     ]
-    with open(os.path.join(d, "00_ideologies.txt"), "w") as f:
+    with open(os.path.join(d, "00_ideologies.txt"), "w", encoding="utf-8") as f:
         f.write("ideologies = {\n\n")
         for name, color, subtypes, ai_flag, war_t, fac_t in ideologies:
             f.write(f"\t{name} = {{\n\n\t\ttypes = {{\n")
@@ -413,7 +413,7 @@ def _write_state_categories(output_dir):
         ("megalopolis", 10, (0, 100, 0)),
     ]
     for name, slots, (cr, cg, cb) in categories:
-        with open(os.path.join(d, f"{name}.txt"), "w") as f:
+        with open(os.path.join(d, f"{name}.txt"), "w", encoding="utf-8") as f:
             f.write(f"state_categories={{\n\t{name} = {{\n")
             f.write(f"\t\tlocal_building_slots = {slots}\n")
             f.write(f"\t\tcolor = {{ {cr} {cg} {cb} }}\n\t}}\n}}\n")
@@ -429,9 +429,9 @@ def _write_localisation_lv1(states, output_dir):
     with open(os.path.join(d, "test_l_english.yml"), "w", encoding="utf-8-sig") as f:
         f.write("l_english:\n")
         for sid in states:
-            f.write(f' STATE_{sid}:0 "State {sid}"\n')
-        f.write(' STRATEGICREGION_1:0 "Region 1"\n')
-        f.write(' SUPPLYAREA_1:0 "Supply Area"\n')
+            f.write(f' STATE_WT_{sid}:0 "State {sid}"\n')
+        f.write(' STRATEGICREGION_WT_1:0 "Region 1"\n')
+        f.write(' SUPPLYAREA_WT_1:0 "Supply Area"\n')
         f.write(' AAA:0 "Test Nation"\n')
         f.write(' AAA_DEF:0 "Test Nation"\n')
         f.write(' AAA_ADJ:0 "Tester"\n')
@@ -469,7 +469,7 @@ def _write_descriptor(output_dir, level):
 
     rp = "\n".join(f'replace_path="{p}"' for p in essential_rp) + "\n"
 
-    with open(os.path.join(output_dir, "descriptor.mod"), "w") as f:
+    with open(os.path.join(output_dir, "descriptor.mod"), "w", encoding="utf-8") as f:
         f.write(f'version="0.1"\n')
         f.write('tags={\n\t"Alternative History"\n\t"Map"\n\t"Total Conversion"\n}\n')
         f.write(f'name="TestMOD_Lv{level}"\n')
@@ -479,7 +479,7 @@ def _write_descriptor(output_dir, level):
 
     mod_dir_name = os.path.basename(output_dir)
     outer_mod = os.path.join(os.path.dirname(output_dir), f"{mod_dir_name}.mod")
-    with open(outer_mod, "w") as f:
+    with open(outer_mod, "w", encoding="utf-8") as f:
         f.write(f'version="0.1"\n')
         f.write('tags={\n\t"Alternative History"\n\t"Map"\n\t"Total Conversion"\n}\n')
         f.write(f'name="TestMOD_Lv{level}"\n')

@@ -6,7 +6,7 @@ import numpy as np
 def write_supply_nodes(states, province_map, output_dir):
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
-    with open(os.path.join(d, "supply_nodes.txt"), "w") as f:
+    with open(os.path.join(d, "supply_nodes.txt"), "w", encoding="utf-8") as f:
         # 按索引每5个State放一个补给节点
         state_list = [(sid, provs) for sid, provs in states.items() if provs]
         written = False
@@ -31,7 +31,7 @@ def write_railways(states, province_map, output_dir):
         if provs:
             fallback_pid = provs[0]
             break
-    with open(os.path.join(d, "railways.txt"), "w") as f:
+    with open(os.path.join(d, "railways.txt"), "w", encoding="utf-8") as f:
         f.write(f"1 2 {fallback_pid} {fallback_pid}\n")
 
 
@@ -47,9 +47,9 @@ def write_supply_areas(states, output_dir, states_per_area: int = 15):
     state_ids = sorted(states.keys())
     if not state_ids:
         # 至少写一个空补给区域文件，避免目录为空
-        with open(os.path.join(d, "1-SupplyArea.txt"), "w") as f:
+        with open(os.path.join(d, "1-SupplyArea.txt"), "w", encoding="utf-8") as f:
             f.write("supply_area={\n\tid=1\n")
-            f.write('\tname="SUPPLYAREA_1"\n\tvalue=1\n')
+            f.write('\tname="SUPPLYAREA_WT_1"\n\tvalue=1\n')
             f.write("\tstates={\n\t\t1\n\t}\n}\n")
         return
 
@@ -60,10 +60,10 @@ def write_supply_areas(states, output_dir, states_per_area: int = 15):
         chunk = state_ids[i:i + states_per_area]
         # value 随 state 数量缩放（1-10），更多 state 的区域给更高补给值
         value = max(1, min(10, len(chunk)))
-        with open(os.path.join(d, f"{area_id}-SupplyArea.txt"), "w") as f:
+        with open(os.path.join(d, f"{area_id}-SupplyArea.txt"), "w", encoding="utf-8") as f:
             f.write("supply_area={\n")
             f.write(f"\tid={area_id}\n")
-            f.write(f'\tname="SUPPLYAREA_{area_id}"\n')
+            f.write(f'\tname="SUPPLYAREA_WT_{area_id}"\n')
             f.write(f"\tvalue={value}\n")
             f.write("\tstates={\n\t\t")
             f.write(" ".join(str(s) for s in chunk))

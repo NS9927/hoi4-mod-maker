@@ -714,6 +714,10 @@ class ToolPanel(QWidget):
         return self._strategic_region_page._sr_name_edit
 
     @property
+    def _sr_name_en_edit(self):
+        return self._strategic_region_page._sr_name_en_edit
+
+    @property
     def _sr_weather_combo(self):
         return self._strategic_region_page._sr_weather_combo
 
