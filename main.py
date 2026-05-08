@@ -41,12 +41,18 @@ def main():
     app.setApplicationName("HOI4 MOD 制作工具")
     app.setOrganizationName("HOI4ModTools")
 
-    # 用 PyQtDarkTheme 专业暗色主题, 替代手写 QSS
-    import qdarktheme
-    app.setStyleSheet(qdarktheme.load_stylesheet(
-        "dark",
-        custom_colors={"primary": "#6c6cf0"},
-    ))
+    # 用 PyQtDarkTheme 专业暗色主题, 失败时退回手写 QSS, 保证软件能起来
+    try:
+        import qdarktheme
+        app.setStyleSheet(qdarktheme.load_stylesheet(
+            "dark",
+            custom_colors={"primary": "#6c6cf0"},
+        ))
+    except Exception as e:
+        # qdarktheme 缺失或资源加载失败 -> 退回 ui/styles.py 自带暗色主题
+        print(f"[warn] qdarktheme 不可用, 退回内置主题: {e}", file=sys.stderr)
+        from ui.styles import DARK_STYLESHEET
+        app.setStyleSheet(DARK_STYLESHEET)
 
     window = MainWindow()
     window.showMaximized()

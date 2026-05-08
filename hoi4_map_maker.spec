@@ -6,6 +6,7 @@
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_data_files
 
 block_cipher = None
 
@@ -27,6 +28,8 @@ a = Analysis(
         ('resources', 'resources'),
         ('data/atlas_tiles', 'data/atlas_tiles'),
         ('ui/i18n', 'ui/i18n'),
+        # qdarktheme 内部 .qss 模板/.svg 图标资源, 不显式列出运行时找不到
+        *collect_data_files('qdarktheme'),
     ],
     hiddenimports=[
         # features 是动态加载的, PyInstaller 抓不到, 显式列出
@@ -77,6 +80,8 @@ a = Analysis(
         'features.map.default_map.page',
         'scipy.ndimage',
         'scipy.spatial',
+        # 包名 pyqtdarktheme != 模块名 qdarktheme, PyInstaller 静态分析在某些环境抓不到, 显式声明
+        'qdarktheme',
         *_i18n_hiddenimports,
     ],
     hookspath=[],
