@@ -14,12 +14,9 @@ import struct
 
 import numpy as np
 
-from data.constants import MAP_WIDTH, MAP_HEIGHT
+# 注意: 用 import as, 不 from import — from import 是值绑定, set_map_size 不更新.
+import data.constants as _const
 from data.trees_palette import TREES_PALETTE_BYTES
-
-
-_TREES_W = MAP_WIDTH // 4
-_TREES_H = MAP_HEIGHT // 4
 
 
 def write_trees_bmp(
@@ -42,8 +39,8 @@ def write_trees_bmp(
         data = tree_map.astype(np.uint8)
         h, w = data.shape[:2]
     else:
-        mw = map_width if map_width else MAP_WIDTH
-        mh = map_height if map_height else MAP_HEIGHT
+        mw = map_width if map_width else _const.MAP_WIDTH
+        mh = map_height if map_height else _const.MAP_HEIGHT
         w = mw // 4
         h = mh // 4
         data = np.zeros((h, w), dtype=np.uint8)

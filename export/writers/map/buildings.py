@@ -2,9 +2,10 @@
 import os
 import numpy as np
 from data.constants import (
-    MAP_WIDTH, MAP_HEIGHT, TILE_LAND, TILE_SEA,
+    TILE_LAND, TILE_SEA,
     VALID_3D_BUILDING_TYPES,
 )
+# 不 import MAP_WIDTH/HEIGHT — 一律用 province_map.shape 取动态尺寸.
 from domain.validators.province import get_coastal_provinces, build_coastal_land_to_sea
 
 

@@ -149,6 +149,9 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._transform_drag = None      # 当前拖拽类型: "move"/"tl"/"tr"/"bl"/"br"/"rotate"/None
         self._transform_drag_start = None
         self._transform_angle = 0.0      # 旋转角度（度）
+        # 上一次实时 apply 写入的目标 box (x0, y0, x1, y1); 下次 apply 前先擦掉,
+        # 防止拖动经过的每个中间位置都留下"踪迹" (土地被复制 bug)
+        self._transform_last_written_box: tuple[int, int, int, int] | None = None
 
         # 脏矩形（需要刷新的区域）
         self._dirty_rect = None  # (x0, y0, x1, y1) 或 None
@@ -814,6 +817,10 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         # 清除整个可能被影响的区域
         ox0, oy0, ox1, oy1 = self._transform_orig_box
         self._tile_map[oy0:oy1, ox0:ox1] = TILE_SEA  # 清原位
+        # 擦上一次实时 apply 写入的位置 — 修复"拖动留下复制痕迹"bug
+        if self._transform_last_written_box is not None:
+            lx0, ly0, lx1, ly1 = self._transform_last_written_box
+            self._tile_map[ly0:ly1, lx0:lx1] = TILE_SEA
         # 也清当前框位置（可能被上次预览污染）
         self._tile_map[y0:y1, x0:x1] = TILE_SEA
 
@@ -822,12 +829,17 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         ph = min(sh, y1 - y0)
         pw = min(sw, x1 - x0)
         self._tile_map[y0:y0 + ph, x0:x0 + pw] = scaled[:ph, :pw]
+        self._transform_last_written_box = (x0, y0, x0 + pw, y0 + ph)
         # _tile_map 和 _map_data.tile_map 是同一个数组，无需额外同步
         self._full_render()
 
     def _cancel_transform(self) -> None:
         """取消变换，恢复原始状态。"""
         if self._transform_snippet is not None and self._transform_orig_box is not None:
+            # 先擦上一次实时 apply 留在画布上的内容 — 否则 ESC 取消时仍有"复制"残留
+            if self._transform_last_written_box is not None:
+                lx0, ly0, lx1, ly1 = self._transform_last_written_box
+                self._tile_map[ly0:ly1, lx0:lx1] = TILE_SEA
             # 恢复原始片段到原始位置
             ox0, oy0, ox1, oy1 = self._transform_orig_box
             self._tile_map[oy0:oy1, ox0:ox1] = self._transform_snippet
@@ -844,6 +856,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._transform_orig_box = None
         self._transform_drag = None
         self._transform_angle = 0.0
+        self._transform_last_written_box = None
         self._update_transform_visuals()
 
     # ── 框选模式 ──
@@ -1503,6 +1516,7 @@ class MapCanvas(InputMixin, OverlayMixin, RefImageMixin, QGraphicsView):
         self._transform_drag = None
         self._transform_drag_start = None
         self._transform_angle = 0.0
+        self._transform_last_written_box = None
 
         # 框选状态
         self._selection_mode = False

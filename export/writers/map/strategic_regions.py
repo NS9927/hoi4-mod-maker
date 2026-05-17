@@ -1,7 +1,9 @@
 """strategicregions/*.txt + weatherpositions.txt."""
 import os
 import numpy as np
-from data.constants import MAP_WIDTH, MAP_HEIGHT, TILE_LAND, TILE_SEA
+from data.constants import TILE_LAND, TILE_SEA
+# 注意: 不从 data.constants import MAP_WIDTH/HEIGHT — from import 绑定值,
+# set_map_size 后不会更新. 一律从 province_map.shape 取实际尺寸.
 
 
 def write_strategic_regions(province_map, tile_map, output_dir,
@@ -20,11 +22,12 @@ def write_strategic_regions(province_map, tile_map, output_dir,
     if province_count == 0:
         return []
 
-    # 向量化计算所有省份质心
+    # 向量化计算所有省份质心 (尺寸从 province_map 取, 跟随实际地图)
+    H, W = province_map.shape
     flat_pm = province_map.ravel()
     n = province_count + 1
     pid_count = np.bincount(flat_pm, minlength=n)
-    ys_grid, xs_grid = np.mgrid[0:MAP_HEIGHT, 0:MAP_WIDTH]
+    ys_grid, xs_grid = np.mgrid[0:H, 0:W]
     sum_y = np.bincount(flat_pm, weights=ys_grid.ravel().astype(np.float64), minlength=n)
     sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
@@ -49,8 +52,8 @@ def write_strategic_regions(province_map, tile_map, output_dir,
             next_rid += 1
 
         # 剩下的省份（海洋/湖泊/孤儿）按网格补充进若干个 region
-        cell_h = MAP_HEIGHT / max(1, grid_rows)
-        cell_w = MAP_WIDTH / max(1, grid_cols)
+        cell_h = H / max(1, grid_rows)
+        cell_w = W / max(1, grid_cols)
         sea_grid_regions: dict[int, list[int]] = {}
         for pid, (cy, cx) in centroids.items():
             if pid in state_in_region:
@@ -64,8 +67,8 @@ def write_strategic_regions(province_map, tile_map, output_dir,
             next_rid += 1
     else:
         # === 旧行为：纯网格拆分 ===
-        cell_h = MAP_HEIGHT / grid_rows
-        cell_w = MAP_WIDTH / grid_cols
+        cell_h = H / grid_rows
+        cell_w = W / grid_cols
         for pid, (cy, cx) in centroids.items():
             row = min(int(cy / cell_h), grid_rows - 1)
             col = min(int(cx / cell_w), grid_cols - 1)
@@ -180,11 +183,12 @@ def write_weatherpositions(region_list, province_map, output_dir):
     d = os.path.join(output_dir, "map")
     os.makedirs(d, exist_ok=True)
 
-    # 向量化算每个省份质心
+    # 向量化算每个省份质心 (尺寸从 province_map 取)
+    H, W = province_map.shape
     flat_pm = province_map.ravel()
     n = int(province_map.max()) + 1
     pid_count = np.bincount(flat_pm, minlength=n)
-    ys_grid, xs_grid = np.mgrid[0:MAP_HEIGHT, 0:MAP_WIDTH]
+    ys_grid, xs_grid = np.mgrid[0:H, 0:W]
     sum_y = np.bincount(flat_pm, weights=ys_grid.ravel().astype(np.float64), minlength=n)
     sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
@@ -200,11 +204,11 @@ def write_weatherpositions(region_list, province_map, output_dir):
                     sy += sum_y[p]
                     total_pix += int(pid_count[p])
             if total_pix == 0:
-                cx, cy = MAP_WIDTH / 2, MAP_HEIGHT / 2
+                cx, cy = W / 2, H / 2
             else:
                 cx = sx / total_pix
                 cy = sy / total_pix
-            hoi4_z = MAP_HEIGHT - cy
+            hoi4_z = H - cy
             # vanilla 格式：region_id;x;y;z;size
             f.write(f"{rid};{cx:.2f};10.00;{hoi4_z:.2f};small\n")
 

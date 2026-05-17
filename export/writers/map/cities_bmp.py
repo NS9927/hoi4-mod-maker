@@ -15,7 +15,8 @@ import struct
 
 import numpy as np
 
-from data.constants import MAP_WIDTH, MAP_HEIGHT
+# 注意: 模块顶部不 import MAP_WIDTH/HEIGHT — from import 是值绑定, set_map_size
+# 后不更新. 函数内需要时用 import data.constants as _c 取动态值.
 
 
 # terrain.bmp 中 spawn_city=yes 的调色板索引
@@ -30,16 +31,13 @@ def write_cities_bmp(output_dir: str,
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "cities.bmp")
 
-    from data.constants import MAP_WIDTH, MAP_HEIGHT
-    w, h = MAP_WIDTH, MAP_HEIGHT
-
+    # 尺寸以 terrain_map 为权威 (与 provinces.bmp 一致); 无 terrain 时 fallback 到全局
     if terrain_map is not None:
-        # 直接在全尺寸上标记 urban 像素
-        data = np.zeros((h, w), dtype=np.uint8)
-        src_h, src_w = terrain_map.shape
-        rh, rw = min(h, src_h), min(w, src_w)
-        data[:rh, :rw] = (terrain_map[:rh, :rw] == _URBAN_PALETTE_INDEX).astype(np.uint8) * 15
+        h, w = terrain_map.shape
+        data = (terrain_map == _URBAN_PALETTE_INDEX).astype(np.uint8) * 15
     else:
+        import data.constants as _c
+        w, h = _c.MAP_WIDTH, _c.MAP_HEIGHT
         data = np.zeros((h, w), dtype=np.uint8)
 
     _write_8bit_bmp(path, data, w, h)

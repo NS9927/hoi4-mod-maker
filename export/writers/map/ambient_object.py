@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import os
 
-from data.constants import MAP_HEIGHT
+# 注意: 用 import as 而非 from import — set_map_size 改的是模块属性,
+# from import 复制了值, 后续不会跟着更新.
+import data.constants as _const
 
 
 def write_ambient_object_txt(output_dir: str) -> None:
@@ -20,9 +22,10 @@ def write_ambient_object_txt(output_dir: str) -> None:
     os.makedirs(d, exist_ok=True)
 
     # vanilla: top z ≈ MAP_HEIGHT + 142, bottom z = -140
-    top_z = MAP_HEIGHT + 142
+    map_h = _const.MAP_HEIGHT
+    top_z = map_h + 142
     bottom_z = -140
-    logo_z = MAP_HEIGHT + 82
+    logo_z = map_h + 82
 
     path = os.path.join(d, "ambient_object.txt")
     with open(path, "w", encoding="utf-8") as f:

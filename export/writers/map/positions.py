@@ -1,7 +1,8 @@
 """positions.txt — 省份单位/文字/城市/港口位置坐标."""
 import os
 import numpy as np
-from data.constants import MAP_WIDTH, MAP_HEIGHT
+# 尺寸从 province_map.shape 取, 不用 from data.constants import MAP_* (from import
+# 是值绑定, set_map_size 后不更新, 非默认尺寸地图会出错).
 
 
 from export.writers.map._coords import safe_coord as _safe_coord
@@ -21,12 +22,13 @@ def write_positions_txt(province_map: np.ndarray,
     if province_count == 0:
         return
 
+    H, W = province_map.shape
     # 使用预计算数据，或自行计算
     if pid_count is None:
         flat_pm = province_map.ravel()
         n = province_count + 1
         pid_count = np.bincount(flat_pm, minlength=n)
-        ys_grid, xs_grid = np.mgrid[0:MAP_HEIGHT, 0:MAP_WIDTH]
+        ys_grid, xs_grid = np.mgrid[0:H, 0:W]
         sum_y = np.bincount(flat_pm, weights=ys_grid.ravel().astype(np.float64), minlength=n)
         sum_x = np.bincount(flat_pm, weights=xs_grid.ravel().astype(np.float64), minlength=n)
 
@@ -37,7 +39,7 @@ def write_positions_txt(province_map: np.ndarray,
         cx, cy = _safe_coord(pid, province_map, pid_count, sum_x, sum_y)
         # 转换为 HOI4 坐标系: Z 从底部算
         hoi4_x = cx
-        hoi4_z = MAP_HEIGHT - cy
+        hoi4_z = H - cy
         y = 9.500
 
         # 所有 6 个位置槽都用质心

@@ -18,11 +18,11 @@ import struct
 
 import numpy as np
 
-from data.constants import MAP_WIDTH, MAP_HEIGHT, TILE_LAND, TILE_SEA, TILE_LAKE
+from data.constants import TILE_LAND, TILE_SEA, TILE_LAKE
 
-
-_DDS_WIDTH = MAP_WIDTH // 2   # 我们地图 2048 → DDS 1024
-_DDS_HEIGHT = MAP_HEIGHT // 2  # 我们地图 1024 → DDS 512
+# 不在模块顶部固化 _DDS_WIDTH/_DDS_HEIGHT — 那样会绑定到 import 时的 MAP_WIDTH
+# (5632), set_map_size 后不会更新, 导致 DDS 文件头与实际像素尺寸不符 → 损坏文件.
+# 所有尺寸一律在函数内从 tile_map.shape 取.
 
 # 默认颜色 (B, G, R, A) — DDS 字节顺序. 用户通过 ColormapSettings 覆盖.
 _DEFAULT_COLOR_LAND = (60, 90, 95, 0)
@@ -103,9 +103,10 @@ def write_water_colormap_dds(
     out_dir = os.path.join(output_dir, "map", "terrain")
     os.makedirs(out_dir, exist_ok=True)
 
+    src_h, src_w = tile_map.shape
     for level, divisor in enumerate([2, 4, 8]):
-        dds_w = MAP_WIDTH // divisor
-        dds_h = MAP_HEIGHT // divisor
+        dds_w = src_w // divisor
+        dds_h = src_h // divisor
         if dds_w < 1 or dds_h < 1:
             break
         ds = full_pixels[::divisor, ::divisor][:dds_h, :dds_w]
@@ -120,9 +121,12 @@ def _write_water_colormap_solid(tile_map, output_dir):
     water_color = np.array([110, 70, 30, 255], dtype=np.uint8)
     out_dir = os.path.join(output_dir, "map", "terrain")
     os.makedirs(out_dir, exist_ok=True)
+    src_h, src_w = tile_map.shape
     for level, divisor in enumerate([2, 4, 8]):
-        dds_w = MAP_WIDTH // divisor
-        dds_h = MAP_HEIGHT // divisor
+        dds_w = src_w // divisor
+        dds_h = src_h // divisor
+        if dds_w < 1 or dds_h < 1:
+            break
         pixels = np.empty((dds_h, dds_w, 4), dtype=np.uint8)
         pixels[:] = water_color
         header = _build_dds_header(dds_w, dds_h)
@@ -145,10 +149,8 @@ def write_colormap_dds(
     - settings: ColormapSettings 实例, None 用默认色
     - 输出: 降采样 BGRA8 DDS
     """
-    if tile_map.shape != (MAP_HEIGHT, MAP_WIDTH):
-        raise ValueError(
-            f"tile_map 尺寸应为 ({MAP_HEIGHT}, {MAP_WIDTH}), 实际 {tile_map.shape}"
-        )
+    # 不再校验与全局 MAP_WIDTH/HEIGHT 一致 — 以 tile_map.shape 为权威，
+    # HOI4 只要求 256 倍数, 不限定预设尺寸.
 
     # 决定三色
     if settings is not None:
@@ -167,7 +169,7 @@ def write_colormap_dds(
     land_mask = downsampled == TILE_LAND
     lake_mask = downsampled == TILE_LAKE
 
-    if terrain_map is not None and terrain_map.shape == (MAP_HEIGHT, MAP_WIDTH):
+    if terrain_map is not None and terrain_map.shape == tile_map.shape:
         # 按地形类型着色陆地
         from data.terrain_types import PALETTE_TO_TYPE
         ds_terrain = terrain_map[::2, ::2]
@@ -185,7 +187,7 @@ def write_colormap_dds(
     pixels[lake_mask] = color_lake
 
     # ── 高度调制 + 雪山 + 海岸沙滩 (有 heightmap 才做) ──
-    if height_map is not None and height_map.shape == (MAP_HEIGHT, MAP_WIDTH):
+    if height_map is not None and height_map.shape == tile_map.shape:
         ds_height = height_map[::2, ::2].astype(np.float32)
         # 1. 雪山: 高度 > 200 → 渐进白
         snow_t = np.clip((ds_height - 200) / 40.0, 0, 1)  # 200→0, 240→1
@@ -240,7 +242,8 @@ def write_colormap_dds(
     out_dir = os.path.join(output_dir, "map", "terrain")
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, "colormap_rgb_cityemissivemask_a.dds")
-    header = _build_dds_header(_DDS_WIDTH, _DDS_HEIGHT)
+    # 用动态尺寸 — 与 pixels (= downsampled.shape) 一致
+    header = _build_dds_header(w, h)
     with open(out_path, "wb") as f:
         f.write(header)
         f.write(pixels.tobytes())
