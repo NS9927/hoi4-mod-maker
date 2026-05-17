@@ -426,7 +426,7 @@ class ApplicationController:
                 # 在列表中选中对应行 + 更新 page 的 _current_state_id
                 self._panel.select_state_in_list(sid)
                 # 在画布上高亮该 state 的 owner 那一国 (state 模式渲染会叠暖黄)
-                owner = self._project.country_mgr.get_state_owner(sid)
+                owner = self._project.country_mgr.get_owner_of_state(sid)
                 country = self._project.country_mgr.get_country(owner) if owner else None
                 if country is not None:
                     self._canvas.set_highlight_country(tuple(country.color))

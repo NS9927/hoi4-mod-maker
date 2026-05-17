@@ -243,7 +243,7 @@ class OverlayMixin:
         pid_to_color = np.zeros((max_pid + 1, 4), dtype=np.uint8)  # BGRA
         countries = getattr(country_mgr, "countries", {}) or {}
         states = getattr(state_mgr, "states", {}) or {}
-        get_owner = getattr(country_mgr, "get_state_owner", lambda _sid: "")
+        get_owner = getattr(country_mgr, "get_owner_of_state", lambda _sid: "")
         for sid, state in states.items():
             if borders_only:
                 bgra = (0, 0, 0, 0)  # 完全透明 — 只保留州边界线效果
