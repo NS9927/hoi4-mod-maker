@@ -137,7 +137,7 @@ def test_parse_sr_weather_and_naval():
     assert r is not None
     assert r["id"] == 42
     assert r["provinces"] == [100, 200, 300]
-    assert r["naval_terrain"] == "deep_ocean"
+    assert r["naval_terrain"] == "water_deep_ocean"
     assert r["weather_preset"] == "desert"  # sandstorm > 0.1
 
 

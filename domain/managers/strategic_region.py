@@ -150,7 +150,7 @@ class StrategicRegion:
     name_en: str = ""              # 可选英文名（本地化英文 yml 用；空则默认 "Region {id}"）
     province_ids: list[int] = field(default_factory=list)
     weather_preset: str = "temperate"
-    naval_terrain: str = ""  # ocean_terrain / deep_ocean / shallow_sea 等
+    naval_terrain: str = ""  # vanilla 合法值: "" / water_deep_ocean / water_shallow_sea / water_fjords
 
     # 注意: 不要再在 __post_init__ 里把 name 填成 STRATEGICREGION_{id}
     # name 是显示名（可中文），key 在导出时独立生成（strategic_regions writer）
@@ -264,7 +264,7 @@ class StrategicRegionManager:
             for group in _split_connected(province_map, set(sea_provs)):
                 r = self.create_region()
                 r.province_ids = list(group)
-                r.naval_terrain = "ocean"
+                r.naval_terrain = "water_deep_ocean"
             for group in _split_connected(province_map, set(land_provs)):
                 r = self.create_region()
                 r.province_ids = list(group)
@@ -425,13 +425,22 @@ class StrategicRegionManager:
     def from_dict(self, data: dict) -> None:
         self._regions = {}
         self._next_id = int(data.get("next_id", 1))
+        # 老项目兼容: 把短名/非法名迁移到 vanilla 完整名
+        _NAVAL_MIGRATE = {
+            "ocean": "water_deep_ocean",
+            "deep_ocean": "water_deep_ocean",
+            "shallow_sea": "water_shallow_sea",
+            "fjords": "water_fjords",
+        }
         for d in data.get("regions", []):
+            nt = d.get("naval_terrain", "")
+            nt = _NAVAL_MIGRATE.get(nt, nt)
             r = StrategicRegion(
                 id=int(d["id"]),
                 name=d.get("name", ""),
                 province_ids=[int(p) for p in d.get("province_ids", [])],
                 weather_preset=d.get("weather_preset", "temperate"),
-                naval_terrain=d.get("naval_terrain", ""),
+                naval_terrain=nt,
             )
             self._regions[r.id] = r
             self._next_id = max(self._next_id, r.id + 1)

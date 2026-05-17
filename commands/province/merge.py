@@ -25,6 +25,7 @@ class MergeProvincesCommand(Command):
         pid_remove: int,
         state_mgr=None,
         country_mgr=None,
+        strategic_region_mgr=None,
     ) -> None:
         """
         参数:
@@ -33,18 +34,24 @@ class MergeProvincesCommand(Command):
             pid_remove: 被移除的省份 ID
             state_mgr: StateManager（可选，用于更新 state 引用）
             country_mgr: CountryManager（可选，用于更新 country 引用）
+            strategic_region_mgr: StrategicRegionManager（可选, 清理 region 残留 pid）
         """
         self._map_data = map_data
         self._pid_keep = pid_keep
         self._pid_remove = pid_remove
         self._state_mgr = state_mgr
         self._country_mgr = country_mgr
+        self._strategic_region_mgr = strategic_region_mgr
 
         # undo 数据（execute 时填充）
         self._affected_pixels: np.ndarray | None = None  # bool mask
         self._old_state_of_removed: int = 0
         self._old_vp_of_removed: dict[int, int] = {}
         self._compact_mapping: dict[int, int] = {}
+        # 被吞并 pid 原属的 strategic_region id（0 = 未分配）
+        self._old_region_of_removed: int = 0
+        # 若 pid_remove 曾是某国首都, 记录 (tag, old_capital_pid)；否则 ("", 0)
+        self._old_capital_of_country: tuple[str, int] = ("", 0)
 
     def execute(self) -> None:
         """合并省份像素，更新 state/country 引用，压实 ID。"""
@@ -76,9 +83,48 @@ class MergeProvincesCommand(Command):
                     state.provinces.remove(self._pid_remove)
                 state.victory_points.pop(self._pid_remove, None)
 
+        # 清理 strategic_region: pid_remove 的 ID 会被切割/增量生成复用，
+        # 不清掉会导致新 pid 被错误地"继承"到旧的 strategic_region。
+        if self._strategic_region_mgr is not None:
+            for r in self._strategic_region_mgr.regions.values():
+                if self._pid_remove in r.province_ids:
+                    self._old_region_of_removed = r.id
+                    r.province_ids.remove(self._pid_remove)
+                    break
+
+        # country.capital: pid_remove 若是某国首都, capital 会指向死 ID
+        # → 启动游戏 set_controller 时崩。把首都迁到 pid_keep (同国) 或该国其他省份。
+        if self._country_mgr is not None:
+            for tag, country in self._country_mgr.countries.items():
+                if country.capital == self._pid_remove:
+                    self._old_capital_of_country = (tag, self._pid_remove)
+                    country.capital = self._pick_replacement_capital(tag)
+                    break  # 首都只能属于一个国家
+
         # 不压实 ID — 保留空洞，让用户用切割/增量生成补回来
         # 导出时检查 ID 连续性，有空洞则提示
         self._compact_mapping = {}
+
+    def _pick_replacement_capital(self, tag: str) -> int:
+        """为国家 tag 选一个新首都. 优先 pid_keep (若同国), 否则该国任一非 pid_remove 省份."""
+        # 优先 pid_keep — 它物理上接管了 pid_remove 的像素，最连续
+        if self._state_mgr is not None:
+            keep_sid = self._state_mgr.get_state_of_province(self._pid_keep)
+            if keep_sid > 0:
+                owner = self._country_mgr.get_owner_of_state(keep_sid)
+                if owner == tag:
+                    return self._pid_keep
+        # 否则在该国 owned states 里挑一个
+        owned = self._country_mgr.get_states_of_country(tag)
+        if self._state_mgr is not None:
+            for sid in owned:
+                s = self._state_mgr.get_state(sid)
+                if s is None:
+                    continue
+                for p in s.provinces:
+                    if p != self._pid_remove:
+                        return p
+        return 0
 
     def undo(self) -> None:
         """恢复被合并省份的像素和引用。"""
@@ -107,3 +153,19 @@ class MergeProvincesCommand(Command):
             self._state_mgr._province_to_state[self._pid_remove] = (
                 self._old_state_of_removed
             )
+
+        # 恢复 strategic_region 引用
+        if (
+            self._strategic_region_mgr is not None
+            and self._old_region_of_removed > 0
+        ):
+            r = self._strategic_region_mgr.get(self._old_region_of_removed)
+            if r is not None and self._pid_remove not in r.province_ids:
+                r.province_ids.append(self._pid_remove)
+
+        # 恢复 country.capital
+        if self._country_mgr is not None and self._old_capital_of_country[0]:
+            tag, old_cap = self._old_capital_of_country
+            country = self._country_mgr.get_country(tag)
+            if country is not None:
+                country.capital = old_cap

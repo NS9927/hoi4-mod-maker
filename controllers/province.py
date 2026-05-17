@@ -217,6 +217,7 @@ class ProvinceController(BaseController):
                 pid_remove=pid,
                 state_mgr=self.project.state_mgr,
                 country_mgr=self.project.country_mgr,
+                strategic_region_mgr=self.project.strategic_region_mgr,
             )
             self.history.execute(cmd)
             self.project.mark_dirty()

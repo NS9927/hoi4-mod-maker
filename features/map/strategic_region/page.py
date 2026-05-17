@@ -172,8 +172,12 @@ class StrategicRegionPage(QWidget):
         self._sr_naval_combo = QComboBox()
         self._sr_naval_combo.setStyleSheet(_COMBOBOX_STYLE)
         self._sr_naval_combo.addItem(tr("sr_naval_none"), "")
-        for nt in ("ocean", "deep_ocean", "shallow_sea"):
-            self._sr_naval_combo.addItem(nt, nt)
+        for value, label_key in (
+            ("water_deep_ocean", "sr_naval_deep_ocean"),
+            ("water_shallow_sea", "sr_naval_shallow_sea"),
+            ("water_fjords", "sr_naval_fjords"),
+        ):
+            self._sr_naval_combo.addItem(tr(label_key), value)
         self._sr_naval_combo.currentIndexChanged.connect(
             lambda idx: self.strategic_region_naval_changed.emit(
                 self._sr_naval_combo.currentData() or ""

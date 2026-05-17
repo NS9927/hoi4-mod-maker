@@ -258,19 +258,21 @@ def _parse_strategic_region_file(path: str) -> dict | None:
         except ValueError:
             pass
 
-    # 读取 naval_terrain（如 naval_terrain=water_deep_ocean）
+    # 读取 naval_terrain（vanilla 合法值: water_deep_ocean/water_shallow_sea/water_fjords）
     naval_terrain = ""
     import re
     nt_match = re.search(r'naval_terrain\s*=\s*(\S+)', text)
     if nt_match:
-        raw = nt_match.group(1).strip()
-        # 映射 vanilla 值到内部值
-        if "deep_ocean" in raw:
-            naval_terrain = "deep_ocean"
-        elif "shallow" in raw:
-            naval_terrain = "shallow_sea"
-        elif "ocean" in raw or "water" in raw:
-            naval_terrain = "ocean"
+        raw = nt_match.group(1).strip().strip('"')
+        if raw in ("water_deep_ocean", "water_shallow_sea", "water_fjords"):
+            naval_terrain = raw
+        # 兼容老 MOD 残留的短名
+        elif raw in ("deep_ocean", "ocean"):
+            naval_terrain = "water_deep_ocean"
+        elif raw == "shallow_sea":
+            naval_terrain = "water_shallow_sea"
+        elif raw == "fjords":
+            naval_terrain = "water_fjords"
 
     # 从 weather 的 temperature 推断天气 preset
     weather_preset = _guess_weather_preset(text)

@@ -104,8 +104,12 @@ class StrategicRegionDialog(QDialog):
         naval_row.addWidget(QLabel("Naval terrain:"))
         self._naval_combo = QComboBox()
         self._naval_combo.addItem(tr("sr_dlg_naval_none"), "")
-        for nt in ("ocean", "deep_ocean", "shallow_sea"):
-            self._naval_combo.addItem(nt, nt)
+        for value, label_key in (
+            ("water_deep_ocean", "sr_naval_deep_ocean"),
+            ("water_shallow_sea", "sr_naval_shallow_sea"),
+            ("water_fjords", "sr_naval_fjords"),
+        ):
+            self._naval_combo.addItem(tr(label_key), value)
         self._naval_combo.currentIndexChanged.connect(self._on_naval_changed)
         naval_row.addWidget(self._naval_combo)
         right.addLayout(naval_row)

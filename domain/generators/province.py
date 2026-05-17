@@ -635,6 +635,23 @@ def generate_provinces_in_region(
         if outside_pixels == 0:
             fully_removed.add(pid)
 
+    # 1b. 在清零像素前，记录选区内每个像素原本属于哪个 strategic_region，
+    #     用于后续把新省份按"原位置 + 同类型"自动归位到正确的战略区。
+    old_pixel_region: np.ndarray | None = None
+    region_is_land: dict[int, bool] = {}
+    if strategic_region_mgr is not None:
+        max_pid_now = int(province_map.max())
+        pid_to_rid = np.zeros(max_pid_now + 2, dtype=np.int32)
+        for r in strategic_region_mgr.regions.values():
+            # 海陆类型: 有 naval_terrain → 海洋 region
+            region_is_land[r.id] = not bool(r.naval_terrain)
+            for pid in r.province_ids:
+                if 0 < pid <= max_pid_now:
+                    pid_to_rid[pid] = r.id
+        old_pixel_region = np.where(
+            region_mask, pid_to_rid[province_map], 0
+        ).astype(np.int32)
+
     # 2. 清除选区内的旧 ID
     province_map[region_mask] = 0
 
@@ -733,6 +750,31 @@ def generate_provinces_in_region(
                                 new_cap = s.provinces[0]
                                 break
                     country.capital = new_cap
+
+    # 8. 把新生成的省份按"原位置 + 同海陆类型"自动归位到合适的战略区。
+    #    没有匹配 region 时不分配（用户后续手动指派）。
+    if strategic_region_mgr is not None and old_pixel_region is not None and new_ids:
+        for new_pid in new_ids:
+            new_mask = province_map == new_pid
+            if not new_mask.any():
+                continue
+            land_pix = int((tile_map[new_mask] == TILE_LAND).sum())
+            new_is_land = land_pix * 2 > int(new_mask.sum())
+            old_rids = old_pixel_region[new_mask]
+            old_rids = old_rids[old_rids > 0]
+            if len(old_rids) == 0:
+                continue
+            rid_counts: dict[int, int] = {}
+            for rid in np.unique(old_rids):
+                rid_int = int(rid)
+                if region_is_land.get(rid_int) == new_is_land:
+                    rid_counts[rid_int] = int((old_rids == rid).sum())
+            if not rid_counts:
+                continue
+            best_rid = max(rid_counts, key=rid_counts.get)
+            target = strategic_region_mgr.get(best_rid)
+            if target is not None and int(new_pid) not in target.province_ids:
+                target.province_ids.append(int(new_pid))
 
     return fully_removed, new_ids
 
