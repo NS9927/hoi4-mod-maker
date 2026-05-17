@@ -132,21 +132,29 @@ def get_language() -> str:
     return _current_lang
 
 
-def tr(key: str, *args: object) -> str:
+def tr(key: str, *args: object, **kwargs: object) -> str:
     """
-    获取翻译文本，支持 str.format 参数。
-    例：tr("status_pos", 100, 200) -> "位置: (100, 200)"
+    获取翻译文本，支持 str.format 位置参数和命名参数。
+    例：tr("status_pos", 100, 200)             -> "位置: (100, 200)"
+        tr("dlg_regen_done", removed=5, ...)   -> "删除 5 个 ..."
 
     缺失时按 _current_lang -> en -> zh -> key 顺序 fallback。
+    placeholder 不匹配时 logger.warning 不再静默吞 (历史上的 silent KeyError 坑).
     """
     for lang in (_current_lang, *_FALLBACK_CHAIN):
         text = _languages.get(lang, {}).get(key)
-        if text is not None:
-            if args:
-                try:
-                    return text.format(*args)
-                except (IndexError, KeyError):
-                    return text
+        if text is None:
+            continue
+        if not args and not kwargs:
+            return text
+        try:
+            return text.format(*args, **kwargs)
+        except (IndexError, KeyError) as exc:
+            logger.warning(
+                "i18n placeholder mismatch: key=%s lang=%s args=%r kwargs=%r "
+                "template=%r error=%s",
+                key, lang, args, kwargs, text, exc,
+            )
             return text
     return key
 
