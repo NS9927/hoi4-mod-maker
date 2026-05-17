@@ -361,6 +361,7 @@ class ExportDialog(QDialog):
             ("supply", tr("export_scope_supply"), True),
             ("gfx", tr("export_scope_gfx"), True),
             ("replace_path", tr("export_scope_replace_path"), True),
+            ("descriptor", tr("export_scope_descriptor"), True),
         ]
         for key, label, default in scope_items:
             cb = QCheckBox(label)

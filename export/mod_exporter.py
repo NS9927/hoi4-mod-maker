@@ -369,9 +369,12 @@ def export_full_mod(
     from export.writers.common.defines import write_defines_lua
     write_defines_lua(output_dir, province_count=province_count)
 
-    # === descriptor + replace_path ===
-    if _enabled("replace_path"):
+    # === descriptor (独立开关 — 已有自己 MOD 框架的用户可关掉, 只取内容文件) ===
+    if _enabled("descriptor"):
         _write_descriptor(mod_name, output_dir)
+
+    # === replace_path 清洗目录 + tutorial 屏蔽 ===
+    if _enabled("replace_path"):
         from export.writers.replace_path.scrubber import write_replace_path_dirs
         write_replace_path_dirs(output_dir)
 
