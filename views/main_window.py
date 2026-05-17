@@ -148,7 +148,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         editor_layout.setSpacing(0)
 
         self._tool_panel = ToolPanel()
-        self._tool_panel.setFixedWidth(380)
+        # 软约束: 最小 380px (中/英 设计宽度), 上限 480px 防俄语等长语言把侧栏吃满
+        self._tool_panel.setMinimumWidth(380)
+        self._tool_panel.setMaximumWidth(480)
         editor_layout.addWidget(self._tool_panel)
 
         self._canvas = MapCanvas()

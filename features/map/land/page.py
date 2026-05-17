@@ -220,7 +220,7 @@ class LandPage(QWidget):
         self._vanilla_ref_toggle = QPushButton(tr("land_btn_hide"))
         self._vanilla_ref_toggle.setCheckable(True)
         self._vanilla_ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._vanilla_ref_toggle.setFixedWidth(50)
+        self._vanilla_ref_toggle.setMinimumWidth(50)
         self._vanilla_ref_toggle.toggled.connect(
             lambda on: self._vanilla_ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
         )
@@ -249,7 +249,7 @@ class LandPage(QWidget):
         self._ref_toggle = QPushButton(tr("land_btn_hide"))
         self._ref_toggle.setCheckable(True)
         self._ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._ref_toggle.setFixedWidth(50)
+        self._ref_toggle.setMinimumWidth(50)
         self._ref_toggle.toggled.connect(
             lambda on: self._ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
         )
@@ -270,7 +270,7 @@ class LandPage(QWidget):
         scale_row.addStretch()
         self._ref_fit_btn = QPushButton(tr("land_btn_fit_map"))
         self._ref_fit_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._ref_fit_btn.setFixedWidth(70)
+        self._ref_fit_btn.setMinimumWidth(70)
         scale_row.addWidget(self._ref_fit_btn)
         ref_box.layout().addLayout(scale_row)
 

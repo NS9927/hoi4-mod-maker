@@ -218,7 +218,10 @@ DARK_STYLESHEET = """
 QMainWindow, QWidget {
     background-color: #1e1e2e;
     color: #e0e0f0;
-    font-family: "Microsoft YaHei", "Noto Sans SC", "Segoe UI", sans-serif;
+    /* Segoe UI 在前: 西里尔/拉丁字母用 Segoe UI (正常 metrics),
+       中文 fallback 到 YaHei. YaHei 在前会让西里尔字母按 CJK 全角宽度渲染,
+       出现"字母间距异常大 + 文字截断"的 bug. */
+    font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
     font-size: 15px;
 }
 

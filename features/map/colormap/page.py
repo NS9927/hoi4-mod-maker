@@ -45,7 +45,7 @@ class ColormapPage(QWidget):
         for label_text, attr_name in [(tr("colormap_land_label"), "land"), (tr("colormap_sea_label"), "sea"), (tr("colormap_lake_label"), "lake")]:
             row = QHBoxLayout()
             lbl = QLabel(label_text)
-            lbl.setFixedWidth(50)
+            lbl.setMinimumWidth(50)
             lbl.setStyleSheet(_LABEL_STYLE)
             row.addWidget(lbl)
             swatch = QPushButton()

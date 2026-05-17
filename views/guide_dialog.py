@@ -41,7 +41,9 @@ class GuideDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(tr("guide_title"))
-        self.setFixedSize(520, 400)
+        # 长翻译可能撑大对话框, 允许扩展 + 用户拖动调整
+        self.setMinimumSize(520, 400)
+        self.resize(520, 400)
         self.setStyleSheet(f"""
             QDialog {{
                 background: {_BG};
@@ -59,7 +61,9 @@ class GuideDialog(QDialog):
 
         # 标题栏
         header = QLabel(tr("guide_title"))
-        header.setFont(QFont("Microsoft YaHei", 16, QFont.Weight.Bold))
+        _hf = QFont("Segoe UI", 16, QFont.Weight.Bold)
+        _hf.setFamilies(["Segoe UI", "Microsoft YaHei", "Noto Sans SC"])
+        header.setFont(_hf)
         header.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header.setStyleSheet(f"""
             color: {_TEXT};
@@ -77,7 +81,7 @@ class GuideDialog(QDialog):
         # 左侧步骤导航
         self._step_labels: list[QLabel] = []
         left = QWidget()
-        left.setFixedWidth(160)
+        left.setMinimumWidth(160)
         left.setStyleSheet(f"background: {_INPUT_BG}; border-right: 1px solid {_BORDER};")
         left_lay = QVBoxLayout(left)
         left_lay.setContentsMargins(0, 12, 0, 12)
@@ -99,12 +103,16 @@ class GuideDialog(QDialog):
         right_lay.setSpacing(12)
 
         self._step_num = QLabel()
-        self._step_num.setFont(QFont("Microsoft YaHei", 12, QFont.Weight.Bold))
+        _nf = QFont("Segoe UI", 12, QFont.Weight.Bold)
+        _nf.setFamilies(["Segoe UI", "Microsoft YaHei", "Noto Sans SC"])
+        self._step_num.setFont(_nf)
         self._step_num.setStyleSheet(f"color: {_ACCENT};")
         right_lay.addWidget(self._step_num)
 
         self._step_title = QLabel()
-        self._step_title.setFont(QFont("Microsoft YaHei", 15, QFont.Weight.Bold))
+        _tf = QFont("Segoe UI", 15, QFont.Weight.Bold)
+        _tf.setFamilies(["Segoe UI", "Microsoft YaHei", "Noto Sans SC"])
+        self._step_title.setFont(_tf)
         self._step_title.setStyleSheet(f"color: {_TEXT};")
         self._step_title.setWordWrap(True)
         right_lay.addWidget(self._step_title)

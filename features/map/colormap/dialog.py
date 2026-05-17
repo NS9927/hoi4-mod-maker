@@ -73,7 +73,7 @@ class ColormapDialog(QDialog):
     ) -> QPushButton:
         row = QHBoxLayout()
         lbl = QLabel(f"{label_text}:")
-        lbl.setFixedWidth(60)
+        lbl.setMinimumWidth(60)
         row.addWidget(lbl)
 
         swatch = QPushButton()

@@ -52,7 +52,8 @@ class _SizePickerDialog(QDialog):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle(tr("welcome_size_picker_title"))
-        self.setFixedSize(300, 160)
+        self.setMinimumSize(300, 160)
+        self.resize(300, 160)
 
         layout = QFormLayout(self)
 
@@ -118,7 +119,8 @@ class WelcomePage(QWidget):
 
         # 标题
         title = QLabel(tr("welcome_title"))
-        title_font = QFont("Microsoft YaHei", 28, QFont.Weight.Bold)
+        title_font = QFont("Segoe UI", 28, QFont.Weight.Bold)
+        title_font.setFamilies(["Segoe UI", "Microsoft YaHei", "Noto Sans SC"])
         title.setFont(title_font)
         title.setStyleSheet(f"color: {_TEXT}; background: transparent;")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -209,7 +211,8 @@ class WelcomePage(QWidget):
         left.addWidget(recent_label)
 
         self._recent_list = QListWidget()
-        self._recent_list.setFixedSize(640, 220)  # 加宽到 640（原 360）显示长路径
+        # 软约束: 最小 640x220, 窗口大时可自适应
+        self._recent_list.setMinimumSize(640, 220)
         self._recent_list.setToolTip(tr("welcome_recent_tooltip"))
         self._recent_list.setStyleSheet(f"""
             QListWidget {{
