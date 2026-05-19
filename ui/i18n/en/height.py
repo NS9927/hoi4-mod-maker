@@ -75,6 +75,8 @@ STRINGS: dict[str, str] = {
     "height_ref_text": "0-94: Seabed (dark)95: Sea level96-114: Coastal lowland → Plains115-129: Medium → Forest130-164: Higher → Hills165-209: High → Mountains210+: Very high → Snow peaks",
     "height_ridge_hint": "Drag on the map to draw a mountain ridge. Heights fall off naturally from the ridge line.",
     "height_section_auto_gen": "Smart Generation",
+    "height_gen_params_hint": "💡 After changing params above, scroll up and click [Smart Generate Heightmap] again to apply.",
+    "height_section_local_edit": "🖌 Local Edit (Ridge / Lasso Refine)",
     "height_section_brush": "Manual Brush",
     "height_section_manual": "Manual Fine-tune",
     "height_section_ref": "Height Reference",
