@@ -19,6 +19,7 @@ STRINGS: dict[str, str] = {
     "colormap_pick_color_title": "Выберите цвет {}",
     "colormap_reset_btn": "Сбросить по умолчанию",
     "colormap_sea_label": "Море:",
+    "colormap_section_colors": "Настройки цвета",
     "colormap_tip": """Базовые цвета стратегического вида.
 Задайте цвета суши/моря/озёр.
 Изменения применяются при следующем экспорте.""",

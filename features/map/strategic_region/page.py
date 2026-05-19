@@ -187,7 +187,11 @@ class StrategicRegionPage(QWidget):
         pl.addLayout(naval_row)
 
         self._sr_prov_count = QLabel(tr("sr_prov_count", 0))
-        self._sr_prov_count.setStyleSheet(_DIM_LABEL_STYLE)
+        self._sr_prov_count.setStyleSheet(
+            "color: #86efac; font-size: 12px; font-weight: 600; padding: 6px 8px;"
+            " background: rgba(34, 197, 94, 0.10);"
+            " border: 1px solid rgba(34, 197, 94, 0.30); border-radius: 4px;"
+        )
         pl.addWidget(self._sr_prov_count)
         lay.addWidget(prop_box)
 

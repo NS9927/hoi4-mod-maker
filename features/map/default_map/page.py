@@ -11,7 +11,9 @@ from PyQt5.QtWidgets import (
 
 from ui.i18n import tr
 from ui.styles import (
-    _DIM_LABEL_STYLE, _SPINBOX_STYLE, _LIST_STYLE,
+    make_section as _make_section,
+    _DIM_LABEL_STYLE, _LABEL_STYLE, _SPINBOX_STYLE, _LIST_STYLE,
+    _SECONDARY_BTN_STYLE,
 )
 
 
@@ -43,9 +45,14 @@ class DefaultMapPage(QWidget):
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
 
-        # 河流最大等级
+        # ── 河流配置 ──
+        river_box = _make_section(tr("defmap_section_river"))
+        rl = river_box.layout()
+
         river_row = QHBoxLayout()
-        river_row.addWidget(QLabel(tr("defmap_river_max_label")))
+        river_lbl = QLabel(tr("defmap_river_max_label"))
+        river_lbl.setStyleSheet(_LABEL_STYLE)
+        river_row.addWidget(river_lbl)
         self._dm_river_max = QSpinBox()
         self._dm_river_max.setRange(1, 10)
         self._dm_river_max.setValue(5)
@@ -54,26 +61,33 @@ class DefaultMapPage(QWidget):
             lambda v: self.default_map_river_changed.emit(v)
         )
         river_row.addWidget(self._dm_river_max)
-        lay.addLayout(river_row)
+        rl.addLayout(river_row)
+        lay.addWidget(river_box)
 
-        # 树木调色板
-        lay.addWidget(QLabel(tr("defmap_tree_palette_label")))
+        # ── 树木调色板 ──
+        tree_box = _make_section(tr("defmap_section_trees"))
+        tl = tree_box.layout()
+
         self._dm_tree_list = QListWidget()
         self._dm_tree_list.setStyleSheet(_LIST_STYLE)
-        self._dm_tree_list.setMaximumHeight(100)
-        lay.addWidget(self._dm_tree_list)
+        self._dm_tree_list.setMinimumHeight(150)
+        tl.addWidget(self._dm_tree_list)
 
         btn_row = QHBoxLayout()
         add_btn = QPushButton(tr("defmap_add_btn"))
+        add_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         add_btn.clicked.connect(lambda: self.default_map_tree_add_requested.emit())
         del_btn = QPushButton(tr("defmap_delete_btn"))
+        del_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         del_btn.clicked.connect(lambda: self.default_map_tree_del_requested.emit())
         reset_btn = QPushButton(tr("defmap_reset_btn"))
+        reset_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         reset_btn.clicked.connect(lambda: self.default_map_tree_reset_requested.emit())
         btn_row.addWidget(add_btn)
         btn_row.addWidget(del_btn)
         btn_row.addWidget(reset_btn)
-        lay.addLayout(btn_row)
+        tl.addLayout(btn_row)
+        lay.addWidget(tree_box)
 
         lay.addStretch(1)
         scroll.setWidget(page)

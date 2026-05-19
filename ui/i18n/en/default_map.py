@@ -11,6 +11,8 @@ STRINGS: dict[str, str] = {
     "defmap_delete_btn": "Delete",
     "defmap_reset_btn": "Reset to Default",
     "defmap_river_max_label": "Max River Level:",
+    "defmap_section_river": "River Settings",
+    "defmap_section_trees": "Tree Palette",
     "defmap_tip": "HOI4 engine default.map configuration.Max river level: thickest river rendering level (default 5)Tree palette: controls forest/tree display color indicesChanges take effect on next export.",
     "defmap_tree_palette_label": "Tree Palette Indices:",
     "dlg_defmap_palette_prompt": "Palette index (1-13):",

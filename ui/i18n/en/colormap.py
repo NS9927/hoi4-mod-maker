@@ -21,6 +21,7 @@ Default is earth-tone brown + indigo. Change to make your world unique.
     "colormap_pick_color_title": "Choose {} Color",
     "colormap_reset_btn": "Reset to Default",
     "colormap_sea_label": "Sea:",
+    "colormap_section_colors": "Color Settings",
     "colormap_tip": """Strategic view base colors.
 Set land/sea/lake colors.
 Changes apply on next export.""",

@@ -8,13 +8,13 @@
 from PyQt5.QtCore import pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QGroupBox, QButtonGroup,
+    QButtonGroup,
 )
 
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _SECTION_STYLE, _DIM_LABEL_STYLE,
+    _DIM_LABEL_STYLE,
     _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
 
@@ -27,15 +27,6 @@ _RAIL_COLORS = {
     4: "#D27832",   # 橙
     5: "#D23232",   # 红
 }
-
-
-def _make_section(title: str) -> QGroupBox:
-    box = QGroupBox(title)
-    box.setStyleSheet(_SECTION_STYLE)
-    inner = QVBoxLayout(box)
-    inner.setContentsMargins(8, 12, 8, 8)
-    inner.setSpacing(6)
-    return box
 
 
 # 按钮 ID 约定: 0-5 = 铁路等级, 10 = 补给节点, 11 = 擦除补给

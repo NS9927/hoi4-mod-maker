@@ -21,6 +21,7 @@ STRINGS: dict[str, str] = {
     "colormap_pick_color_title": "选择{}颜色",
     "colormap_reset_btn": "恢复默认",
     "colormap_sea_label": "海洋:",
+    "colormap_section_colors": "颜色设置",
     "colormap_tip": """战略视角缩放时的全图底色(colormap).
 分别设置陆地/海洋/湖泊的底色.
 改颜色后下次导出生效.""",

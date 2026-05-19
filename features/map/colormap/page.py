@@ -11,7 +11,10 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtGui import QColor
 
 from ui.i18n import tr
-from ui.styles import _DIM_LABEL_STYLE, _LABEL_STYLE
+from ui.styles import (
+    make_section as _make_section,
+    _DIM_LABEL_STYLE, _LABEL_STYLE, _SECONDARY_BTN_STYLE,
+)
 
 
 class ColormapPage(QWidget):
@@ -40,12 +43,15 @@ class ColormapPage(QWidget):
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
 
-        # 三个色块
+        # ── 颜色设置 ──
+        color_box = _make_section(tr("colormap_section_colors"))
+        cl = color_box.layout()
+
         self._swatches: dict[str, QPushButton] = {}
         for label_text, attr_name in [(tr("colormap_land_label"), "land"), (tr("colormap_sea_label"), "sea"), (tr("colormap_lake_label"), "lake")]:
             row = QHBoxLayout()
             lbl = QLabel(label_text)
-            lbl.setMinimumWidth(50)
+            lbl.setMinimumWidth(60)
             lbl.setStyleSheet(_LABEL_STYLE)
             row.addWidget(lbl)
             swatch = QPushButton()
@@ -54,12 +60,14 @@ class ColormapPage(QWidget):
             swatch.clicked.connect(lambda checked=False, s=swatch, a=attr_name: self._pick_color(s, a))
             row.addWidget(swatch)
             row.addStretch(1)
-            lay.addLayout(row)
+            cl.addLayout(row)
             self._swatches[attr_name] = swatch
 
         reset_btn = QPushButton(tr("colormap_reset_btn"))
+        reset_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         reset_btn.clicked.connect(lambda: self.colormap_reset_requested.emit())
-        lay.addWidget(reset_btn)
+        cl.addWidget(reset_btn)
+        lay.addWidget(color_box)
 
         lay.addStretch(1)
         scroll.setWidget(page)
