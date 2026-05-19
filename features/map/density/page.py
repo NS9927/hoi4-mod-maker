@@ -125,21 +125,15 @@ class DensityPage(QWidget):
 
         lay.addWidget(val_box)
 
-        # ── 操作 ──
-        op_box = _make_section(tr("density_section_ops"))
-
+        # 清空按钮 — 破坏性次要操作，视觉降权直接挂在外层（无需独立 section）
         clear_btn = QPushButton(tr("density_btn_clear"))
-        clear_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        clear_btn.setStyleSheet(
+            _SECONDARY_BTN_STYLE
+            + f"QPushButton {{ padding: 5px 8px; font-size: 12px; color: {_DIM}; }}"
+        )
         clear_btn.setToolTip(tr("density_btn_clear_tip"))
         clear_btn.clicked.connect(self.density_clear_requested.emit)
-        op_box.layout().addWidget(clear_btn)
-
-        op_hint = QLabel(tr("density_op_hint"))
-        op_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px;")
-        op_hint.setWordWrap(True)
-        op_box.layout().addWidget(op_hint)
-
-        lay.addWidget(op_box)
+        lay.addWidget(clear_btn)
 
         lay.addStretch()
 

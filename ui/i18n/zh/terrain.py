@@ -14,9 +14,9 @@ STRINGS: dict[str, str] = {
     "downgrade_mountain_confirm_title": "降级山脉",
     "downgrade_mountain_confirm_msg": "将降级整张地图的山地和雪山（同时改 terrain + height + 视觉）。可撤销 (Ctrl+Z)。继续？",
     "terrain_btn_downgrade": "一键降级山脉（整张图）",
-    "terrain_btn_downgrade_tip": "对整张地形图：按上方「降级强度」只把最高的那部分山地/雪山降级。\n强度 50% 只降 band 上半段, 100% 全都降。Ctrl+Z 撤销。",
+    "terrain_btn_downgrade_tip": "🌋 降级 = 把高山往低改（雪山→山地→丘陵→平原）。\n用途：自动生成出来山太多/太高，想让地图更平缓。\n按【降级强度】控制改多少：50% 只降一半，100% 全降。Ctrl+Z 撤销。",
     "terrain_btn_downgrade_region": "选区降级（套索选区）",
-    "terrain_btn_downgrade_region_tip": "勾选后画一个圈, 只对圈内的山脉降级。Ctrl+Z 撤销。",
+    "terrain_btn_downgrade_region_tip": "🌋 局部降级：勾选后在地图上画一个圈, 只对圈内的山脉降级。Ctrl+Z 撤销。",
     "status_downgrade_lasso_mode": "选区降级模式：画一个圈框住要降级的区域",
     "status_downgrade_done": "已降级山脉（Ctrl+Z 可撤销）",
     "gt_desert": "沙漠",
@@ -46,12 +46,14 @@ STRINGS: dict[str, str] = {
     "gt_terrain_9": "沼泽",
     "pterrain_assign_mode": "🖊 分配模式（开启后点击改地形）",
     "pterrain_current_label": "当前：{0} ({1})",
-    "pterrain_intro": """🟢 <b>属性地形</b>（影响战斗 / 补给）
-
-默认是<b>查看模式</b>：点 province 只显示信息，不改地形。
-要改地形：勾选下面的<b>「分配模式」</b>，然后点 province。
-
-💡 此模式只改 gameplay 数据，不动 terrain.bmp 视觉。""",
+    "pterrain_intro": """🟢 <b>属性地形</b> = gameplay 类型（影响行军 / 战斗 / 补给 / 补给中心成本）。<br/>
+要改<b>外观贴图</b>？请去【<b>视觉地形</b>】tab。<br/><br/>
+默认是<b>查看模式</b>：点 province 只显示信息。<br/>
+要改地形：勾选下面的<b>「分配模式」</b>，然后点 province。""",
+    "terrain_concept_hint": "🎨 <b>视觉地形</b> = terrain.bmp 像素贴图（地图看起来什么样）。<br/>要改<b>gameplay 行军/战斗</b>类型？请去【<b>属性地形</b>】tab。",
+    "terrain_mode_province_tip": "🟢 按省份模式：点一个省份 → 整个省份的地形改为选中类型（同时影响视觉+属性）",
+    "terrain_mode_brush_tip": "🖌 画笔模式：像素级涂抹地形贴图（只影响视觉外观，不影响 gameplay 属性）",
+    "terrain_label_downgrade_strength": "降级强度 (雪山→山→丘陵→平原)",
     "pterrain_section_types": "地形类型",
     "auto_terrain_confirm_title": "自动生成地形",
     "auto_terrain_confirm_msg": "将根据当前高度图重新生成整张地形 (terrain.bmp)。\n现有地形会被覆盖（Ctrl+Z 可撤销）。继续？",
@@ -88,6 +90,7 @@ STRINGS: dict[str, str] = {
     "terrain_name_plains": "平原",
     "terrain_name_urban": "城市",
     "terrain_section_auto_gen": "智能地形生成",
+    "terrain_search_placeholder": "🔍 搜索地形（名称 / 类型 / 分组）…",
     "terrain_section_brush": "画笔设置",
     "terrain_section_edit_mode": "编辑模式",
     "terrain_tip_index": "索引",

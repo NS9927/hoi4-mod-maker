@@ -93,6 +93,13 @@ class HeightPage(QWidget):
         from_terrain_tip.setWordWrap(True)
         auto_top_layout.addWidget(from_terrain_tip)
 
+        # 导入高度图 — 也是"一次性整图操作"，跟上面两个并排
+        import_btn = QPushButton(tr("height_import_btn"))
+        import_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        import_btn.setToolTip(tr("height_import_tip"))
+        import_btn.clicked.connect(self.import_heightmap_requested.emit)
+        auto_top_layout.addWidget(import_btn)
+
         lay.addWidget(auto_top_box)
 
         # ── 详细参数（自动生成区）──
@@ -136,11 +143,11 @@ class HeightPage(QWidget):
         )
         gl.addWidget(self._mountain_slider)
 
-        import_btn = QPushButton(tr("height_import_btn"))
-        import_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        import_btn.setToolTip(tr("height_import_tip"))
-        import_btn.clicked.connect(self.import_heightmap_requested.emit)
-        gl.addWidget(import_btn)
+        # 提示：改了参数要再次点[一键生成]才生效
+        gen_hint = QLabel(tr("height_gen_params_hint"))
+        gen_hint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px 2px;")
+        gen_hint.setWordWrap(True)
+        gl.addWidget(gen_hint)
 
         lay.addWidget(gen_box)
 

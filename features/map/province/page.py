@@ -5,15 +5,16 @@
 """
 
 from PyQt5.QtCore import Qt, pyqtSignal
+from PyQt5.QtGui import QIntValidator
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
-    QPushButton, QLabel,
+    QPushButton, QLabel, QLineEdit,
 )
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _ACCENT, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
+    _DIM, _ACCENT, _BORDER, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
+    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
 )
 from ui.i18n import tr
 
@@ -58,6 +59,7 @@ class ProvincePage(QWidget):
     merge_mode_toggled = pyqtSignal(bool)
     regen_mode_toggled = pyqtSignal(bool)
     regen_execute_requested = pyqtSignal()
+    find_province_requested = pyqtSignal(int)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -67,6 +69,27 @@ class ProvincePage(QWidget):
         lay = QVBoxLayout(self)
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(10)
+
+        # ── 省份查找（顶部）──
+        find_row = QHBoxLayout()
+        find_row.setSpacing(4)
+        find_icon = QLabel("🔍")
+        find_icon.setStyleSheet(f"color: {_DIM}; font-size: 14px; padding: 0 4px;")
+        find_row.addWidget(find_icon)
+
+        self._find_input = QLineEdit()
+        self._find_input.setPlaceholderText(tr("province_search_placeholder"))
+        self._find_input.setStyleSheet(_LINEEDIT_STYLE)
+        self._find_input.setValidator(QIntValidator(1, 99999999, self))
+        self._find_input.returnPressed.connect(self._on_find_clicked)
+        find_row.addWidget(self._find_input, stretch=1)
+
+        self._find_btn = QPushButton(tr("province_btn_find"))
+        self._find_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        self._find_btn.setToolTip(tr("province_btn_find_tip"))
+        self._find_btn.clicked.connect(self._on_find_clicked)
+        find_row.addWidget(self._find_btn)
+        lay.addLayout(find_row)
 
         # 提示 (动态更新)
         self._province_hint = QLabel(tr("province_hint_default"))
@@ -171,6 +194,26 @@ class ProvincePage(QWidget):
         self.regen_mode_toggled.emit(on)
         self._update_mode_visuals()
 
+    def _on_find_clicked(self) -> None:
+        txt = self._find_input.text().strip()
+        if not txt:
+            return
+        try:
+            pid = int(txt)
+        except ValueError:
+            return
+        if pid <= 0:
+            return
+        self.find_province_requested.emit(pid)
+        # 重置输入框红色边框（如果上次查无）
+        self._find_input.setStyleSheet(_LINEEDIT_STYLE)
+
+    def mark_find_not_found(self) -> None:
+        """外部 handler 在 ID 不存在时调用 — 输入框边框变红。"""
+        self._find_input.setStyleSheet(
+            _LINEEDIT_STYLE + "QLineEdit { border: 1px solid #ef4444; }"
+        )
+
     def _update_mode_visuals(self) -> None:
         """根据当前激活模式更新按钮样式和提示条。"""
         merging = self._merge_btn.isChecked()
@@ -208,11 +251,15 @@ class ProvincePage(QWidget):
     def update_province_info(
         self, pid: int, ptype: str, terrain: str, pixels: int, coastal: bool
     ) -> None:
-        """更新省份信息面板（单行紧凑格式）"""
-        coast_str = tr("province_coastal_yes") if coastal else ""
-        parts = [f"ID: {pid}", ptype, terrain, f"{pixels}px"]
-        if coast_str:
-            parts.append(coast_str)
+        """更新省份信息面板（单行紧凑格式，加字段标签）"""
+        parts = [
+            f"ID: {pid}",
+            f"{tr('province_info_type')}: {ptype}",
+            f"{tr('province_info_terrain')}: {terrain}",
+            f"{pixels}px",
+        ]
+        if coastal:
+            parts.append(tr("province_info_coastal"))
         self._prov_info_label.setText(" | ".join(parts))
 
     def update_province_gaps(self, gap_ids: list[int]) -> None:

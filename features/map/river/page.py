@@ -53,9 +53,11 @@ class RiverPage(QWidget):
         self._width_group.setExclusive(True)
         for i, (idx, name_key) in enumerate(RIVER_WIDTH_TYPES):
             r, g, b = RIVER_PALETTE[idx]
-            btn = _make_river_btn(tr(name_key), r, g, b)
+            label = tr(name_key)
+            btn = _make_river_btn(label, r, g, b)
             btn.setCheckable(True)
             btn.setProperty("river_idx", idx)
+            btn.setToolTip(tr("river_width_tip_fmt").format(label, idx))
             self._width_group.addButton(btn, idx)
             btn.clicked.connect(lambda _, ix=idx: self._on_width_clicked(ix))
             wgrid.addWidget(btn, i // 4, i % 4)
@@ -83,6 +85,12 @@ class RiverPage(QWidget):
         step3.setTextFormat(Qt.TextFormat.RichText)
         manual_layout.addWidget(step3)
 
+        # marker 按钮 + 对应 tooltip key
+        _MARKER_TIP_KEYS = {
+            "river_marker_source": "river_marker_source_tip",
+            "river_marker_confluence": "river_marker_confluence_tip",
+            "river_marker_mouth": "river_marker_mouth_tip",
+        }
         mgrid = QGridLayout()
         mgrid.setSpacing(4)
         self._marker_group = QButtonGroup(self)
@@ -92,6 +100,9 @@ class RiverPage(QWidget):
             btn = _make_river_btn(tr(name_key), r, g, b)
             btn.setCheckable(True)
             btn.setProperty("river_idx", idx)
+            tip_key = _MARKER_TIP_KEYS.get(name_key)
+            if tip_key:
+                btn.setToolTip(tr(tip_key))
             self._marker_group.addButton(btn, idx)
             btn.clicked.connect(lambda _, ix=idx: self._on_marker_clicked(ix))
             mgrid.addWidget(btn, 0, i)
@@ -102,14 +113,21 @@ class RiverPage(QWidget):
         step3_hint.setWordWrap(True)
         manual_layout.addWidget(step3_hint)
 
+        # 验证按钮 — 挪到手动 section 末尾（用户画完河流的自然位置）
+        validate_btn = QPushButton(tr("river_btn_validate_new"))
+        validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        validate_btn.setToolTip(tr("river_validate_tooltip"))
+        validate_btn.clicked.connect(self.validate_river_requested.emit)
+        manual_layout.addWidget(validate_btn)
+
         lay.addWidget(manual_box)
 
-        # ═══════════════════ 工具：橡皮/平移 ═══════════════════
+        # ═══════════════════ 工具：画笔/橡皮（中键已支持平移，删 pan 按钮）═══════════════════
         tools_box = _make_section(tr("section_tools"))
         tl = QHBoxLayout()
         self._river_tool_group = QButtonGroup(self)
         self._river_tool_group.setExclusive(True)
-        for tid, label in [("brush", tr("river_brush_btn")), ("eraser", tr("river_eraser_btn")), ("pan", tr("river_pan_btn"))]:
+        for tid, label in [("brush", tr("river_brush_btn")), ("eraser", tr("river_eraser_btn"))]:
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
@@ -128,7 +146,7 @@ class RiverPage(QWidget):
         size_row = QHBoxLayout()
         size_lbl = QLabel(tr("river_eraser_range"))
         size_lbl.setStyleSheet(_LABEL_STYLE)
-        self._river_brush_label = QLabel("1px")
+        self._river_brush_label = QLabel(tr("river_eraser_label_fmt").format(1))
         self._river_brush_label.setStyleSheet(_DIM_LABEL_STYLE)
         size_row.addWidget(size_lbl)
         size_row.addStretch()
@@ -149,12 +167,11 @@ class RiverPage(QWidget):
 
         lay.addWidget(tools_box)
 
-        # 验证按钮
-        validate_btn = QPushButton(tr("river_btn_validate_new"))
-        validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        validate_btn.setToolTip(tr("river_validate_tooltip"))
-        validate_btn.clicked.connect(self.validate_river_requested.emit)
-        lay.addWidget(validate_btn)
+        # 底部导航/快捷键提示
+        nav_tip = QLabel(tr("river_nav_tip"))
+        nav_tip.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px 2px;")
+        nav_tip.setWordWrap(True)
+        lay.addWidget(nav_tip)
 
         lay.addStretch()
 
@@ -177,7 +194,7 @@ class RiverPage(QWidget):
         self.river_type_changed.emit(idx)
 
     def _on_river_brush(self, size: int) -> None:
-        self._river_brush_label.setText(f"{size}px")
+        self._river_brush_label.setText(tr("river_eraser_label_fmt").format(size))
         self.brush_size_changed.emit(size)
 
     def showEvent(self, event):

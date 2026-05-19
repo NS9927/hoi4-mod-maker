@@ -44,7 +44,6 @@ STRINGS: dict[str, str] = {
     "tab_height": "Height",
     "tab_land": "Land",
     "tab_logistics": "Logistics",
-    "tab_new_land": "New Land",
     "tab_province_terrain": "Terrain (Attribute)",
     "tab_state": "State",
     "tab_strategic_region": "Strategic Region",

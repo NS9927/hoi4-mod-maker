@@ -80,7 +80,12 @@ STRINGS: dict[str, str] = {
     "state_manpower_label": "Призывной контингент:",
     "state_name_label": "Название:",
     "state_per_spin_label": "Провинций на регион:",
+    "state_per_spin_tip": "Среднее количество провинций в регионе. Типично 10-20: меньше = раздроблено, больше = негибко.",
     "state_props_section": "Свойства региона",
     "state_quick_section": "Быстрый старт",
+    "state_detail_btn_tip": "Открыть диалог детализации региона: ресурсы / уровни построек / коры / претензии / очки победы и т.д.",
+    "state_search_placeholder": "🔍 Поиск регионов (ID / имя / TAG) …",
+    "state_list_item_fmt": "[{sid}] {name} | {tag} | {count}пр",
+    "state_list_item_fmt_no_owner": "[{sid}] {name} | (без владельца) | {count}пр",
     "state_vp_hint": "Двойной клик по провинции = установить очко победы (ОП)",
 }

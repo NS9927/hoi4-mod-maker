@@ -42,7 +42,6 @@ STRINGS: dict[str, str] = {
     "tab_height": "Высоты",
     "tab_land": "Суша",
     "tab_logistics": "Логистика",
-    "tab_new_land": "Новая суша",
     "tab_province_terrain": "Атрибут",
     "tab_state": "Регион",
     "tab_strategic_region": "Страт. зона",

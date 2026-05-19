@@ -78,7 +78,7 @@ class ApplicationController:
 
     # 模式名称映射
     _MODE_NAMES = {
-        "land": "大陆", "new_land": "新大陆", "province": "省份", "terrain": "地形",
+        "land": "大陆", "province": "省份", "terrain": "地形",
         "height": "高度", "state": "State", "country": "国家",
         "river": "河流", "continent": "大洲", "logistics": "后勤",
         "strategic_region": "战略区", "colormap": "总览贴图",
@@ -92,8 +92,8 @@ class ApplicationController:
             self._current_controller.deactivate()
 
         self._canvas.cleanup_mode_state()
-        # density / new_land 模式底图都是 land
-        if mode in ("new_land", "density"):
+        # density 模式底图是 land（叠密度遮罩）
+        if mode == "density":
             self._canvas.display_mode = "land"
         else:
             self._canvas.display_mode = mode
@@ -113,13 +113,6 @@ class ApplicationController:
                 self._current_controller.density_mode = True
                 self._current_controller.activate()
                 self._current_controller._emit_status("密度画笔模式")
-        elif mode == "new_land":
-            # 新大陆模式：借用 LandController
-            self._canvas.set_density_overlay_visible(False)
-            land_ctrl = self._controllers.get("land")
-            if land_ctrl is not None:
-                land_ctrl.density_mode = False
-            self._current_controller = land_ctrl
         else:
             # 切到其他模式时，确保 land controller 退出密度模式，隐藏密度遮罩
             self._canvas.set_density_overlay_visible(False)
@@ -239,7 +232,11 @@ class ApplicationController:
     # ═══════════════════════ State/Country 刷新 ═══════════════
 
     def _refresh_state_list(self) -> None:
-        items = [(sid, s.name, len(s.provinces)) for sid, s in self._project.state_mgr.states.items()]
+        country_mgr = self._project.country_mgr
+        items = [
+            (sid, s.name, len(s.provinces), country_mgr.get_owner_of_state(sid))
+            for sid, s in self._project.state_mgr.states.items()
+        ]
         self._panel.update_state_list(items)
 
     def _refresh_state_colors(self) -> None:
@@ -493,6 +490,11 @@ class ApplicationController:
         """获取当前模式对应的数组，用于画笔快照。"""
         mode = self._canvas.display_mode
         if mode == "land":
+            # 密度遮罩开启时画笔改的是 density_map（在 land mode 底图上叠加涂抹）
+            md = self._project.map_data
+            if (getattr(self._canvas, '_density_overlay_visible', False)
+                    and md.density_map is not None):
+                return {"density_map": md.density_map}
             return {"tile_map": self._canvas.tile_map}
         elif mode == "terrain":
             return {"terrain_map": self._canvas.terrain_map}
@@ -506,13 +508,17 @@ class ApplicationController:
 
     def _get_all_arrays(self) -> dict[str, np.ndarray]:
         """获取所有数组引用（撤销/重做时需要）。"""
-        return {
+        arrays = {
             "tile_map": self._canvas.tile_map,
             "province_map": self._canvas.province_map,
             "terrain_map": self._canvas.terrain_map,
             "height_map": self._canvas.height_map,
             "river_map": self._canvas.river_map,
         }
+        md = self._project.map_data
+        if md.density_map is not None:
+            arrays["density_map"] = md.density_map
+        return arrays
 
     def on_stroke_started(self) -> None:
         """画笔开始 — 记录操作前快照。"""
@@ -537,6 +543,15 @@ class ApplicationController:
             self._cmd_history._notify()
         self._stroke_before = None
 
+    def _refresh_brush_targets(self, cmd) -> None:
+        """递归把 BrushStrokeCommand（包括嵌套在 CompositeCommand 内的）刷成最新数组引用。"""
+        from commands.composite import CompositeCommand
+        if isinstance(cmd, BrushStrokeCommand):
+            cmd.set_target_arrays(self._get_all_arrays())
+        elif isinstance(cmd, CompositeCommand):
+            for child in cmd.children:
+                self._refresh_brush_targets(child)
+
     def undo(self) -> str:
         """执行撤销。返回状态消息。"""
         # 如果有未完成的 stroke，先提交
@@ -546,10 +561,8 @@ class ApplicationController:
         if not self._cmd_history.can_undo:
             return "没有可撤销的操作"
 
-        # 确保 BrushStrokeCommand 有最新的数组引用
-        cmd = self._cmd_history._undo_stack[-1]
-        if isinstance(cmd, BrushStrokeCommand):
-            cmd.set_target_arrays(self._get_all_arrays())
+        # 确保 BrushStrokeCommand（含 composite 内的）有最新数组引用
+        self._refresh_brush_targets(self._cmd_history._undo_stack[-1])
 
         self._cmd_history.undo()
         self._post_undo_redo_refresh()
@@ -563,16 +576,14 @@ class ApplicationController:
         if not self._cmd_history.can_redo:
             return "没有可重做的操作"
 
-        cmd = self._cmd_history._redo_stack[-1]
-        if isinstance(cmd, BrushStrokeCommand):
-            cmd.set_target_arrays(self._get_all_arrays())
+        self._refresh_brush_targets(self._cmd_history._redo_stack[-1])
 
         self._cmd_history.redo()
         self._post_undo_redo_refresh()
         return "已重做"
 
     def _post_undo_redo_refresh(self) -> None:
-        """撤销/重做后刷新画布 + 按模式重建颜色图。"""
+        """撤销/重做后刷新画布 + 按模式重建颜色图 + 通知所有 list 刷新。"""
         mode = self._canvas.display_mode
         if mode == "logistics":
             self._refresh_railway_colors()
@@ -586,6 +597,22 @@ class ApplicationController:
         elif mode == "continent":
             self._refresh_continent_colors()
         self._canvas.refresh_display()
+
+        # 撤销/重做可能改了 manager 数据 — 全面 emit 让所有 list 刷新（低频操作，可接受）
+        bus = self._event_bus
+        bus.emit("state_changed", state_id=0, action="refresh")
+        bus.emit("country_changed", tag="", action="refresh")
+        bus.emit("continent_changed", action="refresh")
+        bus.emit("sr_colors_dirty")
+        bus.emit("railway_changed")
+        # 省份数和缺失 ID 也可能变（如局部重生）
+        pm_max = int(self._canvas.province_map.max())
+        bus.emit("province_count_changed", count=pm_max)
+        import numpy as np
+        if pm_max > 0:
+            existing = set(np.unique(self._canvas.province_map).tolist()) - {0}
+            gap_ids = sorted(set(range(1, pm_max + 1)) - existing)
+            bus.emit("province_gaps_changed", gap_ids=gap_ids)
 
     # ═══════════════════════ 省份点击路由 ═══════════════════
 

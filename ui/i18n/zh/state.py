@@ -82,7 +82,12 @@ STRINGS: dict[str, str] = {
     "state_manpower_label": "人口:",
     "state_name_label": "名称:",
     "state_per_spin_label": "每State省份数:",
+    "state_per_spin_tip": "每个 State 平均包含的省份数。典型值 10-20，过小会零碎（导出文件多），过大行政划分不灵活。",
     "state_props_section": "State 属性",
     "state_quick_section": "快速开始",
+    "state_detail_btn_tip": "打开 State 详情对话框：编辑资源 / 建筑等级 / 核心 / 宣称 / 胜利点等",
+    "state_search_placeholder": "🔍 搜索州（ID / 名称 / TAG）…",
+    "state_list_item_fmt": "[{sid}] {name} | {tag} | {count}省",
+    "state_list_item_fmt_no_owner": "[{sid}] {name} | (无主) | {count}省",
     "state_vp_hint": "双击地图省份 = 设置胜利点(VP)",
 }

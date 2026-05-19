@@ -82,7 +82,12 @@ STRINGS: dict[str, str] = {
     "state_manpower_label": "Manpower:",
     "state_name_label": "Name:",
     "state_per_spin_label": "Provinces per State:",
+    "state_per_spin_tip": "Average provinces per State. Typical 10-20: too small = fragmented (many export files), too large = inflexible administration.",
     "state_props_section": "State Properties",
     "state_quick_section": "Quick Start",
+    "state_detail_btn_tip": "Open the State Detail dialog: edit resources / building levels / cores / claims / victory points etc.",
+    "state_search_placeholder": "🔍 Search states (ID / name / TAG) …",
+    "state_list_item_fmt": "[{sid}] {name} | {tag} | {count}p",
+    "state_list_item_fmt_no_owner": "[{sid}] {name} | (no owner) | {count}p",
     "state_vp_hint": "Double-click a province = set Victory Point (VP)",
 }

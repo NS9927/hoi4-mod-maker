@@ -4,7 +4,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGroupBox,
     QPushButton, QSlider, QLabel, QButtonGroup,
-    QSpinBox, QGridLayout,
+    QSpinBox, QGridLayout, QFrame,
 )
 
 from data.constants import (
@@ -14,8 +14,8 @@ from data.constants import (
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
-    _TOOL_BTN_STYLE, _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
+    _DIM, _BORDER, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
+    _TOOL_BTN_STYLE, _TILE_BTN_STYLE, _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
     _SPINBOX_STYLE, _color_icon,
 )
 from ui.i18n import tr
@@ -32,8 +32,8 @@ class LandPage(QWidget):
     brush_size_changed = pyqtSignal(int)
     generate_provinces_requested = pyqtSignal(int)
     validate_requested = pyqtSignal()
-    quick_init_requested = pyqtSignal()
     smooth_coast_requested = pyqtSignal()
+    clear_new_land_mask_requested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -44,40 +44,70 @@ class LandPage(QWidget):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(10)
 
-        # ── 一键初始化（提到最顶部）──
-        quick_init_btn = QPushButton(tr("land_btn_quick_init"))
-        quick_init_btn.setStyleSheet(
-            "QPushButton { background: #22c55e; color: white; padding: 10px;"
-            " border-radius: 5px; font-weight: bold; font-size: 14px; }"
-            "QPushButton:hover { background: #2ad66a; }"
-        )
-        quick_init_btn.setToolTip(tr("land_btn_quick_init_tip"))
-        quick_init_btn.clicked.connect(self.quick_init_requested.emit)
-        lay.addWidget(quick_init_btn)
+        # ── 地块类型（互斥 toggle，默认选陆地）──
+        tile_box = _make_section(tr("land_section_tile_draw"))
+        tile_row = QHBoxLayout()
+        tile_row.setSpacing(3)
+        self._tile_group = QButtonGroup(self)
+        self._tile_group.setExclusive(True)
+        for tile_id, label, color in [
+            (TILE_LAND, tr("land_draw_land"), (139, 172, 101)),
+            (TILE_SEA,  tr("land_draw_sea"), (68, 105, 156)),
+            (TILE_LAKE, tr("land_draw_lake"), (100, 160, 210)),
+        ]:
+            btn = QPushButton(f"  {label}")
+            btn.setIcon(_color_icon(*color))
+            btn.setCheckable(True)
+            btn.setProperty("tile_id", tile_id)
+            btn.setStyleSheet(_TILE_BTN_STYLE)
+            btn.clicked.connect(lambda _, t=tile_id: self._on_tile_click(t))
+            self._tile_group.addButton(btn)
+            tile_row.addWidget(btn)
+            if tile_id == TILE_LAND:
+                btn.setChecked(True)
+        tile_box.layout().addLayout(tile_row)
+        lay.addWidget(tile_box)
 
         # ── 工具 + 画笔大小（合并为一个 section）──
+        # 按性质分三组：[绘制] | [编辑] | [导航]，用竖线视觉分隔
         tools_box = _make_section(tr("land_section_tools"))
         tl = QHBoxLayout()
         tl.setSpacing(3)
         self._land_tool_group = QButtonGroup(self)
         self._land_tool_group.setExclusive(True)
-        tools = [("brush", tr("land_tool_brush")), ("eraser", tr("land_tool_eraser")),
-                 ("fill", tr("land_tool_fill")),
-                 ("transform", tr("land_tool_transform")),
-                 ("pan", tr("land_tool_pan"))]
-        for tid, label in tools:
-            btn = QPushButton(label)
-            btn.setCheckable(True)
-            btn.setProperty("tool_id", tid)
-            btn.setStyleSheet(_TOOL_BTN_STYLE)
-            if tid == "transform":
-                btn.setToolTip(tr("land_tool_transform_tip"))
-            elif tid == "fill":
-                btn.setToolTip(tr("land_tool_fill_tip"))
-            self._land_tool_group.addButton(btn)
-            tl.addWidget(btn)
-            if tid == "brush":
-                btn.setChecked(True)
+
+        tool_groups: list[list[tuple[str, str]]] = [
+            # 绘制
+            [("brush", tr("land_tool_brush")),
+             ("eraser", tr("land_tool_eraser")),
+             ("fill", tr("land_tool_fill"))],
+            # 增量（new_land 工具，记入 mask 用于增量生成）
+            [("new_land", tr("land_tool_new_land"))],
+            # 编辑（框选）
+            [("transform", tr("land_tool_transform"))],
+        ]
+
+        for gi, group in enumerate(tool_groups):
+            if gi > 0:
+                sep = QFrame()
+                sep.setFixedWidth(1)
+                sep.setStyleSheet(f"background: {_BORDER}; margin: 4px 6px;")
+                tl.addWidget(sep)
+            for tid, label in group:
+                btn = QPushButton(label)
+                btn.setCheckable(True)
+                btn.setProperty("tool_id", tid)
+                btn.setStyleSheet(_TOOL_BTN_STYLE)
+                if tid == "transform":
+                    btn.setToolTip(tr("land_tool_transform_tip"))
+                elif tid == "fill":
+                    btn.setToolTip(tr("land_tool_fill_tip"))
+                elif tid == "new_land":
+                    btn.setToolTip(tr("land_tool_new_land_tip"))
+                self._land_tool_group.addButton(btn)
+                tl.addWidget(btn)
+                if tid == "brush":
+                    btn.setChecked(True)
         self._land_tool_group.buttonClicked.connect(
             lambda b: self.tool_changed.emit(b.property("tool_id"))
         )
@@ -100,34 +130,26 @@ class LandPage(QWidget):
         self._land_brush_slider.setStyleSheet(_SLIDER_STYLE)
         self._land_brush_slider.valueChanged.connect(self._on_land_brush)
         tools_box.layout().addWidget(self._land_brush_slider)
+
+        # 导航/操作 入口提示（含可点击的"清空扩展遮罩"链接）
+        tip_label = QLabel(tr("land_nav_tip"))
+        tip_label.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 4px 2px;")
+        tip_label.setWordWrap(True)
+        tip_label.setTextFormat(Qt.RichText)
+        tip_label.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        tip_label.linkActivated.connect(self._on_tip_link)
+        tools_box.layout().addWidget(tip_label)
         lay.addWidget(tools_box)
 
-        # ── 地块类型（改横排 toggle）──
-        tile_box = _make_section(tr("land_section_tile_draw"))
-        tile_row = QHBoxLayout()
-        tile_row.setSpacing(3)
-        for tile_id, label, color in [
-            (TILE_LAND, tr("land_draw_land"), (139, 172, 101)),
-            (TILE_SEA,  tr("land_draw_sea"), (68, 105, 156)),
-            (TILE_LAKE, tr("land_draw_lake"), (100, 160, 210)),
-        ]:
-            btn = QPushButton(f"  {label}")
-            btn.setIcon(_color_icon(*color))
-            btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-            btn.clicked.connect(lambda _, t=tile_id: self._on_tile_click(t))
-            tile_row.addWidget(btn)
-        tile_box.layout().addLayout(tile_row)
-        lay.addWidget(tile_box)
+        # ── 省份生成 ──
+        gen_box = _make_section(tr("land_section_province_gen"))
 
-        # 平滑海岸线
+        # 平滑海岸线（建议生成省份前使用，所以收进此 section 顶部）
         coast_btn = QPushButton(tr("land_btn_smooth_coast"))
         coast_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         coast_btn.setToolTip(tr("land_btn_smooth_coast_tip"))
         coast_btn.clicked.connect(self.smooth_coast_requested.emit)
-        lay.addWidget(coast_btn)
-
-        # ── 省份生成 ──
-        gen_box = _make_section(tr("land_section_province_gen"))
+        gen_box.layout().addWidget(coast_btn)
 
         spin_row = QHBoxLayout()
         spin_lbl = QLabel(tr("land_label_province_count"))
@@ -186,6 +208,7 @@ class LandPage(QWidget):
         gen_btn_row.setSpacing(4)
         gen_btn = QPushButton(tr("land_btn_generate"))
         gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
+        gen_btn.setToolTip(tr("land_btn_generate_tip"))
         gen_btn.clicked.connect(self._on_generate_provinces)
         gen_btn_row.addWidget(gen_btn)
 
@@ -194,6 +217,12 @@ class LandPage(QWidget):
         validate_btn.clicked.connect(self.validate_requested.emit)
         gen_btn_row.addWidget(validate_btn)
         gen_box.layout().addLayout(gen_btn_row)
+
+        # 增量/全量提示（按钮下方常驻小灰字，不依赖 hover）
+        gen_subhint = QLabel(tr("land_btn_generate_subhint"))
+        gen_subhint.setStyleSheet(f"color: {_DIM}; font-size: 11px; padding: 2px;")
+        gen_subhint.setWordWrap(True)
+        gen_box.layout().addWidget(gen_subhint)
 
         lay.addWidget(gen_box)
 
@@ -304,6 +333,11 @@ class LandPage(QWidget):
     def _on_generate_provinces(self) -> None:
         count = self._province_count_spin.value()
         self.generate_provinces_requested.emit(count)
+
+    def _on_tip_link(self, href: str) -> None:
+        """提示条 HTML 链接点击 — 当前只有清空扩展遮罩。"""
+        if href == "clear_new_land_mask":
+            self.clear_new_land_mask_requested.emit()
 
     def get_generation_params(self) -> dict:
         """返回省份生成的所有参数。"""

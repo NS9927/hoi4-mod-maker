@@ -18,6 +18,13 @@ from ui.styles import (
 )
 
 
+def _format_state_item(sid: int, name: str, count: int, tag: str) -> str:
+    """格式化 state list item 文本（含国家归属）。"""
+    if tag:
+        return tr("state_list_item_fmt").format(sid=sid, name=name, tag=tag, count=count)
+    return tr("state_list_item_fmt_no_owner").format(sid=sid, name=name, count=count)
+
+
 
 
 class StatePage(QWidget):
@@ -36,6 +43,9 @@ class StatePage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current_state_id = 0
+        # 缓存当前 state 列表数据用于搜索过滤（每次 update_state_list 覆盖）
+        self._state_items_cache: list[tuple[int, str, int, str]] = []
+        self._search_text: str = ""
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -58,6 +68,7 @@ class StatePage(QWidget):
         self._state_per_spin.setRange(5, 30)
         self._state_per_spin.setValue(15)
         self._state_per_spin.setStyleSheet(_SPINBOX_STYLE)
+        self._state_per_spin.setToolTip(tr("state_per_spin_tip"))
         auto_row.addWidget(self._state_per_spin, 1)
         ql.addLayout(auto_row)
         lay.addWidget(quick_box)
@@ -95,8 +106,15 @@ class StatePage(QWidget):
         el.addLayout(batch_row)
         lay.addWidget(edit_box)
 
-        # ── 州列表 ──
+        # ── 州列表（含搜索）──
         list_box = _make_section(tr("state_list_section"))
+
+        self._state_search = QLineEdit()
+        self._state_search.setPlaceholderText(tr("state_search_placeholder"))
+        self._state_search.setStyleSheet(_LINEEDIT_STYLE)
+        self._state_search.textChanged.connect(self._on_search_changed)
+        list_box.layout().addWidget(self._state_search)
+
         self._state_list = QListWidget()
         self._state_list.setStyleSheet(_LIST_STYLE)
         self._state_list.setMinimumHeight(200)
@@ -142,6 +160,7 @@ class StatePage(QWidget):
         il.addLayout(cat_row)
 
         detail_btn = QPushButton(tr("state_detail_btn"))
+        detail_btn.setToolTip(tr("state_detail_btn_tip"))
         detail_btn.clicked.connect(self._on_state_detail_clicked)
         il.addWidget(detail_btn)
 
@@ -229,14 +248,41 @@ class StatePage(QWidget):
         if ret == QMessageBox.Yes:
             self.state_delete_requested.emit(self._current_state_id)
 
-    # ── 公共更新方法 ──
-    def update_state_list(self, states: list[tuple[int, str, int]]) -> None:
-        """刷新 State 列表，items 为 (id, name, province_count)"""
+    def _on_search_changed(self, text: str) -> None:
+        """搜索框输入 → 持久化 + 重建可见列表。"""
+        self._search_text = text.strip().lower()
+        self._rebuild_state_list()
+
+    def _rebuild_state_list(self) -> None:
+        """根据 cache + search_text 重建可见列表项（保留 currentRow 选中）。"""
+        self._state_list.blockSignals(True)
+        prev_id = self._current_state_id
         self._state_list.clear()
-        for state_id, name, prov_count in states:
-            item = QListWidgetItem(f"[{state_id}] {name} ({prov_count})")
-            item.setData(Qt.UserRole, state_id)
+        q = self._search_text
+        for sid, name, count, tag in self._state_items_cache:
+            label = _format_state_item(sid, name, count, tag)
+            if q and q not in label.lower() and q not in str(sid):
+                continue
+            item = QListWidgetItem(label)
+            item.setData(Qt.UserRole, sid)
             self._state_list.addItem(item)
+            if sid == prev_id:
+                self._state_list.setCurrentItem(item)
+        self._state_list.blockSignals(False)
+
+    # ── 公共更新方法 ──
+    def update_state_list(self, states) -> None:
+        """刷新 State 列表。
+        兼容旧签名 (id, name, count) 和新签名 (id, name, count, owner_tag)。"""
+        self._state_items_cache = []
+        for it in states:
+            if len(it) == 3:
+                sid, name, count = it
+                tag = ""
+            else:
+                sid, name, count, tag = it
+            self._state_items_cache.append((sid, name, count, tag))
+        self._rebuild_state_list()
 
     def update_state_info(self, name: str, manpower: int, category: str) -> None:
         """填充 State 属性字段"""

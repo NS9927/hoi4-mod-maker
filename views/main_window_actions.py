@@ -86,69 +86,11 @@ class _ValidateThread(QThread):
 class MainWindowActionsMixin(MainWindowFileOpsMixin):
     """省份生成/验证/国家对话框/河流/地形/大陆/战略区/后勤处理。"""
 
-    # ═══════════════════════ 新大陆 ═══════════════════
-
-    def _on_new_land_generate(self) -> None:
-        """新大陆页面的生成按钮：用 mask 清零 → 增量生成 → 清空 mask。"""
-        import numpy as np
-
-        mask = self._canvas.new_land_mask
-        n = int(mask.sum())
-        if n == 0:
-            self._status_info.setText(tr("status_no_new_land"))
-            return
-
-        # 防呆: 二次确认 (会修改 tile_map + province_map, 撤销才能恢复)
-        ret = QMessageBox.question(
-            self, tr("new_land_generate_confirm_title"),
-            tr("new_land_generate_confirm_msg").format(n=n),
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
-        )
-        if ret != QMessageBox.Yes:
-            return
-
-        self._status_info.setText(f"正在为 {n} 像素新陆地生成省份...")
-        QApplication.processEvents()
-
-        # 保存 mask 副本，立刻清空原 mask（用户可以马上画下一批）
-        mask_copy = mask.copy()
-        self._new_land_mask_copy = mask_copy  # 给 _on_generate_done 用于 terrain 同步
-        self._canvas.new_land_mask[:] = False
-        if hasattr(self._tool_panel, '_new_land_page'):
-            self._tool_panel._new_land_page.update_pixel_count(0)
-
-        # 清零 mask 像素的 province_map
-        pm_copy = self._canvas.province_map.copy()
-        pm_copy[mask_copy] = 0
-
-        # 读取省份数量参数
-        count = 12000
-        if hasattr(self._tool_panel, '_land_page') and self._tool_panel._land_page is not None:
-            params = self._tool_panel._land_page.get_generation_params()
-            count = params.get("target_count", 12000)
-
-        self._gen_thread = _GenerateThread(
-            self._canvas.tile_map, count,
-            province_map=pm_copy,
-            incremental=True,
-            skip_mismatch_clear=True,
-        )
-        self._gen_thread.finished.connect(self._on_generate_done)
-        self._gen_thread.error.connect(self._on_generate_error)
-        self._gen_thread.start()
-
-    def _on_new_land_clear(self) -> None:
-        """清空新大陆画笔的 mask。"""
-        self._canvas.new_land_mask[:] = False
-        self._status_info.setText(tr("status_new_land_cleared"))
-        # 更新页面像素计数
-        if hasattr(self._tool_panel, '_new_land_page'):
-            self._tool_panel._new_land_page.update_pixel_count(0)
-
     # ═══════════════════════ 州自动分组 ═══════════════════
 
     def _on_auto_states_with_confirm(self, per_state: int) -> None:
-        """自动分组前确认（会清空现有州数据）。"""
+        """自动分组前确认（会清空现有州数据）。可撤销 (Ctrl+Z)。"""
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         existing = len(self._project.state_mgr.states)
         if existing > 0:
             reply = QMessageBox.question(
@@ -159,12 +101,21 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             )
             if reply != QMessageBox.StandardButton.Yes:
                 return
+        # 撤销快照：state_mgr 内部字段
+        state_mgr = self._project.state_mgr
+        snap_fields = [f for f in ("_states", "_next_id") if hasattr(state_mgr, f)]
+        cmd = ManagerSnapshotCommand("自动分组州", state_mgr, snap_fields)
         self._controllers["state"].auto_states(per_state)
+        cmd.capture_after()
+        self._cmd_history._undo_stack.append(cmd)
+        self._cmd_history._redo_stack.clear()
+        self._cmd_history._notify()
 
     # ═══════════════════════ 战略区域自动生成 ═══════════════════
 
     def _on_auto_sr_with_confirm(self) -> None:
-        """自动生成战略区域前确认。"""
+        """自动生成战略区域前确认。可撤销 (Ctrl+Z)。"""
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         existing = self._project.strategic_region_mgr.count()
         if existing > 0:
             reply = QMessageBox.question(
@@ -174,13 +125,34 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             )
             if reply != QMessageBox.StandardButton.Yes:
                 return
+        # 撤销快照：strategic_region_mgr 内部字段
+        sr_mgr = self._project.strategic_region_mgr
+        snap_fields = [f for f in ("_regions", "_next_id") if hasattr(sr_mgr, f)]
+        cmd = ManagerSnapshotCommand("自动生成战略区", sr_mgr, snap_fields)
         self._controllers["strategic_region"].auto_generate()
+        cmd.capture_after()
+        self._cmd_history._undo_stack.append(cmd)
+        self._cmd_history._redo_stack.clear()
+        self._cmd_history._notify()
 
     # ═══════════════════════ 省份生成与验证 ═══════════════════
+
+    def _on_clear_new_land_mask(self) -> None:
+        """清空扩展陆地遮罩（保留已画陆地像素）。"""
+        mask = self._canvas.new_land_mask
+        if not mask.any():
+            return
+        mask[:] = False
+        self._status_info.setText(tr("status_extend_mask_cleared"))
 
     def _on_generate_provinces(self, count: int) -> None:
         incremental = False
         has_provinces = int(self._canvas.province_map.max()) > 0
+
+        # R-NULL: 无省份时扩展遮罩无意义 — 自动清空避免误导
+        if not has_provinces and self._canvas.new_land_mask.any():
+            self._canvas.new_land_mask[:] = False
+            self._status_info.setText(tr("status_no_prov_mask_ignored"))
 
         if has_provinces:
             reply = QMessageBox.question(
@@ -212,9 +184,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             province_map_for_thread = self._canvas.province_map.copy()
             mask = self._canvas.new_land_mask
             if mask.any():
+                # 保存副本供 _on_generate_done 同步 terrain，并立刻清空让用户可连画下一批
+                self._new_land_mask_copy = mask.copy()
                 province_map_for_thread[mask] = 0
+                self._canvas.new_land_mask[:] = False
 
-        has_new_land_mask = incremental and self._canvas.new_land_mask.any()
+        has_new_land_mask = incremental and getattr(self, '_new_land_mask_copy', None) is not None and self._new_land_mask_copy.any()
         self._gen_thread = _GenerateThread(
             self._canvas.tile_map, count,
             province_map=province_map_for_thread,
@@ -421,14 +396,26 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText(tr("status_ready"))
 
     def _on_smooth_coast(self) -> None:
-        """平滑海岸线。有选区时只平滑选区内，否则全图。"""
+        """平滑海岸线。有选区时只平滑选区内，否则全图。可撤销 (Ctrl+Z)。"""
         from domain.generators.coastline import smooth_coastline
+        from commands.land.brush_stroke import BrushStrokeCommand
         map_data = self._project.map_data
 
         # 检查画布是否有选区（变换工具框选的区域）
         sel = getattr(self._canvas, '_selection_rect', None)
-        # 防呆: 全图模式才弹窗 (选区是用户已经画了, 意图明确)
-        if not sel:
+        has_provinces = int(self._canvas.province_map.max()) > 0
+
+        # 已有省份时强警告：平滑会让 tile/province 边界错位
+        if has_provinces:
+            ret = QMessageBox.warning(
+                self, tr("smooth_coast_after_gen_title"),
+                tr("smooth_coast_after_gen_msg"),
+                QMessageBox.Yes | QMessageBox.No, QMessageBox.No,
+            )
+            if ret != QMessageBox.Yes:
+                return
+        elif not sel:
+            # 无省份 + 全图：常规确认
             ret = QMessageBox.question(
                 self, tr("smooth_coast_confirm_title"),
                 tr("smooth_coast_confirm_msg"),
@@ -443,8 +430,22 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         else:
             region = None
 
+        # 撤销快照：操作前
+        snap_arrays = {"tile_map": map_data.tile_map}
+        before = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+
         new_tile = smooth_coastline(map_data.tile_map, region=region)
         map_data.tile_map[:] = new_tile
+
+        # 撤销快照：操作后 + 入栈
+        if BrushStrokeCommand.has_changes(before, snap_arrays):
+            after = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+            cmd = BrushStrokeCommand("平滑海岸线", before, after)
+            cmd.set_target_arrays(self._app._get_all_arrays())
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
+
         self._canvas.tile_map = map_data.tile_map
         self._canvas._full_render()
         self._project.mark_dirty()
@@ -469,7 +470,8 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText(tr("status_density_cleared"))
 
     def _on_quick_init(self) -> None:
-        """一键初始化：自动生成州 + 战略区域 + 默认国家。"""
+        """一键初始化：自动生成州 + 战略区域 + 默认国家。可撤销 (Ctrl+Z)。"""
+        from commands.map.quick_init import QuickInitCommand
         pm = self._canvas.province_map
         if int(pm.max()) == 0:
             QMessageBox.warning(self, tr("dlg_quick_init_title"), tr("dlg_quick_init_no_provinces"))
@@ -485,6 +487,13 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText(tr("status_initializing"))
         QApplication.processEvents()
 
+        # 撤销快照：操作前（捕获三个 manager 的初始状态）
+        cmd = QuickInitCommand(
+            self._project.state_mgr,
+            self._project.country_mgr,
+            self._project.strategic_region_mgr,
+        )
+
         try:
             from views.export_dialog import auto_complete_project
 
@@ -499,6 +508,12 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
 
             fc = _FakeCanvas(self._project.map_data)
             log = auto_complete_project(self._project, fc)
+
+            # 捕获 after 状态 + 推入撤销栈
+            cmd.capture_after()
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
 
             self._canvas.refresh_display()
             msg = tr("dlg_quick_init_done") + "\n".join(f"- {l}" for l in log)
@@ -636,7 +651,23 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             return
         self._canvas.set_highlight_country(tuple(country.color))
 
+    def _on_country_property_change(self, tag: str, prop: str, val) -> None:
+        """修改国家属性。可撤销 (Ctrl+Z)。"""
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
+        cm = self._project.country_mgr
+        cmd = ManagerSnapshotCommand(
+            f"修改 {tag} {prop}", cm,
+            [f for f in ("_countries",) if hasattr(cm, f)],
+        )
+        self._controllers["country"].change_property(tag, prop, val)
+        cmd.capture_after()
+        self._cmd_history._undo_stack.append(cmd)
+        self._cmd_history._redo_stack.clear()
+        self._cmd_history._notify()
+
     def _on_country_color_change(self, tag: str) -> None:
+        """修改国家颜色。可撤销 (Ctrl+Z)。"""
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         country = self._project.country_mgr.get_country(tag)
         if not country:
             return
@@ -644,8 +675,17 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         chosen = QColorDialog.getColor(QColor(r, g, b), self, tr("dlg_country_change_color").format(tag=tag))
         if not chosen.isValid():
             return
+        cm = self._project.country_mgr
+        cmd = ManagerSnapshotCommand(
+            f"修改 {tag} 颜色", cm,
+            [f for f in ("_countries",) if hasattr(cm, f)],
+        )
         ctrl: CountryController = self._controllers["country"]
         ctrl.change_color(tag, (chosen.red(), chosen.green(), chosen.blue()))
+        cmd.capture_after()
+        self._cmd_history._undo_stack.append(cmd)
+        self._cmd_history._redo_stack.clear()
+        self._cmd_history._notify()
 
     # ═══════════════════════ River / Terrain / Height ═══════
 
@@ -807,7 +847,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._tool_panel._terrain_page.reset_downgrade_lasso_button()
 
     def _on_auto_height(self) -> None:
+        """自动生成高度图（覆盖整图）。可撤销 (Ctrl+Z)。"""
         from services.terrain_service import smart_auto_height
+        from commands.land.brush_stroke import BrushStrokeCommand
         # 防呆: 二次确认 (覆盖整张高度图)
         ret = QMessageBox.question(
             self, tr("auto_height_confirm_title"),
@@ -823,10 +865,25 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         if hasattr(height_page, 'get_height_config'):
             config = height_page.get_height_config()
         map_data = self._project.map_data
+
+        # 撤销快照：操作前
+        snap_arrays = {"height_map": map_data.height_map}
+        before = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+
         new_height = smart_auto_height(map_data.tile_map, config)
         # 同时更新 map_data 和 canvas (两边共享同一个数组)
         map_data.height_map[:] = new_height
         self._canvas.height_map = map_data.height_map
+
+        # 撤销快照：操作后 + 入栈
+        if BrushStrokeCommand.has_changes(before, snap_arrays):
+            after = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+            cmd = BrushStrokeCommand("自动生成高度图", before, after)
+            cmd.set_target_arrays(self._app._get_all_arrays())
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
+
         self._project.mark_dirty()
         # 自动生成高度 → world_normal / colormap 要重生
         self._project.mark_assets_dirty(
@@ -876,7 +933,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._status_info.setText(tr("status_height_smoothed"))
 
     def _on_import_heightmap(self) -> None:
+        """导入高度图（覆盖整图）。可撤销 (Ctrl+Z)。"""
         from PyQt5.QtWidgets import QFileDialog
+        from commands.land.brush_stroke import BrushStrokeCommand
         path, _ = QFileDialog.getOpenFileName(
             self, tr("height_import_btn"),
             "", "Images (*.bmp *.png *.jpg *.tif);;All Files (*)"
@@ -895,11 +954,27 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             from PIL import Image
             import numpy as np
             img = Image.open(path).convert("L")
-            h, w = self._project.map_data.height_map.shape
+            map_data = self._project.map_data
+            h, w = map_data.height_map.shape
             img = img.resize((w, h), Image.BILINEAR)
             new_height = np.array(img, dtype=np.uint8)
-            self._project.map_data.height_map[:] = new_height
-            self._canvas.height_map = self._project.map_data.height_map
+
+            # 撤销快照：操作前
+            snap_arrays = {"height_map": map_data.height_map}
+            before = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+
+            map_data.height_map[:] = new_height
+            self._canvas.height_map = map_data.height_map
+
+            # 入栈
+            if BrushStrokeCommand.has_changes(before, snap_arrays):
+                after = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+                cmd = BrushStrokeCommand("导入高度图", before, after)
+                cmd.set_target_arrays(self._app._get_all_arrays())
+                self._cmd_history._undo_stack.append(cmd)
+                self._cmd_history._redo_stack.clear()
+                self._cmd_history._notify()
+
             self._canvas.refresh_display()
             self._project.mark_dirty()
             self._status_info.setText(tr("height_import_success"))
@@ -1065,25 +1140,58 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
             ctrl.toggle_pick(False)
 
     def _on_continent_add(self, name: str) -> None:
+        """添加大洲。可撤销 (Ctrl+Z)。"""
         from controllers.continent import ContinentController
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         ctrl: ContinentController = self._controllers["continent"]
+        cm = self._project.continent_mgr
+        cmd = ManagerSnapshotCommand(
+            "添加大洲", cm,
+            [f for f in ("_names", "_province_continent") if hasattr(cm, f)],
+        )
         if ctrl.add_continent(name):
+            cmd.capture_after()
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
             self._refresh_continent_list()
         else:
             QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_add_failed"))
 
     def _on_continent_rename(self, index: int, name: str) -> None:
+        """重命名大洲。可撤销 (Ctrl+Z)。"""
         from controllers.continent import ContinentController
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         ctrl: ContinentController = self._controllers["continent"]
+        cm = self._project.continent_mgr
+        cmd = ManagerSnapshotCommand(
+            "重命名大洲", cm,
+            [f for f in ("_names",) if hasattr(cm, f)],
+        )
         if ctrl.rename_continent(index, name):
+            cmd.capture_after()
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
             self._refresh_continent_list()
         else:
             QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_rename_failed"))
 
     def _on_continent_remove(self, index: int) -> None:
+        """删除大洲。可撤销 (Ctrl+Z)。"""
         from controllers.continent import ContinentController
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
         ctrl: ContinentController = self._controllers["continent"]
+        cm = self._project.continent_mgr
+        cmd = ManagerSnapshotCommand(
+            "删除大洲", cm,
+            [f for f in ("_names", "_province_continent") if hasattr(cm, f)],
+        )
         if ctrl.remove_continent(index):
+            cmd.capture_after()
+            self._cmd_history._undo_stack.append(cmd)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
             self._refresh_continent_list()
         else:
             QMessageBox.warning(self, tr("dlg_error"), tr("dlg_continent_delete_failed"))
@@ -1112,13 +1220,39 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         else:
             ctrl.toggle_pick(False)
 
+    def _track_sr_op(self, label: str):
+        """工厂方法：为 sr_mgr 当前状态创建 snapshot Command（操作后调 cmd.capture_after()+ push）。"""
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
+        sr_mgr = self._project.strategic_region_mgr
+        return ManagerSnapshotCommand(
+            label, sr_mgr,
+            [f for f in ("_regions", "_next_id") if hasattr(sr_mgr, f)],
+        )
+
+    def _commit_cmd(self, cmd) -> None:
+        """通用：snapshot 操作 capture_after + push 撤销栈。"""
+        cmd.capture_after()
+        self._cmd_history._undo_stack.append(cmd)
+        self._cmd_history._redo_stack.clear()
+        self._cmd_history._notify()
+
+    def _on_sr_new(self) -> None:
+        """新建战略区。可撤销 (Ctrl+Z)。"""
+        cmd = self._track_sr_op("新建战略区")
+        self._controllers["strategic_region"].create_region()
+        self._commit_cmd(cmd)
+        self._refresh_sr_list()
+
     def _on_sr_delete(self) -> None:
+        """删除战略区。可撤销 (Ctrl+Z)。"""
         lst = self._tool_panel._sr_list
         item = lst.currentItem()
         if item is None:
             return
         rid = int(item.data(Qt.UserRole) or 0)
+        cmd = self._track_sr_op(f"删除战略区 #{rid}")
         self._controllers["strategic_region"].delete_region(rid)
+        self._commit_cmd(cmd)
         self._refresh_sr_list()
 
     def _get_sr_current_rid(self) -> int:
@@ -1159,28 +1293,44 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         self._tool_panel._sr_prov_count.setText(tr("sr_prov_count").format(len(r.province_ids)))
 
     def _on_sr_name_changed(self, name: str) -> None:
+        """改战略区名称。可撤销 (Ctrl+Z)。"""
         rid = self._get_sr_current_rid()
-        if rid > 0:
-            self._controllers["strategic_region"].set_name(rid, name)
-            self._refresh_sr_list()
+        if rid <= 0:
+            return
+        cmd = self._track_sr_op(f"改战略区 #{rid} 名称")
+        self._controllers["strategic_region"].set_name(rid, name)
+        self._commit_cmd(cmd)
+        self._refresh_sr_list()
 
     def _on_sr_name_en_changed(self, name_en: str) -> None:
+        """改战略区英文名。可撤销 (Ctrl+Z)。"""
         rid = self._get_sr_current_rid()
         if rid <= 0:
             return
         r = self._project.strategic_region_mgr.get(rid)
-        if r is not None:
-            r.name_en = name_en
+        if r is None:
+            return
+        cmd = self._track_sr_op(f"改战略区 #{rid} 英文名")
+        r.name_en = name_en
+        self._commit_cmd(cmd)
 
     def _on_sr_weather_changed(self, preset: str) -> None:
+        """改战略区天气。可撤销 (Ctrl+Z)。"""
         rid = self._get_sr_current_rid()
-        if rid > 0:
-            self._controllers["strategic_region"].set_weather(rid, preset)
+        if rid <= 0:
+            return
+        cmd = self._track_sr_op(f"改战略区 #{rid} 天气")
+        self._controllers["strategic_region"].set_weather(rid, preset)
+        self._commit_cmd(cmd)
 
     def _on_sr_naval_changed(self, naval: str) -> None:
+        """改战略区海军地形。可撤销 (Ctrl+Z)。"""
         rid = self._get_sr_current_rid()
-        if rid > 0:
-            self._controllers["strategic_region"].set_naval(rid, naval)
+        if rid <= 0:
+            return
+        cmd = self._track_sr_op(f"改战略区 #{rid} 海军地形")
+        self._controllers["strategic_region"].set_naval(rid, naval)
+        self._commit_cmd(cmd)
 
     def _refresh_sr_list(self) -> None:
         from PyQt5.QtWidgets import QListWidgetItem

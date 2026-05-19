@@ -6,13 +6,7 @@ river — en 翻译
 
 STRINGS: dict[str, str] = {
     "dlg_river_validate_title": "River Validation",
-    "river_auto_need_provinces": "Please generate provinces before auto-generating rivers",
-    "river_auto_tip": "Auto-draw rivers from heightmap. Manual edit / erase still works after.",
-    "river_auto_tooltip": "Auto-generate a reasonable river network based on heightmap, done in seconds",
     "river_brush_btn": "Brush",
-    "river_btn_auto": "Auto Generate Rivers",
-    "river_btn_auto_new": "🌊 Auto-Generate Rivers",
-    "river_btn_auto_tip": "Auto-generate river network from heightmap (flow from mountains to ocean)",
     "river_btn_validate": "Validate Rivers",
     "river_btn_validate_new": "✓ Validate Rivers",
     "river_eraser_btn": "Eraser",
@@ -23,7 +17,6 @@ STRINGS: dict[str, str] = {
     "river_marker_mouth": "Mouth",
     "river_marker_source": "Source",
     "river_pan_btn": "Pan",
-    "river_section_auto": "🪄 Auto-Generate Rivers (Recommended)",
     "river_section_brush_size": "Brush Size",
     "river_section_manual": "✏️ Manual Drawing (3 Steps)",
     "river_section_markers": "Markers (Single Pixel)",
@@ -31,7 +24,10 @@ STRINGS: dict[str, str] = {
     "river_section_width": "Width Brush",
     "river_step1_title": "<b>Step 1:</b> Select river width",
     "river_step2_hint": """Click-drag from mountains to sea → release
-⚠️ Only horizontal/vertical, no diagonal""",
+⚠️ HOI4 rivers crash easily! Must follow:
+  • Must be 1px wide (brush locked)
+  • Must be orthogonal (H/V only, no diagonal)
+  • Each river needs a [Source] marker (Step 3)""",
     "river_step2_title": "<b>Step 2:</b> Draw river on map",
     "river_step3_hint": """Each river needs ≥1 source (green)
 Mouth marker (yellow) at sea entry
@@ -41,6 +37,12 @@ Flow-in (red) where rivers merge""",
     "river_tool_eraser": "Eraser",
     "river_tool_pan": "Pan",
     "river_validate_tooltip": "Check for diagonal pixels, missing sources, etc.",
+    "river_width_tip_fmt": "{0} — HOI4 palette index {1} (higher = wider in-game)",
+    "river_marker_source_tip": "🟢 Source: each river needs exactly 1, placed at the river's start (mountain side). Rivers without a source are NOT rendered by HOI4.",
+    "river_marker_confluence_tip": "🔴 Confluence: place at the point where two rivers merge (small river joining a larger one).",
+    "river_marker_mouth_tip": "🟡 Mouth: place at the river's end if it does not directly touch the sea — otherwise HOI4 treats it as a broken river.",
+    "river_nav_tip": "💡 Middle-click = pan ｜ Ctrl+Z = undo ｜ Draw mistake? Click [Validate] above to check legality",
+    "river_eraser_label_fmt": "Eraser: {0}px",
     "river_width_1": "Trickle",
     "river_width_2": "Small",
     "river_width_4": "Medium",

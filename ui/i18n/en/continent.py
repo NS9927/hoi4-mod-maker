@@ -38,7 +38,7 @@ STRINGS: dict[str, str] = {
     "continent_rename_btn": "Rename",
     "continent_rename_dlg_label": "New name:",
     "continent_rename_dlg_title": "Rename",
-    "continent_tip": "Define continents and assign provinces.HOI4 requires all land provinces belong to a continent,affects continent.txt and definition.csv.Create continents first (e.g. europe, asia), then use pick modeto assign provinces to the selected continent.",
+    "continent_tip": "🌍 Continents = HOI4 wargoal-target regions (North America / Europe / Africa...). They affect wargoal target resolution.\nAll land provinces must belong to a continent (writes continent.txt + definition.csv).\nUsage: add continents → pick mode → click provinces to assign.",
     "dlg_continent_add_failed": "Failed to add continent",
     "dlg_continent_delete_failed": "Delete failed",
     "dlg_continent_rename_failed": "Rename failed",

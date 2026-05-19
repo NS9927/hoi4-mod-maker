@@ -14,9 +14,9 @@ STRINGS: dict[str, str] = {
     "downgrade_mountain_confirm_title": "Downgrade Mountains",
     "downgrade_mountain_confirm_msg": "Will downgrade all mountains and snow caps map-wide (terrain + height + visual). Undoable (Ctrl+Z). Continue?",
     "terrain_btn_downgrade": "Downgrade Mountains (Whole Map)",
-    "terrain_btn_downgrade_tip": "Downgrades only the highest pixels per band (per 'Downgrade Strength' slider).\n50%% = upper-half of each band, 100%% = whole band. Ctrl+Z to undo.",
+    "terrain_btn_downgrade_tip": "🌋 Downgrade = pushes mountains to lower terrain (Snow → Mountain → Hills → Plains).\nUse case: auto-generated map has too many/too tall mountains, want a flatter look.\n'Downgrade Strength' controls how much: 50% only half, 100% all. Ctrl+Z to undo.",
     "terrain_btn_downgrade_region": "Downgrade Region (Lasso)",
-    "terrain_btn_downgrade_region_tip": "Toggle on and draw a loop to downgrade mountains only within the area. Ctrl+Z to undo.",
+    "terrain_btn_downgrade_region_tip": "🌋 Local downgrade: toggle on, draw a loop on the map — only mountains inside get downgraded. Ctrl+Z to undo.",
     "status_downgrade_lasso_mode": "Downgrade lasso mode: draw a loop to select area",
     "status_downgrade_done": "Mountains downgraded (Ctrl+Z to undo)",
     "gt_desert": "Desert",
@@ -46,12 +46,14 @@ STRINGS: dict[str, str] = {
     "gt_terrain_9": "Marsh",
     "pterrain_assign_mode": "🖊 Assign Mode (click to change terrain)",
     "pterrain_current_label": "Current: {0} ({1})",
-    "pterrain_intro": """🟢 <b>Attribute Terrain</b> (affects combat / supply)
-
-Default is <b>view mode</b>: click province shows info only, no edit.
-To edit: check <b>'Assign Mode'</b> below, then click province.
-
-💡 This mode only changes gameplay data, not terrain.bmp visual.""",
+    "pterrain_intro": """🟢 <b>Attribute Terrain</b> = gameplay type (affects movement / combat / supply / supply hub cost).<br/>
+Want to change the <b>visual texture</b>? Go to the <b>[Visual Terrain]</b> tab.<br/><br/>
+Default is <b>view mode</b>: click a province to see info only.<br/>
+To edit: check <b>'Assign Mode'</b> below, then click province.""",
+    "terrain_concept_hint": "🎨 <b>Visual Terrain</b> = terrain.bmp pixel texture (what the map looks like).<br/>Want to change <b>gameplay movement/combat</b>? Go to the <b>[Attribute Terrain]</b> tab.",
+    "terrain_mode_province_tip": "🟢 Province mode: click a province → the whole province's terrain becomes the selected type (affects both visual + attribute)",
+    "terrain_mode_brush_tip": "🖌 Brush mode: paint pixel-by-pixel (visual only, gameplay attribute unaffected)",
+    "terrain_label_downgrade_strength": "Downgrade Strength (Snow → Mountain → Hills → Plains)",
     "pterrain_section_types": "Terrain Types",
     "auto_terrain_confirm_title": "Auto-Generate Terrain",
     "auto_terrain_confirm_msg": "Will regenerate the entire terrain (terrain.bmp) from current heightmap.\nExisting terrain will be overwritten (Ctrl+Z to undo). Continue?",
@@ -88,6 +90,7 @@ To edit: check <b>'Assign Mode'</b> below, then click province.
     "terrain_name_plains": "Plains",
     "terrain_name_urban": "Urban",
     "terrain_section_auto_gen": "Smart Terrain Generation",
+    "terrain_search_placeholder": "🔍 Search terrain (name / type / group) …",
     "terrain_section_brush": "Brush Settings",
     "terrain_section_edit_mode": "Edit Mode",
     "terrain_tip_index": "Index",

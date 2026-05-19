@@ -35,6 +35,9 @@ class CountryPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._quick_create_color = (100, 100, 200)
+        # 搜索缓存
+        self._country_items_cache: list[tuple[str, str, tuple]] = []
+        self._search_text: str = ""
         self._init_ui()
 
     def _init_ui(self) -> None:
@@ -42,21 +45,29 @@ class CountryPage(QWidget):
         lay.setContentsMargins(8, 8, 8, 8)
         lay.setSpacing(10)
 
-        # 创建国家按钮
-        create_btn = QPushButton(tr("country_create_btn"))
-        create_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        create_btn.clicked.connect(self.create_country_requested.emit)
-        lay.addWidget(create_btn)
-
-        # 快速创建国家按钮
+        # ★ 推荐：一键创建国家（单对话框）— 放在最显眼位置
         quick_btn = QPushButton(tr("country_quick_create_btn"))
-        quick_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        quick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         quick_btn.setToolTip(tr("country_quick_create_tip"))
         quick_btn.clicked.connect(self._show_quick_create_dialog)
         lay.addWidget(quick_btn)
 
-        # 国家列表
+        # 分步创建（备选）
+        create_btn = QPushButton(tr("country_create_btn"))
+        create_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
+        create_btn.setToolTip(tr("country_create_tip"))
+        create_btn.clicked.connect(self.create_country_requested.emit)
+        lay.addWidget(create_btn)
+
+        # 国家列表（含搜索）
         list_box = _make_section(tr("country_list_section"))
+
+        self._country_search = QLineEdit()
+        self._country_search.setPlaceholderText(tr("country_search_placeholder"))
+        self._country_search.setStyleSheet(_LINEEDIT_STYLE)
+        self._country_search.textChanged.connect(self._on_search_changed)
+        list_box.layout().addWidget(self._country_search)
+
         self._country_list = QListWidget()
         self._country_list.setStyleSheet(_LIST_STYLE)
         self._country_list.setMaximumHeight(200)
@@ -254,16 +265,35 @@ class CountryPage(QWidget):
                 from PyQt5.QtWidgets import QMessageBox
                 QMessageBox.warning(dlg, tr("dlg_error"), tr("country_tag_invalid"))
 
-    # ── 公共更新方法 ──
-    def update_country_list(self, countries: list[tuple[str, str, tuple]]) -> None:
-        """刷新国家列表，items 为 (tag, name, color)"""
+    def _on_search_changed(self, text: str) -> None:
+        """搜索框输入 → 持久化 + 重建可见列表。"""
+        self._search_text = text.strip().lower()
+        self._rebuild_country_list()
+
+    def _rebuild_country_list(self) -> None:
+        """根据 cache + search_text 重建可见列表项（保留选中）。"""
+        self._country_list.blockSignals(True)
+        prev_tag = self._country_tag_label.text() if hasattr(self, "_country_tag_label") else ""
         self._country_list.clear()
-        for tag, name, color in countries:
-            item = QListWidgetItem(f"[{tag}] {name}")
+        q = self._search_text
+        for tag, name, color in self._country_items_cache:
+            label = f"[{tag}] {name}"
+            if q and q not in label.lower():
+                continue
+            item = QListWidgetItem(label)
             item.setData(Qt.UserRole, tag)
             r, g, b = color
             item.setForeground(QBrush(QColor(r, g, b)))
             self._country_list.addItem(item)
+            if tag == prev_tag:
+                self._country_list.setCurrentItem(item)
+        self._country_list.blockSignals(False)
+
+    # ── 公共更新方法 ──
+    def update_country_list(self, countries: list[tuple[str, str, tuple]]) -> None:
+        """刷新国家列表，items 为 (tag, name, color)"""
+        self._country_items_cache = list(countries)
+        self._rebuild_country_list()
 
     def update_country_info(
         self, tag: str, name: str, party: str, color: tuple, capital_name: str

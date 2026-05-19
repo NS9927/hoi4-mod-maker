@@ -80,6 +80,28 @@ _TOOL_BTN_STYLE = f"""
     }}
 """
 
+# 地块选择按钮 (icon + label, padding 大, :checked 用半透明 accent + 描边不抢 icon 色)
+_TILE_BTN_STYLE = f"""
+    QPushButton {{
+        background: {_INPUT_BG};
+        border: 2px solid {_BORDER};
+        color: {_TEXT};
+        padding: 7px 10px;
+        font-size: 14px;
+        border-radius: 4px;
+        text-align: left;
+    }}
+    QPushButton:checked {{
+        background: rgba(108, 108, 240, 0.22);
+        border: 2px solid {_ACCENT};
+        font-weight: 600;
+    }}
+    QPushButton:hover:!checked {{
+        background: rgba(108, 108, 240, 0.08);
+        border-color: {_ACCENT};
+    }}
+"""
+
 _PRIMARY_BTN_STYLE = f"""
     QPushButton {{
         background: {_ACCENT};

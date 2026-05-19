@@ -44,7 +44,6 @@ STRINGS: dict[str, str] = {
     "tab_height": "高度",
     "tab_land": "陆海",
     "tab_logistics": "后勤",
-    "tab_new_land": "新大陆",
     "tab_province_terrain": "地形（属性）",
     "tab_state": "州",
     "tab_strategic_region": "战略区",

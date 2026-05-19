@@ -245,6 +245,8 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         self._add_action(tools_menu, tr("action_generate_provinces"),
                          lambda: self._on_generate_provinces(DEFAULT_PROVINCES), "Ctrl+G")
         self._add_action(tools_menu, tr("action_validate"), self._on_validate, "Ctrl+Shift+V")
+        tools_menu.addSeparator()
+        self._add_action(tools_menu, tr("action_quick_init"), self._on_quick_init)
 
         # 设置
         settings_menu = menubar.addMenu(tr("menu_settings"))
@@ -332,11 +334,9 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 操作按钮 → 本窗口处理（含 UI 交互）
         tp.generate_provinces_requested.connect(self._on_generate_provinces)
         tp.validate_requested.connect(self._on_validate)
-        tp.quick_init_requested.connect(self._on_quick_init)
         tp.smooth_coast_requested.connect(self._on_smooth_coast)
+        tp.clear_new_land_mask_requested.connect(self._on_clear_new_land_mask)
         # 新大陆信号
-        tp.new_land_generate_requested.connect(self._on_new_land_generate)
-        tp.new_land_clear_requested.connect(self._on_new_land_clear)
         # 密度模式信号
         tp.density_value_changed.connect(
             lambda v: setattr(self._canvas, '_density_paint_value', v))
@@ -385,6 +385,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.merge_mode_toggled.connect(self._on_merge_toggled)
         tp.regen_mode_toggled.connect(self._on_regen_mode_toggled)
         tp.regen_execute_requested.connect(self._on_regen_execute)
+        tp.find_province_requested.connect(self._on_find_province)
         cv.split_line_drawn.connect(self._on_split_line_drawn)
 
         # State 信号 → controller
@@ -413,9 +414,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         )
         # 选中国家时, 在 canvas 上高亮该国所有领土像素
         tp.country_selected.connect(self._on_country_highlight)
-        tp.country_property_changed.connect(
-            lambda tag, prop, val: self._controllers["country"].change_property(tag, prop, val)
-        )
+        tp.country_property_changed.connect(self._on_country_property_change)
         tp.country_color_change_requested.connect(self._on_country_color_change)
         tp.country_delete_requested.connect(
             lambda tag: self._controllers["country"].delete_country(tag)
@@ -459,9 +458,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         tp.sr_assign_mode_changed.connect(
             lambda on: self._controllers["strategic_region"].set_assign_mode(on)
         )
-        tp.strategic_region_new_requested.connect(
-            lambda: (self._controllers["strategic_region"].create_region(), self._refresh_sr_list())
-        )
+        tp.strategic_region_new_requested.connect(self._on_sr_new)
         tp.strategic_region_delete_requested.connect(self._on_sr_delete)
         tp.strategic_region_name_changed.connect(self._on_sr_name_changed)
         tp.strategic_region_name_en_changed.connect(self._on_sr_name_en_changed)
@@ -730,7 +727,37 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         else:
             self._status_info.setText(tr("status_view_mode"))
 
+    def _on_find_province(self, pid: int) -> None:
+        """省份查找：跳转 + 高亮 + 同步信息条。"""
+        import numpy as np
+        if pid <= 0:
+            return
+        pm = self._canvas.province_map
+        ys, xs = np.where(pm == pid)
+        if len(ys) == 0:
+            self._status_info.setText(tr("status_province_not_found").format(pid=pid))
+            page = getattr(self._tool_panel, "_province_page", None)
+            if page is not None and hasattr(page, "mark_find_not_found"):
+                page.mark_find_not_found()
+            return
+        cx = int(xs.mean())
+        cy = int(ys.mean())
+        self._canvas.centerOn(float(cx), float(cy))
+        # 复用省份模式的"选中"渲染做高亮
+        self._canvas._selected_province_id = pid
+        self._canvas._selected_province_tile = int(self._canvas._tile_map[cy, cx])
+        self._canvas._render_province_overlay()
+        # 通过 province controller 触发信息更新（让信息条/统计自动刷新）
+        pctrl = self._controllers.get("province")
+        if pctrl is not None and hasattr(pctrl, "on_province_clicked"):
+            pctrl.on_province_clicked(pid)
+        self._status_info.setText(tr("status_province_located").format(pid=pid))
+
     def _on_regen_execute(self) -> None:
+        """局部重新生成选中省份。可撤销 (Ctrl+Z) — 复合命令同时还原 province_map + 3 个 manager。"""
+        from commands.land.brush_stroke import BrushStrokeCommand
+        from commands.map.manager_snapshot import ManagerSnapshotCommand
+        from commands.composite import CompositeCommand
         ctrl: ProvinceController = self._controllers["province"]
         if not ctrl.regen_selected_pids:
             QMessageBox.warning(self, tr("dlg_regen_title"), tr("dlg_regen_select_first"))
@@ -742,7 +769,45 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
+
+        # 撤销快照 before — province_map + 三个 manager（execute_regen 内部会改它们）
+        snap_arrays = {"province_map": self._project.map_data.province_map}
+        before = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+        state_mgr = self._project.state_mgr
+        sr_mgr = self._project.strategic_region_mgr
+        country_mgr = self._project.country_mgr
+        state_cmd = ManagerSnapshotCommand(
+            "局部重生 state", state_mgr,
+            [f for f in ("_states", "_next_id") if hasattr(state_mgr, f)],
+        )
+        sr_cmd = ManagerSnapshotCommand(
+            "局部重生 sr", sr_mgr,
+            [f for f in ("_regions", "_next_id") if hasattr(sr_mgr, f)],
+        )
+        country_cmd = ManagerSnapshotCommand(
+            "局部重生 country", country_mgr,
+            [f for f in ("_state_owner", "_countries") if hasattr(country_mgr, f)],
+        )
+
         removed, created = ctrl.execute_regen()
+
+        # 入栈 — 即便 province_map 没变也要 push（manager 可能改了）
+        array_cmd = None
+        if BrushStrokeCommand.has_changes(before, snap_arrays):
+            after = BrushStrokeCommand.snapshot_arrays(snap_arrays)
+            array_cmd = BrushStrokeCommand("局部重生 province_map", before, after)
+            array_cmd.set_target_arrays(self._app._get_all_arrays())
+        state_cmd.capture_after()
+        sr_cmd.capture_after()
+        country_cmd.capture_after()
+
+        children = [c for c in (array_cmd, state_cmd, sr_cmd, country_cmd) if c is not None]
+        if children:
+            composite = CompositeCommand(children, "局部重新生成")
+            self._cmd_history._undo_stack.append(composite)
+            self._cmd_history._redo_stack.clear()
+            self._cmd_history._notify()
+
         self._update_province_count()
         QMessageBox.information(
             self, tr("dlg_regen_done_title"),

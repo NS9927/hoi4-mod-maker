@@ -11,7 +11,7 @@ from PyQt5.QtGui import QPixmap, QIcon, QPainter, QPen, QColor
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QGridLayout, QHBoxLayout, QGroupBox,
     QPushButton, QLabel, QScrollArea, QButtonGroup,
-    QSlider, QCheckBox, QSpinBox,
+    QSlider, QCheckBox, QSpinBox, QLineEdit,
 )
 
 from data.terrain_types import (
@@ -23,7 +23,7 @@ from ui.styles import (
     make_section as _make_section,
     _DIM, _SECTION_STYLE, _PRIMARY_BTN_STYLE, _TOOL_BTN_STYLE,
     _SLIDER_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SPINBOX_STYLE,
-    _SECONDARY_BTN_STYLE,
+    _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
 )
 from ui.i18n import tr
 
@@ -93,6 +93,17 @@ class TerrainPage(QWidget):
         outer = QVBoxLayout(self)
         outer.setContentsMargins(8, 8, 8, 8)
         outer.setSpacing(4)
+
+        # ── 概念隔离 hint（顶部）──
+        concept_hint = QLabel(tr("terrain_concept_hint"))
+        concept_hint.setWordWrap(True)
+        concept_hint.setTextFormat(Qt.RichText)
+        concept_hint.setStyleSheet(
+            f"color: {_DIM}; font-size: 11px; padding: 6px 8px;"
+            f" background: rgba(108, 108, 240, 0.08);"
+            f" border-left: 3px solid #6c6cf0; border-radius: 3px;"
+        )
+        outer.addWidget(concept_hint)
 
         # ── 智能生成设置 ──
         gen_box = _make_section(tr("terrain_section_auto_gen"))
@@ -230,12 +241,14 @@ class TerrainPage(QWidget):
         province_btn.setChecked(True)
         province_btn.setStyleSheet(_TOOL_BTN_STYLE)
         province_btn.setMinimumWidth(60)
+        province_btn.setToolTip(tr("terrain_mode_province_tip"))
         self._terrain_mode_group.addButton(province_btn, 0)
         mode_row.addWidget(province_btn)
         brush_btn = QPushButton(tr("terrain_mode_brush"))
         brush_btn.setCheckable(True)
         brush_btn.setStyleSheet(_TOOL_BTN_STYLE)
         brush_btn.setMinimumWidth(60)
+        brush_btn.setToolTip(tr("terrain_mode_brush_tip"))
         self._terrain_mode_group.addButton(brush_btn, 1)
         mode_row.addWidget(brush_btn)
         self._terrain_mode_group.idClicked.connect(self._on_mode_switched)
@@ -271,6 +284,17 @@ class TerrainPage(QWidget):
         self._brush_box.hide()  # 默认省份模式，隐藏画笔设置
         outer.addWidget(self._brush_box)
 
+        # ── 搜索框（过滤地形按钮）──
+        self._search_input = QLineEdit()
+        self._search_input.setPlaceholderText(tr("terrain_search_placeholder"))
+        self._search_input.setStyleSheet(_LINEEDIT_STYLE)
+        self._search_input.textChanged.connect(self._on_search_changed)
+        outer.addWidget(self._search_input)
+
+        # 用于过滤的引用
+        self._terrain_btn_entries: list[tuple[QPushButton, str]] = []
+        self._terrain_group_entries: list[tuple[QGroupBox, list[tuple[QPushButton, str]]]] = []
+
         # 可滚动区域
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -287,6 +311,7 @@ class TerrainPage(QWidget):
 
             group_name = _group_cn(group_type)
             box = _make_section(f"{group_name} ({len(variants)})")
+            group_btn_list: list[tuple[QPushButton, str]] = []
             # 加粗分组边框
             box.setStyleSheet(box.styleSheet() + """
                 QGroupBox {
@@ -344,9 +369,20 @@ class TerrainPage(QWidget):
                     lambda _, idx=gt.palette_index: self.terrain_index_changed.emit(idx)
                 )
                 grid.addWidget(btn, i, 0)
+                # 记录按钮 + 可搜索文本（display name + 内部 id + 类型 + 分组名）
+                search_text = " ".join([
+                    graphical_terrain_display_name(gt) or "",
+                    gt.id or "",
+                    gt.type or "",
+                    group_name,
+                ])
+                entry = (btn, search_text)
+                self._terrain_btn_entries.append(entry)
+                group_btn_list.append(entry)
 
             box.layout().addLayout(grid)
             lay.addWidget(box)
+            self._terrain_group_entries.append((box, group_btn_list))
 
         lay.addStretch()
         scroll.setWidget(scroll_content)
@@ -358,6 +394,18 @@ class TerrainPage(QWidget):
         is_brush = mode_id == 1
         self.terrain_brush_mode_changed.emit(is_brush)
         self._brush_box.setVisible(is_brush)
+
+    def _on_search_changed(self, text: str) -> None:
+        """按输入文本过滤地形按钮 + 空组自动隐藏。"""
+        q = text.strip().lower()
+        for box, btns in self._terrain_group_entries:
+            any_visible = False
+            for btn, search_text in btns:
+                match = (not q) or (q in search_text.lower())
+                btn.setVisible(match)
+                if match:
+                    any_visible = True
+            box.setVisible(any_visible)
 
     def _on_brush_size(self, size: int) -> None:
         self._brush_size_label.setText(f"{size}px")

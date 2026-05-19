@@ -19,6 +19,7 @@ STRINGS: dict[str, str] = {
     "action_new": "新建项目",
     "action_open": "打开项目",
     "action_paths": "路径设置",
+    "action_quick_init": "一键初始化（州+战略区+国家）",
     "action_redo": "重做",
     "action_reset_hints": "重置操作提示",
     "action_save": "保存项目",

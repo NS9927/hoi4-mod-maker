@@ -19,3 +19,4 @@ logs/
 logs/*.log
 dist/
 build/
+build_log.txt
