@@ -3,7 +3,7 @@
 功能: 大陆列表 CRUD + 拾取省份指派.
 """
 
-from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QInputDialog, QScrollArea, QCheckBox,
@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
 
 from ui.i18n import tr
 from ui.styles import (
+    make_section as _make_section,
     _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE, _LIST_STYLE,
 )
 
@@ -44,11 +45,14 @@ class ContinentPage(QWidget):
         tip.setStyleSheet(_DIM_LABEL_STYLE)
         lay.addWidget(tip)
 
-        # 大陆列表
+        # ── 大陆列表 ──
+        list_box = _make_section(tr("continent_list_section"))
+        ll = list_box.layout()
+
         self._continent_list = QListWidget()
         self._continent_list.setStyleSheet(_LIST_STYLE)
-        self._continent_list.setMaximumHeight(150)
-        lay.addWidget(self._continent_list)
+        self._continent_list.setMinimumHeight(200)
+        ll.addWidget(self._continent_list)
 
         btn_row = QHBoxLayout()
         add_btn = QPushButton(tr("continent_add_btn"))
@@ -60,25 +64,29 @@ class ContinentPage(QWidget):
         btn_row.addWidget(add_btn)
         btn_row.addWidget(rename_btn)
         btn_row.addWidget(remove_btn)
-        lay.addLayout(btn_row)
+        ll.addLayout(btn_row)
+        lay.addWidget(list_box)
 
-        # 拾取按钮
+        # ── 指派省份 ──
+        assign_box = _make_section(tr("continent_assign_section"))
+        al = assign_box.layout()
+
         self._continent_pick_btn = QPushButton(tr("continent_pick_btn"))
         self._continent_pick_btn.setCheckable(True)
         self._continent_pick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._continent_pick_btn.toggled.connect(
             lambda on: self.continent_pick_toggled.emit(on)
         )
-        lay.addWidget(self._continent_pick_btn)
+        al.addWidget(self._continent_pick_btn)
 
-        # 按 State 级别分配
         self._by_state_cb = QCheckBox(tr("continent_assign_by_state"))
         self._by_state_cb.toggled.connect(self.assign_by_state_changed.emit)
-        lay.addWidget(self._by_state_cb)
+        al.addWidget(self._by_state_cb)
 
         self._continent_status = QLabel("")
         self._continent_status.setStyleSheet("color: #6c6cf0; font-size: 11px;")
-        lay.addWidget(self._continent_status)
+        al.addWidget(self._continent_status)
+        lay.addWidget(assign_box)
 
         lay.addStretch(1)
         scroll.setWidget(page)
@@ -97,7 +105,10 @@ class ContinentPage(QWidget):
         item = self._continent_list.currentItem()
         if item is None:
             return
-        old = item.text().split(".")[1].strip().split("(")[0].strip() if "." in item.text() else ""
+        # 优先读 UserRole (refresh 时存的真实名)，回退到旧的文本解析
+        old = item.data(Qt.UserRole)
+        if not old:
+            old = item.text().split(".")[1].strip().split("(")[0].strip() if "." in item.text() else ""
         name, ok = QInputDialog.getText(self, tr("continent_rename_dlg_title"), tr("continent_rename_dlg_label"), text=old)
         if ok and name.strip():
             row = self._continent_list.currentRow()

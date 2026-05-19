@@ -1203,7 +1203,9 @@ class MainWindowActionsMixin(MainWindowFileOpsMixin):
         cm = self._project.continent_mgr
         for i, name in enumerate(cm.names):
             count = sum(1 for ci in cm._province_continent.values() if ci == i)
-            lst.addItem(QListWidgetItem(f"{i+1}. {name}  ({count} {tr('unit_provinces')})"))
+            item = QListWidgetItem(f"{i+1}. {name}  ({count} {tr('unit_provinces')})")
+            item.setData(Qt.UserRole, name)
+            lst.addItem(item)
 
     # ═══════════════════════ Strategic Region ═══════════════
 
