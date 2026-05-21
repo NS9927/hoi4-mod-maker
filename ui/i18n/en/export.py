@@ -99,4 +99,7 @@ Path: {}""",
     "export_verify_warnings_header": """
 ── MOD Verification: {count} warnings ──""",
     "export_worker_pre_check": "Running pre-export checks and fixes...",
+    "export_scope_btn_select_all": "Select All",
+    "export_scope_btn_map_only": "Map Only",
+    "export_scope_btn_clear": "Clear",
 }

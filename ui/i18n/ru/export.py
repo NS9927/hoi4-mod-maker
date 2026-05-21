@@ -97,4 +97,7 @@ STRINGS: dict[str, str] = {
     "export_verify_warnings_header": """
 ── Проверка МОДа: предупреждений {count} ──""",
     "export_worker_pre_check": "Запуск предэкспортных проверок и исправлений...",
+    "export_scope_btn_select_all": "Выбрать всё",
+    "export_scope_btn_map_only": "Только карта",
+    "export_scope_btn_clear": "Очистить",
 }

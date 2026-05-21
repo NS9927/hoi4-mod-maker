@@ -99,4 +99,7 @@ STRINGS: dict[str, str] = {
     "export_verify_warnings_header": """
 ── MOD 验证：{count} 个警告 ──""",
     "export_worker_pre_check": "正在执行导出前检查和修复...",
+    "export_scope_btn_select_all": "全选",
+    "export_scope_btn_map_only": "只地图",
+    "export_scope_btn_clear": "清空",
 }

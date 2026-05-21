@@ -351,6 +351,25 @@ class ExportDialog(QDialog):
         # 导出范围选择
         scope_group = QGroupBox(tr("export_scope"))
         scope_layout = QVBoxLayout(scope_group)
+
+        # 预设按钮行: 全选 / 只地图 / 清空
+        preset_row = QHBoxLayout()
+        for preset_key, label_key in (
+            ("all", "export_scope_btn_select_all"),
+            ("map_only", "export_scope_btn_map_only"),
+            ("none", "export_scope_btn_clear"),
+        ):
+            btn = QPushButton(tr(label_key))
+            btn.setStyleSheet(
+                "QPushButton { padding: 4px 12px; border-radius: 3px; }"
+            )
+            btn.clicked.connect(
+                lambda _checked=False, p=preset_key: self._apply_scope_preset(p)
+            )
+            preset_row.addWidget(btn)
+        preset_row.addStretch()
+        scope_layout.addLayout(preset_row)
+
         self._scope_checks = {}
         scope_items = [
             ("map", tr("export_scope_map"), True),
@@ -482,6 +501,24 @@ class ExportDialog(QDialog):
         if not has_missing:
             self._btn_auto.setText(tr("export_btn_export"))
             self._btn_export_direct.setVisible(False)
+
+    # ── 预设 ──
+
+    # "只地图" 预设勾选的 scope key — 只生成 map/ 目录下的纯地图文件
+    # (BMP + definition.csv + buildings + adjacencies + strategicregions + supply_nodes/railways)
+    # 不写 states/countries/localisation/gfx/replace_path/descriptor —
+    # 适合已有 MOD 框架, 只需要地图素材的用户
+    _MAP_ONLY_KEYS = frozenset({"map", "strategic_regions", "supply"})
+
+    def _apply_scope_preset(self, preset: str) -> None:
+        """一键设置 scope 勾选状态. preset = "all" | "map_only" | "none"."""
+        for key, cb in self._scope_checks.items():
+            if preset == "all":
+                cb.setChecked(True)
+            elif preset == "none":
+                cb.setChecked(False)
+            elif preset == "map_only":
+                cb.setChecked(key in self._MAP_ONLY_KEYS)
 
     # ── 导出动作 ──
 
