@@ -3,7 +3,7 @@ REM === HOI4 Map Maker Workshop 打包脚本 ===
 REM 用法: 先跑 PyInstaller，再运行此脚本
 
 set MOD_DIR=D:\Documents\Paradox Interactive\Hearts of Iron IV\mod\hoi4_map_maker
-set DIST_DIR=..\dist\hoi4_map_maker
+set DIST_DIR=..\dist\HOI4MapMaker
 
 echo [1/3] 清理旧文件...
 if exist "%MOD_DIR%" rmdir /s /q "%MOD_DIR%"
@@ -18,12 +18,12 @@ copy /y "descriptor.mod" "%MOD_DIR%\descriptor.mod"
 
 REM 复制外层 .mod 文件（HOI4 启动器需要）
 (
-echo version="1.0.1"
+echo version="1.2.0"
 echo tags={
 echo 	"Utilities"
 echo }
 echo name="HOI4 Fantasy World Map Maker"
-echo supported_version="1.17.*"
+echo supported_version="1.18.*"
 echo path="mod/hoi4_map_maker"
 ) > "D:\Documents\Paradox Interactive\Hearts of Iron IV\mod\hoi4_map_maker.mod"
 

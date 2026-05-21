@@ -1,53 +1,79 @@
-# v1.0.1 更新日志 / Patch Notes
+# v1.2.0 更新日志 / Patch Notes
+
+> 含 v1.1.2 起的新内容（state 三层叠加视图）
 
 ---
 
 ## 中文版（粘贴到创意工坊）
 
-**v1.0.1 - 崩溃修复 + 中文命名支持**
+**v1.2.0 — 俄语支持 + 13 page UI 审计 + 一堆崩溃修复**
 
-### 🐛 修复崩溃
-- **修复：导出 MOD 进游戏点"开始"即崩溃**
-  - 根因：战略区/海岸省份坐标判定的三重不同步
-  - 具体：① coastal 判定改用 HOI4 一致的省级邻接 ② tile_map 自动对齐省份分类 ③ naval_base 坐标改用像素中心（+0.5）避免 HOI4 floor 取整落海像素
-- **修复：战略区名字输入中文直接崩游戏**
-  - 根因：战略区 .txt 里的 name 字段直接写了中文
-  - 修复：name 字段永远只写 localisation key，中文走 yml 本地化
+### 🌍 多语言
+- **新增俄语 (ru) 支持** — 三语 1061 key 齐全
+- 新工具 `tools/i18n_audit.py` / `tools/i18n_add_key.py`，加新语言/新 key 不用手动 grep
+- `tr()` 加 kwargs 支持，placeholder 异常不再静默吞
+- 修复俄语 UI 字间距异常 + tab 文字截断 (qdarktheme + CJK 字体冲突)
 
-### ✨ 新功能：命名支持双语
-- State / 战略区 / VP 城市 都新增"英文名"独立输入框
-- 英文 yml 用英文名，中文 yml 用中文名，不再共用一份
-- 留空自动用默认值（如 `State 123` / `Region 5`）
-- 兼容旧项目数据
+### 🎨 UI 全套审计完成
+- **13 个 page 视觉统一**：Land / Density / Province / Height / Terrain / River / State / Country / Continent / StrategicRegion / Logistics / Colormap / DefaultMap
+- 大陆页：全 manager 操作可撤销 (Ctrl+Z 全部能回滚)
+- 省份页：新增「查找省份」按 ID 跳转 + 高亮
+- ContinentPage 跟其他 page 统一视觉 + 改名按真名
 
-### 🔧 其他修复
-- 战略区生成按州连贯（之前会跳省份）
-- 州算法连通性修复
-- 平滑省份 / 平滑陆地功能
-- 右键设置胜利点
+### 🗺 State 模式三层叠加视图（v1.1.2 起）
+编辑省份归属时一眼分清哪国：
+- 底色 = state 色 ⊗ 国家色 50/50 混合（同国家整体偏向 owner 色，相邻 state 仍可区分）
+- 3 像素白色国家边界（只画两个已分配国家之间）
+- 选中某州 → 同 owner 全国暖黄高亮
+
+### 🐛 崩溃修复
+- **打包后启动崩溃**：qdarktheme 数据文件缺失 (.qss / .svg)
+- 战略区 / 省份合并 / 增量生成相关 BUG
+- 选中州时 `AttributeError get_state_owner` → 改用 `get_owner_of_state`
+- 7 个崩溃 BUG + Vanilla 命名空间隔离
+
+### 📤 导出
+- 新增「descriptor 独立开关」— 允许只导出内容文件，不覆盖现有 descriptor.mod
+- 修：导出尺寸限制 / from-import 陷阱 / transform 复制 BUG
+
+### 🧪 测试
+- 165 测试全过
+- i18n smoke 测试覆盖三语 1061 key
 
 ---
 
 ## English Version
 
-**v1.0.1 - Crash Fix + Bilingual Naming**
+**v1.2.0 — Russian Support + 13-Page UI Audit + Crash Fixes**
+
+### 🌍 Localization
+- **Russian (ru) support added** — 1061 keys complete across all 3 languages
+- New tools `tools/i18n_audit.py` / `tools/i18n_add_key.py` — adding a new language or new key no longer requires manual grep
+- `tr()` now supports kwargs; placeholder exceptions no longer silently swallowed
+- Fixed Russian UI letter-spacing anomaly + tab text truncation (qdarktheme + CJK font conflict)
+
+### 🎨 Full UI Audit Done
+- **13 pages visually unified**: Land / Density / Province / Height / Terrain / River / State / Country / Continent / StrategicRegion / Logistics / Colormap / DefaultMap
+- Continent page: every manager action now undoable (Ctrl+Z rolls back everything)
+- Province page: new "Find Province" jump-to-ID + highlight
+- ContinentPage visually aligned with other pages + renamed to its real name
+
+### 🗺 State Mode 3-Layer Overlay (since v1.1.2)
+See at a glance which country owns what while editing province assignments:
+- Base = state color ⊗ country color 50/50 (same country tints toward owner color, adjacent states still distinguishable)
+- 3-pixel white country borders (only between two assigned countries)
+- Select a state → entire same-owner country highlighted in warm yellow
 
 ### 🐛 Crash Fixes
-- **Fixed: Game crashes on "Start" after exporting MOD**
-  - Root cause: 3-way mismatch in coastal province detection
-  - Fix: ① Coastal detection now uses HOI4-compatible province-level adjacency ② tile_map auto-aligned to province classification ③ naval_base coordinates use pixel center (+0.5) to avoid HOI4 floor-rounding to sea pixels
-- **Fixed: Game crash when strategic region name contains Chinese**
-  - Root cause: Strategic region .txt wrote Chinese name directly
-  - Fix: name field always writes localisation key; display names go through yml localization
+- **Startup crash after packaging**: qdarktheme data files missing (.qss / .svg)
+- Strategic region / province merge / incremental generation bugs
+- Select state `AttributeError get_state_owner` → use `get_owner_of_state`
+- 7 crash bugs + Vanilla namespace isolation
 
-### ✨ New Feature: Bilingual Naming
-- States / Strategic Regions / VP Cities now have separate "English Name" input fields
-- English yml uses English name, Chinese yml uses Chinese name (no longer shared)
-- Leave empty to use defaults (e.g. `State 123` / `Region 5`)
-- Backward compatible with old project files
+### 📤 Export
+- New "descriptor standalone toggle" — allows exporting only content files without overwriting existing descriptor.mod
+- Fixed: export size limit / from-import trap / transform copy bug
 
-### 🔧 Other Fixes
-- Strategic region generation now follows state boundaries (no more province skipping)
-- State algorithm connectivity fix
-- Province / land smoothing feature
-- Right-click to set victory points
+### 🧪 Testing
+- 165 tests all pass
+- i18n smoke test covers all 1061 keys across 3 languages

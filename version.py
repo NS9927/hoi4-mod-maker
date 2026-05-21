@@ -1,9 +1,36 @@
 """版本信息 — 每次发版更新这里"""
 
-VERSION = "1.1.0"
-VERSION_DATE = "2026-04-26"
+VERSION = "1.2.0"
+VERSION_DATE = "2026-05-19"
 
 CHANGELOG = {
+    "1.2.0": {
+        "date": "2026-05-19",
+        "changes": [
+            "新语言: 俄语 (ru) 支持 — tr() 加 kwargs，placeholder 异常不再静默吞",
+            "新工具: i18n maintenance — audit/add_key 工具 + smoke 测试 + 三语 1061 key 齐全",
+            "新功能: 大陆页 全 manager 操作可撤销，UI 重排 + 省份页加 \"查找省份\" 跳转高亮",
+            "新功能: 导出加 descriptor 独立开关 — 允许只导出内容文件不覆盖 descriptor",
+            "崩溃修复: 7 个崩溃 BUG + Vanilla 命名空间隔离",
+            "崩溃修复: 打包后启动 qdarktheme 缺失 — spec 显式 collect qdarktheme data",
+            "崩溃修复: 战略区/省份合并/增量生成相关 BUG",
+            "崩溃修复: 选中州时 AttributeError get_state_owner → get_owner_of_state",
+            "导出修复: 尺寸限制 + from-import 陷阱 + transform 复制 BUG",
+            "UI 重构: 收尾全套 13 个 page 视觉审计 (Land/Density/Province/Height/Terrain/River/State/Country/Continent/StrategicRegion/Logistics/Colormap/DefaultMap)",
+            "UI 重构: ContinentPage 跟其他 page 统一视觉 + 改名按真名",
+            "字体修复: 俄语 UI 字体异常 + 控件宽度软约束 (qdarktheme + CJK 字体导致俄文字间距异常)",
+            "测试: 修 3 个失败测试 + 补 2 个 en i18n key (height_gen_params_hint / height_section_local_edit)",
+        ],
+    },
+    "1.1.2": {
+        "date": "2026-04-27",
+        "changes": [
+            "state 模式视图三层叠加 — 编辑省份归属时一眼分清哪国",
+            "底色 = state 色 ⊗ 国家色 50/50 混合 (同国家整体偏向 owner 色，相邻 state 仍可区分)",
+            "3 像素白色国家边界 (只画两个已分配国家间，跳过海洋/未分配)",
+            "选中州 → 同 owner 全国暖黄高亮",
+        ],
+    },
     "1.1.0": {
         "date": "2026-04-26",
         "changes": [
