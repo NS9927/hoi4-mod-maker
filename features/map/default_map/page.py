@@ -12,8 +12,7 @@ from PyQt5.QtWidgets import (
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _DIM_LABEL_STYLE, _LABEL_STYLE, _SPINBOX_STYLE, _LIST_STYLE,
-    _SECONDARY_BTN_STYLE,
+    _DIM_LABEL_STYLE, _LABEL_STYLE,
 )
 
 
@@ -56,7 +55,6 @@ class DefaultMapPage(QWidget):
         self._dm_river_max = QSpinBox()
         self._dm_river_max.setRange(1, 10)
         self._dm_river_max.setValue(5)
-        self._dm_river_max.setStyleSheet(_SPINBOX_STYLE)
         self._dm_river_max.valueChanged.connect(
             lambda v: self.default_map_river_changed.emit(v)
         )
@@ -69,19 +67,15 @@ class DefaultMapPage(QWidget):
         tl = tree_box.layout()
 
         self._dm_tree_list = QListWidget()
-        self._dm_tree_list.setStyleSheet(_LIST_STYLE)
         self._dm_tree_list.setMinimumHeight(150)
         tl.addWidget(self._dm_tree_list)
 
         btn_row = QHBoxLayout()
         add_btn = QPushButton(tr("defmap_add_btn"))
-        add_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         add_btn.clicked.connect(lambda: self.default_map_tree_add_requested.emit())
         del_btn = QPushButton(tr("defmap_delete_btn"))
-        del_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         del_btn.clicked.connect(lambda: self.default_map_tree_del_requested.emit())
         reset_btn = QPushButton(tr("defmap_reset_btn"))
-        reset_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         reset_btn.clicked.connect(lambda: self.default_map_tree_reset_requested.emit())
         btn_row.addWidget(add_btn)
         btn_row.addWidget(del_btn)

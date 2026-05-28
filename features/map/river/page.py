@@ -13,8 +13,7 @@ from domain.managers.river import (
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _TEXT, _ACCENT, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _SLIDER_STYLE, _TOOL_BTN_STYLE, _SECONDARY_BTN_STYLE, _PRIMARY_BTN_STYLE,
+    _DIM, _TEXT, _ACCENT, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 from ui.i18n import tr
 
@@ -115,7 +114,6 @@ class RiverPage(QWidget):
 
         # 验证按钮 — 挪到手动 section 末尾（用户画完河流的自然位置）
         validate_btn = QPushButton(tr("river_btn_validate_new"))
-        validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.setToolTip(tr("river_validate_tooltip"))
         validate_btn.clicked.connect(self.validate_river_requested.emit)
         manual_layout.addWidget(validate_btn)
@@ -131,7 +129,6 @@ class RiverPage(QWidget):
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setProperty("tool_id", tid)
-            btn.setStyleSheet(_TOOL_BTN_STYLE)
             btn.setMinimumWidth(48)
             self._river_tool_group.addButton(btn)
             tl.addWidget(btn)
@@ -156,7 +153,6 @@ class RiverPage(QWidget):
         self._river_brush_slider = QSlider(Qt.Orientation.Horizontal)
         self._river_brush_slider.setRange(1, 20)
         self._river_brush_slider.setValue(1)  # 默认 1px（画笔也按 1px 画，只影响橡皮）
-        self._river_brush_slider.setStyleSheet(_SLIDER_STYLE)
         self._river_brush_slider.valueChanged.connect(self._on_river_brush)
         tools_box.layout().addWidget(self._river_brush_slider)
 

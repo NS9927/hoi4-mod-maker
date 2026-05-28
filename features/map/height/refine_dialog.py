@@ -16,7 +16,7 @@ from PyQt5.QtWidgets import (
 from commands.map.refine_height_region import RefineParams
 from services.terrain_service import refine_heightmap_region
 from ui.i18n import tr
-from ui.styles import _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE, _SPINBOX_STYLE
+from ui.styles import _LABEL_STYLE, _DIM_LABEL_STYLE
 
 
 class RefineDialog(QDialog):
@@ -76,8 +76,7 @@ class RefineDialog(QDialog):
         self._strength_slider = QSlider(Qt.Orientation.Horizontal)
         self._strength_slider.setRange(0, 100)
         self._strength_slider.setValue(50)
-        self._strength_slider.setStyleSheet(_SLIDER_STYLE)
-        self._strength_slider.valueChanged.connect(self._on_param_changed)
+        self._strength_slider
         self._strength_slider.valueChanged.connect(
             lambda v: self._strength_label.setText(f"{v}%")
         )
@@ -120,7 +119,6 @@ class RefineDialog(QDialog):
         self._shrink_slider = QSlider(Qt.Orientation.Horizontal)
         self._shrink_slider.setRange(5, 100)
         self._shrink_slider.setValue(25)
-        self._shrink_slider.setStyleSheet(_SLIDER_STYLE)
         self._shrink_slider.valueChanged.connect(
             lambda v: self._shrink_dist_label.setText(f"{v}px")
         )
@@ -140,7 +138,6 @@ class RefineDialog(QDialog):
         self._seed_spin = QSpinBox()
         self._seed_spin.setRange(0, 99999)
         self._seed_spin.setValue(42)
-        self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
         self._seed_spin.valueChanged.connect(self._on_param_changed)
         seed_row.addWidget(self._seed_spin)
         rand_btn = QPushButton(tr("refine_dlg_randomize"))

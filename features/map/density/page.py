@@ -9,8 +9,7 @@ from PyQt5.QtGui import QColor, QPixmap
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
+    _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 from ui.i18n import tr
 
@@ -57,7 +56,6 @@ class DensityPage(QWidget):
         self._size_slider = QSlider(Qt.Orientation.Horizontal)
         self._size_slider.setRange(5, 200)
         self._size_slider.setValue(30)
-        self._size_slider.setStyleSheet(_SLIDER_STYLE)
         self._size_slider.valueChanged.connect(self._on_size)
         bl.addWidget(self._size_slider)
 
@@ -75,7 +73,6 @@ class DensityPage(QWidget):
         self._soft_slider = QSlider(Qt.Orientation.Horizontal)
         self._soft_slider.setRange(0, 100)
         self._soft_slider.setValue(50)
-        self._soft_slider.setStyleSheet(_SLIDER_STYLE)
         self._soft_slider.valueChanged.connect(self._on_soft)
         bl.addWidget(self._soft_slider)
 
@@ -105,7 +102,6 @@ class DensityPage(QWidget):
         self._val_slider = QSlider(Qt.Orientation.Horizontal)
         self._val_slider.setRange(0, 100)
         self._val_slider.setValue(80)
-        self._val_slider.setStyleSheet(_SLIDER_STYLE)
         self._val_slider.valueChanged.connect(self._on_value)
         vl.addWidget(self._val_slider)
 
@@ -118,7 +114,6 @@ class DensityPage(QWidget):
             (tr("density_preset_dense"), 90),
         ]:
             btn = QPushButton(name)
-            btn.setStyleSheet(_SECONDARY_BTN_STYLE + "QPushButton { padding: 5px 8px; font-size: 12px; }")
             btn.clicked.connect(lambda _, v=val: self._val_slider.setValue(v))
             preset_row.addWidget(btn)
         vl.addLayout(preset_row)
@@ -127,10 +122,6 @@ class DensityPage(QWidget):
 
         # 清空按钮 — 破坏性次要操作，视觉降权直接挂在外层（无需独立 section）
         clear_btn = QPushButton(tr("density_btn_clear"))
-        clear_btn.setStyleSheet(
-            _SECONDARY_BTN_STYLE
-            + f"QPushButton {{ padding: 5px 8px; font-size: 12px; color: {_DIM}; }}"
-        )
         clear_btn.setToolTip(tr("density_btn_clear_tip"))
         clear_btn.clicked.connect(self.density_clear_requested.emit)
         lay.addWidget(clear_btn)

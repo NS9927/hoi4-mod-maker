@@ -12,7 +12,7 @@ from PyQt5.QtWidgets import (
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE, _LIST_STYLE,
+    _DIM_LABEL_STYLE,
 )
 
 
@@ -50,7 +50,6 @@ class ContinentPage(QWidget):
         ll = list_box.layout()
 
         self._continent_list = QListWidget()
-        self._continent_list.setStyleSheet(_LIST_STYLE)
         self._continent_list.setMinimumHeight(200)
         ll.addWidget(self._continent_list)
 
@@ -73,7 +72,6 @@ class ContinentPage(QWidget):
 
         self._continent_pick_btn = QPushButton(tr("continent_pick_btn"))
         self._continent_pick_btn.setCheckable(True)
-        self._continent_pick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._continent_pick_btn.toggled.connect(
             lambda on: self.continent_pick_toggled.emit(on)
         )

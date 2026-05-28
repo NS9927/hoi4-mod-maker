@@ -18,6 +18,10 @@ from PyQt5.QtWidgets import (
     QProgressBar, QFileDialog, QGroupBox, QCheckBox,
     QTextEdit, QMessageBox, QWidget,
 )
+from qfluentwidgets import (
+    PrimaryPushButton, PushButton as FluentPushButton,
+    FluentIcon as FI,
+)
 
 from data.constants import DEFAULT_MOD_OUTPUT_PATH, DEFAULT_MOD_NAME
 from ui.i18n import tr
@@ -359,10 +363,7 @@ class ExportDialog(QDialog):
             ("map_only", "export_scope_btn_map_only"),
             ("none", "export_scope_btn_clear"),
         ):
-            btn = QPushButton(tr(label_key))
-            btn.setStyleSheet(
-                "QPushButton { padding: 4px 12px; border-radius: 3px; }"
-            )
+            btn = FluentPushButton(tr(label_key))
             btn.clicked.connect(
                 lambda _checked=False, p=preset_key: self._apply_scope_preset(p)
             )
@@ -413,30 +414,17 @@ class ExportDialog(QDialog):
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()
 
-        self._btn_auto = QPushButton(tr("export_btn_auto"))
-        self._btn_auto.setStyleSheet(
-            "QPushButton { background: #6c6cf0; color: white; padding: 8px 20px;"
-            " border-radius: 4px; font-weight: bold; }"
-            "QPushButton:hover { background: #7c7cff; }"
-            "QPushButton:disabled { background: #444; color: #888; }"
-        )
+        self._btn_auto = PrimaryPushButton(tr("export_btn_auto"))
+        self._btn_auto.setIcon(FI.SYNC)
         self._btn_auto.clicked.connect(self._on_auto_export)
         btn_layout.addWidget(self._btn_auto)
 
-        self._btn_export_direct = QPushButton(tr("export_btn_direct"))
-        self._btn_export_direct.setStyleSheet(
-            "QPushButton { background: #22c55e; color: white; padding: 8px 20px;"
-            " border-radius: 4px; font-weight: bold; }"
-            "QPushButton:hover { background: #2ad66a; }"
-            "QPushButton:disabled { background: #444; color: #888; }"
-        )
+        self._btn_export_direct = PrimaryPushButton(tr("export_btn_direct"))
+        self._btn_export_direct.setIcon(FI.SEND)
         self._btn_export_direct.clicked.connect(self._on_direct_export)
         btn_layout.addWidget(self._btn_export_direct)
 
-        self._btn_cancel = QPushButton(tr("btn_cancel"))
-        self._btn_cancel.setStyleSheet(
-            "QPushButton { padding: 8px 16px; border-radius: 4px; }"
-        )
+        self._btn_cancel = FluentPushButton(tr("btn_cancel"))
         self._btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self._btn_cancel)
 
@@ -662,11 +650,8 @@ class ExportDialog(QDialog):
         layout.addWidget(text_edit)
 
         # 关闭按钮
-        btn_close = QPushButton(tr("export_result_close"))
-        btn_close.setStyleSheet(
-            "QPushButton { padding: 8px 20px; border-radius: 4px;"
-            " font-weight: bold; }"
-        )
+        btn_close = PrimaryPushButton(tr("export_result_close"))
+        btn_close.setIcon(FI.ACCEPT)
         btn_close.clicked.connect(dlg.accept)
         btn_layout = QHBoxLayout()
         btn_layout.addStretch()

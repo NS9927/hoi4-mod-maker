@@ -12,9 +12,7 @@ from domain.managers.state import StateManager
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SPINBOX_STYLE, _LINEEDIT_STYLE,
-    _COMBOBOX_STYLE, _LIST_STYLE,
+    _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 
 
@@ -58,8 +56,7 @@ class StatePage(QWidget):
         ql = quick_box.layout()
         auto_row = QHBoxLayout()
         auto_btn = QPushButton(tr("state_auto_btn"))
-        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        auto_btn.clicked.connect(self._on_auto_states)
+        auto_btn
         auto_row.addWidget(auto_btn, 2)
         spin_lbl = QLabel(tr("state_per_spin_label"))
         spin_lbl.setStyleSheet(_LABEL_STYLE)
@@ -67,8 +64,6 @@ class StatePage(QWidget):
         self._state_per_spin = QSpinBox()
         self._state_per_spin.setRange(5, 30)
         self._state_per_spin.setValue(15)
-        self._state_per_spin.setStyleSheet(_SPINBOX_STYLE)
-        self._state_per_spin.setToolTip(tr("state_per_spin_tip"))
         auto_row.addWidget(self._state_per_spin, 1)
         ql.addLayout(auto_row)
         lay.addWidget(quick_box)
@@ -90,7 +85,6 @@ class StatePage(QWidget):
         batch_row = QHBoxLayout()
         self._batch_btn = QPushButton(tr("state_batch_select_btn_short"))
         self._batch_btn.setCheckable(True)
-        self._batch_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._batch_btn.setToolTip(tr("state_batch_select_tip") + "（再次点击退出）")
         self._batch_btn.toggled.connect(self._on_batch_toggled)
         batch_row.addWidget(self._batch_btn)
@@ -111,12 +105,10 @@ class StatePage(QWidget):
 
         self._state_search = QLineEdit()
         self._state_search.setPlaceholderText(tr("state_search_placeholder"))
-        self._state_search.setStyleSheet(_LINEEDIT_STYLE)
-        self._state_search.textChanged.connect(self._on_search_changed)
+        self._state_search
         list_box.layout().addWidget(self._state_search)
 
         self._state_list = QListWidget()
-        self._state_list.setStyleSheet(_LIST_STYLE)
         self._state_list.setMinimumHeight(200)
         self._state_list.currentRowChanged.connect(self._on_state_list_clicked)
         list_box.layout().addWidget(self._state_list)
@@ -131,7 +123,6 @@ class StatePage(QWidget):
         name_lbl.setStyleSheet(_LABEL_STYLE)
         name_row.addWidget(name_lbl)
         self._state_name_edit = QLineEdit()
-        self._state_name_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._state_name_edit.editingFinished.connect(self._on_state_name_changed)
         name_row.addWidget(self._state_name_edit)
         il.addLayout(name_row)
@@ -143,7 +134,6 @@ class StatePage(QWidget):
         self._state_manpower_spin = QSpinBox()
         self._state_manpower_spin.setRange(0, 100000000)
         self._state_manpower_spin.setSingleStep(10000)
-        self._state_manpower_spin.setStyleSheet(_SPINBOX_STYLE)
         self._state_manpower_spin.valueChanged.connect(self._on_state_manpower_changed)
         mp_row.addWidget(self._state_manpower_spin)
         il.addLayout(mp_row)
@@ -153,7 +143,6 @@ class StatePage(QWidget):
         cat_lbl.setStyleSheet(_LABEL_STYLE)
         cat_row.addWidget(cat_lbl)
         self._state_category_combo = QComboBox()
-        self._state_category_combo.setStyleSheet(_COMBOBOX_STYLE)
         self._state_category_combo.addItems(StateManager.CATEGORIES)
         self._state_category_combo.currentTextChanged.connect(self._on_state_category_changed)
         cat_row.addWidget(self._state_category_combo)

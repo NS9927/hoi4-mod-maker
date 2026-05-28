@@ -15,7 +15,6 @@ from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
     _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
 )
 
 # 铁路等级对应颜色 (与 renderer 一致)
@@ -66,7 +65,6 @@ class LogisticsPage(QWidget):
         adj_lay.addWidget(self._logi_adj_status)
 
         adj_btn = QPushButton(tr("logistics_adj_editor_btn"))
-        adj_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         adj_btn.clicked.connect(lambda: self.open_adjacency_dialog_requested.emit())
         adj_lay.addWidget(adj_btn)
 
@@ -168,7 +166,6 @@ class LogisticsPage(QWidget):
         self._tool_btn_group.idClicked.connect(self._on_tool_clicked)
 
         rail_list_btn = QPushButton(tr("logistics_rail_list_btn"))
-        rail_list_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         rail_list_btn.clicked.connect(lambda: self.open_railway_list_requested.emit())
         tool_lay.addWidget(rail_list_btn)
 

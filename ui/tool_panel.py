@@ -14,12 +14,16 @@ from PyQt5.QtWidgets import (
 )
 from PyQt5.QtCore import Qt, pyqtSignal, QSize
 
+from qfluentwidgets import (
+    PushButton, PrimaryPushButton, ToolButton,
+    FluentIcon as FI,
+)
+
 from data.constants import BRUSH_DEFAULT
 from ui.i18n import tr
 
 from ui.styles import (
     _BG, _INPUT_BG, _BORDER, _TEXT, _ACCENT, _DIM,
-    _SECTION_STYLE, _SUCCESS_BTN_STYLE,
 )
 
 
@@ -411,11 +415,12 @@ class ToolPanel(QWidget):
         # 底部固定区域
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
-        sep.setStyleSheet(f"color: {_BORDER}; margin: 0;")
+        sep.setStyleSheet(f"color: {_BORDER}; margin: 0 8px;")
         root.addWidget(sep)
 
-        self._export_btn = QPushButton(tr("panel_export_btn"))
-        self._export_btn.setStyleSheet(_SUCCESS_BTN_STYLE)
+        self._export_btn = PrimaryPushButton(tr("panel_export_btn"))
+        self._export_btn.setIcon(FI.DOWNLOAD)
+        self._export_btn.setFixedHeight(40)
         self._export_btn.clicked.connect(self.export_requested.emit)
         root.addWidget(self._export_btn)
 

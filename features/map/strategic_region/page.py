@@ -15,9 +15,7 @@ from domain.managers.strategic_region import PRESET_LABELS
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _DIM_LABEL_STYLE, _PRIMARY_BTN_STYLE,
-    _LIST_STYLE, _COMBOBOX_STYLE, _LINEEDIT_STYLE,
-    _LABEL_STYLE, _SECONDARY_BTN_STYLE,
+    _DIM_LABEL_STYLE, _LABEL_STYLE,
 )
 
 
@@ -57,12 +55,9 @@ class StrategicRegionPage(QWidget):
         quick_box = _make_section(tr("sr_quick_section"))
         ql = quick_box.layout()
         auto_btn = QPushButton(tr("sr_auto_btn"))
-        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(lambda: self.strategic_region_auto_requested.emit())
         ql.addWidget(auto_btn)
         auto_weather_btn = QPushButton(tr("sr_auto_weather_btn"))
-        auto_weather_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        auto_weather_btn.clicked.connect(lambda: self.auto_weather_requested.emit())
         ql.addWidget(auto_weather_btn)
         lay.addWidget(quick_box)
 
@@ -81,8 +76,6 @@ class StrategicRegionPage(QWidget):
         from_row = QHBoxLayout()
         self._from_states_btn = QPushButton(tr("sr_from_states_btn_short"))
         self._from_states_btn.setCheckable(True)
-        self._from_states_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
-        self._from_states_btn.setToolTip(tr("sr_from_states_tip"))
         self._from_states_btn.toggled.connect(self.create_from_states_toggled.emit)
         from_row.addWidget(self._from_states_btn)
 
@@ -101,7 +94,6 @@ class StrategicRegionPage(QWidget):
         list_box = _make_section(tr("sr_list_section"))
         ll = list_box.layout()
         self._sr_list = QListWidget()
-        self._sr_list.setStyleSheet(_LIST_STYLE)
         self._sr_list.setMinimumHeight(180)
         self._sr_list.currentRowChanged.connect(
             lambda row: self.strategic_region_selected.emit(row)
@@ -128,7 +120,6 @@ class StrategicRegionPage(QWidget):
         name_lbl.setStyleSheet(_LABEL_STYLE)
         name_row.addWidget(name_lbl)
         self._sr_name_edit = QLineEdit()
-        self._sr_name_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._sr_name_edit.setPlaceholderText(tr("sr_name_hint"))
         self._sr_name_edit.editingFinished.connect(
             lambda: self.strategic_region_name_changed.emit(self._sr_name_edit.text())
@@ -141,7 +132,6 @@ class StrategicRegionPage(QWidget):
         name_en_lbl.setStyleSheet(_LABEL_STYLE)
         name_en_row.addWidget(name_en_lbl)
         self._sr_name_en_edit = QLineEdit()
-        self._sr_name_en_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._sr_name_en_edit.setPlaceholderText(tr("sr_name_en_hint"))
         self._sr_name_en_edit.editingFinished.connect(
             lambda: self.strategic_region_name_en_changed.emit(self._sr_name_en_edit.text())
@@ -154,7 +144,6 @@ class StrategicRegionPage(QWidget):
         weather_lbl.setStyleSheet(_LABEL_STYLE)
         weather_row.addWidget(weather_lbl)
         self._sr_weather_combo = QComboBox()
-        self._sr_weather_combo.setStyleSheet(_COMBOBOX_STYLE)
         for key, label in PRESET_LABELS.items():
             self._sr_weather_combo.addItem(label, key)
         self._sr_weather_combo.currentIndexChanged.connect(
@@ -170,7 +159,6 @@ class StrategicRegionPage(QWidget):
         naval_lbl.setStyleSheet(_LABEL_STYLE)
         naval_row.addWidget(naval_lbl)
         self._sr_naval_combo = QComboBox()
-        self._sr_naval_combo.setStyleSheet(_COMBOBOX_STYLE)
         self._sr_naval_combo.addItem(tr("sr_naval_none"), "")
         for value, label_key in (
             ("water_deep_ocean", "sr_naval_deep_ocean"),

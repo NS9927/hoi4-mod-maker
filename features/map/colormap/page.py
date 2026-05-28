@@ -13,7 +13,7 @@ from PyQt5.QtGui import QColor
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _DIM_LABEL_STYLE, _LABEL_STYLE, _SECONDARY_BTN_STYLE,
+    _DIM_LABEL_STYLE, _LABEL_STYLE,
 )
 
 
@@ -64,7 +64,6 @@ class ColormapPage(QWidget):
             self._swatches[attr_name] = swatch
 
         reset_btn = QPushButton(tr("colormap_reset_btn"))
-        reset_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         reset_btn.clicked.connect(lambda: self.colormap_reset_requested.emit())
         cl.addWidget(reset_btn)
         lay.addWidget(color_box)

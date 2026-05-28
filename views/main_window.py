@@ -14,7 +14,9 @@ from PyQt5.QtWidgets import (
     QWidgetAction, QSlider,
 )
 from PyQt5.QtCore import Qt, QTimer, QPoint
-from PyQt5.QtGui import QKeySequence
+from PyQt5.QtGui import QKeySequence, QIcon
+
+from qfluentwidgets import FluentIcon as FI
 
 from model.project import Project
 from model.events import EventBus
@@ -163,36 +165,36 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
 
         # 文件
         file_menu = menubar.addMenu(tr("menu_file"))
-        self._add_action(file_menu, tr("action_new"), self._on_new_project, QKeySequence.StandardKey.New)
-        self._add_action(file_menu, tr("action_open"), self._on_open_project, "Ctrl+O")
-        self._add_action(file_menu, tr("action_save"), self._on_save_project, "Ctrl+S")
+        self._add_action(file_menu, tr("action_new"), self._on_new_project, QKeySequence.StandardKey.New, FI.ADD)
+        self._add_action(file_menu, tr("action_open"), self._on_open_project, "Ctrl+O", FI.FOLDER)
+        self._add_action(file_menu, tr("action_save"), self._on_save_project, "Ctrl+S", FI.SAVE)
         file_menu.addSeparator()
-        self._add_action(file_menu, tr("action_import_image"), self._on_import_image, "Ctrl+I")
-        self._add_action(file_menu, tr("action_load_vanilla_ref"), self._on_load_vanilla_ref)
-        self._add_action(file_menu, tr("action_import_landmask"), self._on_import_landmask, "Ctrl+Shift+I")
-        self._add_action(file_menu, tr("action_import_mod_map"), self._on_import_mod_map, "Ctrl+Shift+M")
-        self._add_action(file_menu, tr("action_export_mod"), self._on_export_mod, "Ctrl+E")
-        self._add_action(file_menu, tr("action_test_export"), self._on_test_export, "Ctrl+T")
+        self._add_action(file_menu, tr("action_import_image"), self._on_import_image, "Ctrl+I", FI.PHOTO)
+        self._add_action(file_menu, tr("action_load_vanilla_ref"), self._on_load_vanilla_ref, icon=FI.VIEW)
+        self._add_action(file_menu, tr("action_import_landmask"), self._on_import_landmask, "Ctrl+Shift+I", FI.DOWNLOAD)
+        self._add_action(file_menu, tr("action_import_mod_map"), self._on_import_mod_map, "Ctrl+Shift+M", FI.FOLDER_ADD)
+        self._add_action(file_menu, tr("action_export_mod"), self._on_export_mod, "Ctrl+E", FI.SHARE)
+        self._add_action(file_menu, tr("action_test_export"), self._on_test_export, "Ctrl+T", FI.CODE)
         file_menu.addSeparator()
-        self._add_action(file_menu, tr("action_exit"), self.close, QKeySequence.StandardKey.Quit)
+        self._add_action(file_menu, tr("action_exit"), self.close, QKeySequence.StandardKey.Quit, FI.CLOSE)
 
         # 编辑
         edit_menu = menubar.addMenu(tr("menu_edit"))
-        self._undo_action = self._add_action(edit_menu, tr("action_undo"), self._on_undo, "Ctrl+Z")
-        self._redo_action = self._add_action(edit_menu, tr("action_redo"), self._on_redo, "Ctrl+Y")
+        self._undo_action = self._add_action(edit_menu, tr("action_undo"), self._on_undo, "Ctrl+Z", FI.CANCEL)
+        self._redo_action = self._add_action(edit_menu, tr("action_redo"), self._on_redo, "Ctrl+Y", FI.ROTATE)
         self._undo_action.setEnabled(False)
         self._redo_action.setEnabled(False)
 
         # 视图
         view_menu = menubar.addMenu(tr("menu_view"))
-        self._add_action(view_menu, tr("action_zoom_fit"), self._canvas.fit_in_view, "Ctrl+0")
-        act_ref = QAction(tr("action_show_ref"), self)
+        self._add_action(view_menu, tr("action_zoom_fit"), self._canvas.fit_in_view, "Ctrl+0", FI.ZOOM)
+        act_ref = QAction(FI.VIEW.icon(), tr("action_show_ref"), self)
         act_ref.setCheckable(True)
         act_ref.setChecked(True)
         act_ref.triggered.connect(self._canvas.toggle_ref_image)
         view_menu.addAction(act_ref)
         # 国家/州 归属叠加层 —— 全局开关，任意模式下都能看
-        act_cs = QAction(tr("action_show_country_state_overlay"), self)
+        act_cs = QAction(FI.FEEDBACK.icon(), tr("action_show_country_state_overlay"), self)
         act_cs.setCheckable(True)
         act_cs.setChecked(False)
         act_cs.setToolTip(tr("action_show_country_state_overlay_tip"))
@@ -200,7 +202,7 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         view_menu.addAction(act_cs)
         self._act_country_state_overlay = act_cs
         # 地形底图（国家/州模式下做底，保留画边界时的地形参考）
-        act_tu = QAction(tr("action_show_terrain_underlay"), self)
+        act_tu = QAction(FI.GLOBE.icon(), tr("action_show_terrain_underlay"), self)
         act_tu.setCheckable(True)
         act_tu.setChecked(False)
         act_tu.setToolTip(tr("action_show_terrain_underlay_tip"))
@@ -227,14 +229,14 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         from PyQt5.QtWidgets import QActionGroup
         underlay_group = QActionGroup(self)
         underlay_group.setExclusive(True)
-        act_src_height = QAction(tr("action_terrain_underlay_src_height"), self)
+        act_src_height = QAction(FI.UP.icon(), tr("action_terrain_underlay_src_height"), self)
         act_src_height.setCheckable(True)
         act_src_height.setChecked(True)
         act_src_height.triggered.connect(lambda: self._on_terrain_underlay_source("height"))
         view_menu.addAction(act_src_height)
         underlay_group.addAction(act_src_height)
 
-        act_src_terrain = QAction(tr("action_terrain_underlay_src_terrain"), self)
+        act_src_terrain = QAction(FI.CLOUD.icon(), tr("action_terrain_underlay_src_terrain"), self)
         act_src_terrain.setCheckable(True)
         act_src_terrain.triggered.connect(lambda: self._on_terrain_underlay_source("terrain"))
         view_menu.addAction(act_src_terrain)
@@ -243,25 +245,31 @@ class MainWindow(MainWindowActionsMixin, QMainWindow):
         # 工具
         tools_menu = menubar.addMenu(tr("menu_tools"))
         self._add_action(tools_menu, tr("action_generate_provinces"),
-                         lambda: self._on_generate_provinces(DEFAULT_PROVINCES), "Ctrl+G")
-        self._add_action(tools_menu, tr("action_validate"), self._on_validate, "Ctrl+Shift+V")
+                         lambda: self._on_generate_provinces(DEFAULT_PROVINCES), "Ctrl+G", FI.ADD)
+        self._add_action(tools_menu, tr("action_validate"), self._on_validate, "Ctrl+Shift+V", FI.CHECKBOX)
         tools_menu.addSeparator()
-        self._add_action(tools_menu, tr("action_quick_init"), self._on_quick_init)
+        self._add_action(tools_menu, tr("action_quick_init"), self._on_quick_init, icon=FI.BRIGHTNESS)
 
         # 设置
         settings_menu = menubar.addMenu(tr("menu_settings"))
-        self._add_action(settings_menu, tr("action_language"), self._on_toggle_language)
-        self._add_action(settings_menu, tr("action_shortcut_settings"), self._on_shortcut_settings)
+        self._add_action(settings_menu, tr("action_language"), self._on_toggle_language, icon=FI.LANGUAGE)
+        self._add_action(settings_menu, tr("action_shortcut_settings"), self._on_shortcut_settings, icon=FI.SETTING)
 
         # 帮助
         help_menu = menubar.addMenu(tr("menu_help"))
-        self._add_action(help_menu, tr("action_guide"), self._show_guide_force)
-        self._add_action(help_menu, tr("action_reset_hints"), self._reset_mode_hints)
+        self._add_action(help_menu, tr("action_guide"), self._show_guide_force, icon=FI.HELP)
+        self._add_action(help_menu, tr("action_reset_hints"), self._reset_mode_hints, icon=FI.SYNC)
         help_menu.addSeparator()
-        self._add_action(help_menu, tr("action_about"), self._on_about)
+        self._add_action(help_menu, tr("action_about"), self._on_about, icon=FI.INFO)
 
-    def _add_action(self, menu, text, slot, shortcut=None):
+    def _add_action(self, menu, text, slot, shortcut=None, icon=None):
         act = QAction(text, self)
+        if icon is not None:
+            from qfluentwidgets import FluentIconBase
+            if isinstance(icon, FluentIconBase):
+                act.setIcon(icon.icon())
+            else:
+                act.setIcon(icon)
         if shortcut:
             act.setShortcut(QKeySequence(shortcut) if isinstance(shortcut, str) else shortcut)
         act.triggered.connect(slot)

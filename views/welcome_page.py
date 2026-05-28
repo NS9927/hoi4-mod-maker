@@ -6,10 +6,13 @@ from __future__ import annotations
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QLabel, QListWidget, QListWidgetItem, QDialog,
-    QSpinBox, QDialogButtonBox, QFormLayout,
 )
-from PyQt5.QtCore import pyqtSignal, Qt, QSettings
-from PyQt5.QtGui import QFont
+from PyQt5.QtCore import Qt, QSettings, pyqtSignal
+from PyQt5.QtGui import QFont, QIcon
+from qfluentwidgets import (
+    setTheme, Theme, PushButton, PrimaryPushButton, SpinBox,
+    CaptionLabel, CardWidget, FluentIcon as FI,
+)
 
 from ui.i18n import tr
 
@@ -46,39 +49,46 @@ def save_recent_project(path: str) -> None:
     settings.setValue("paths", recent)
 
 
-class _SizePickerDialog(QDialog):
-    """地图尺寸选择对话框。"""
+class SizePickerDialog(QDialog):
+    """地图尺寸选择对话框（Fluent控件版）"""
 
-    def __init__(self, parent: QWidget | None = None) -> None:
+    def __init__(self, parent=None):
         super().__init__(parent)
+        setTheme(Theme.DARK)  # 全局暗色主题
         self.setWindowTitle(tr("welcome_size_picker_title"))
-        self.setMinimumSize(300, 160)
-        self.resize(300, 160)
+        self.setFixedSize(320, 200)
 
-        layout = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignCenter)
 
-        self._width_spin = QSpinBox()
-        self._width_spin.setRange(256, 16384)
-        self._width_spin.setValue(5632)
-        self._width_spin.setSingleStep(256)
-        layout.addRow(tr("welcome_width"), self._width_spin)
+        # 宽度
+        layout.addWidget(CaptionLabel(tr("welcome_width")))
+        self.width_spin = SpinBox()
+        self.width_spin.setRange(256, 16384)
+        self.width_spin.setValue(5632)
+        layout.addWidget(self.width_spin)
 
-        self._height_spin = QSpinBox()
-        self._height_spin.setRange(256, 16384)
-        self._height_spin.setValue(2048)
-        self._height_spin.setSingleStep(256)
-        layout.addRow(tr("welcome_height"), self._height_spin)
+        # 高度
+        layout.addWidget(CaptionLabel(tr("welcome_height")))
+        self.height_spin = SpinBox()
+        self.height_spin.setRange(256, 16384)
+        self.height_spin.setValue(2048)
+        layout.addWidget(self.height_spin)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        # 按钮行
+        row = QHBoxLayout()
+        btn_ok = PrimaryPushButton("确定")
+        btn_cancel = PushButton("取消")
+        btn_ok.clicked.connect(self.accept)
+        btn_cancel.clicked.connect(self.reject)
+        row.addWidget(btn_ok)
+        row.addWidget(btn_cancel)
+
+        layout.addLayout(row)
 
     @property
     def chosen_size(self) -> tuple[int, int]:
-        return self._width_spin.value(), self._height_spin.value()
+        return self.width_spin.value(), self.height_spin.value()
 
 
 class WelcomePage(QWidget):
@@ -165,40 +175,19 @@ class WelcomePage(QWidget):
 
         left.addSpacing(24)
 
-        # 按钮样式
-        btn_style = f"""
-            QPushButton {{
-                background: {_INPUT_BG};
-                border: 1px solid {_BORDER};
-                color: {_TEXT};
-                padding: 12px 32px;
-                font-size: 15px;
-                border-radius: 6px;
-                min-width: 200px;
-            }}
-            QPushButton:hover {{
-                border-color: {_ACCENT};
-                background: rgba(108, 108, 240, 0.12);
-            }}
-        """
-
-        btn_new = QPushButton(tr("action_new"))
-        btn_new.setStyleSheet(btn_style)
+        btn_new = PushButton(tr("action_new"))
         btn_new.clicked.connect(self._on_new)
         left.addWidget(btn_new, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        btn_open = QPushButton(tr("action_open"))
-        btn_open.setStyleSheet(btn_style)
+        btn_open = PushButton(tr("action_open"))
         btn_open.clicked.connect(lambda: self.open_project_requested.emit())
         left.addWidget(btn_open, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        btn_import = QPushButton(tr("welcome_import_mod"))
-        btn_import.setStyleSheet(btn_style)
+        btn_import = PushButton(tr("welcome_import_mod"))
         btn_import.clicked.connect(lambda: self.import_mod_requested.emit())
         left.addWidget(btn_import, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        btn_guide = QPushButton(tr("action_guide"))
-        btn_guide.setStyleSheet(btn_style)
+        btn_guide = PushButton(tr("action_guide"))
         btn_guide.clicked.connect(self._on_guide)
         left.addWidget(btn_guide, alignment=Qt.AlignmentFlag.AlignCenter)
 
@@ -246,15 +235,8 @@ class WelcomePage(QWidget):
         right.setSpacing(0)
         right.addStretch(1)
 
-        info_card = QWidget()
+        info_card = CardWidget()
         info_card.setFixedWidth(self._CARD_WIDTH)
-        info_card.setStyleSheet(f"""
-            QWidget {{
-                background: {_INPUT_BG};
-                border: 1px solid {_BORDER};
-                border-radius: 8px;
-            }}
-        """)
         card_lay = QVBoxLayout(info_card)
         card_lay.setContentsMargins(24, 24, 24, 24)
         card_lay.setSpacing(16)
@@ -306,7 +288,7 @@ class WelcomePage(QWidget):
             self._recent_list.addItem(empty)
 
     def _on_new(self) -> None:
-        dlg = _SizePickerDialog(self)
+        dlg = SizePickerDialog(self)
         if dlg.exec_() == QDialog.DialogCode.Accepted:
             w, h = dlg.chosen_size
             self.new_project_requested.emit(w, h)

@@ -13,9 +13,7 @@ from domain.managers.country import RULING_PARTIES
 from ui.i18n import tr
 from ui.styles import (
     make_section as _make_section,
-    _BORDER, _DIM, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
-    _COMBOBOX_STYLE, _LIST_STYLE,
+    _BORDER, _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 
 
@@ -47,15 +45,12 @@ class CountryPage(QWidget):
 
         # ★ 推荐：一键创建国家（单对话框）— 放在最显眼位置
         quick_btn = QPushButton(tr("country_quick_create_btn"))
-        quick_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         quick_btn.setToolTip(tr("country_quick_create_tip"))
         quick_btn.clicked.connect(self._show_quick_create_dialog)
         lay.addWidget(quick_btn)
 
         # 分步创建（备选）
         create_btn = QPushButton(tr("country_create_btn"))
-        create_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        create_btn.setToolTip(tr("country_create_tip"))
         create_btn.clicked.connect(self.create_country_requested.emit)
         lay.addWidget(create_btn)
 
@@ -64,13 +59,11 @@ class CountryPage(QWidget):
 
         self._country_search = QLineEdit()
         self._country_search.setPlaceholderText(tr("country_search_placeholder"))
-        self._country_search.setStyleSheet(_LINEEDIT_STYLE)
-        self._country_search.textChanged.connect(self._on_search_changed)
+        self._country_search
         list_box.layout().addWidget(self._country_search)
 
         self._country_list = QListWidget()
-        self._country_list.setStyleSheet(_LIST_STYLE)
-        self._country_list.setMaximumHeight(200)
+        self._country_list
         self._country_list.currentRowChanged.connect(self._on_country_list_clicked)
         list_box.layout().addWidget(self._country_list)
         lay.addWidget(list_box)
@@ -96,7 +89,6 @@ class CountryPage(QWidget):
         cname_lbl.setStyleSheet(_LABEL_STYLE)
         cname_row.addWidget(cname_lbl)
         self._country_name_edit = QLineEdit()
-        self._country_name_edit.setStyleSheet(_LINEEDIT_STYLE)
         self._country_name_edit.editingFinished.connect(self._on_country_name_changed)
         cname_row.addWidget(self._country_name_edit)
         il.addLayout(cname_row)
@@ -107,7 +99,6 @@ class CountryPage(QWidget):
         party_lbl.setStyleSheet(_LABEL_STYLE)
         party_row.addWidget(party_lbl)
         self._country_party_combo = QComboBox()
-        self._country_party_combo.setStyleSheet(_COMBOBOX_STYLE)
         self._country_party_combo.addItems(RULING_PARTIES)
         self._country_party_combo.currentTextChanged.connect(self._on_country_party_changed)
         party_row.addWidget(self._country_party_combo)
@@ -212,16 +203,13 @@ class CountryPage(QWidget):
         tag_edit = QLineEdit()
         tag_edit.setPlaceholderText(tr("country_tag_placeholder"))
         tag_edit.setMaxLength(3)
-        tag_edit.setStyleSheet(_LINEEDIT_STYLE)
         form.addRow(tr("country_tag_row"), tag_edit)
 
         name_edit = QLineEdit()
         name_edit.setPlaceholderText(tr("country_name_placeholder"))
-        name_edit.setStyleSheet(_LINEEDIT_STYLE)
         form.addRow(tr("country_name_label"), name_edit)
 
         party_combo = QComboBox()
-        party_combo.setStyleSheet(_COMBOBOX_STYLE)
         party_combo.addItems(RULING_PARTIES)
         party_combo.setCurrentText("neutrality")
         form.addRow(tr("country_party_label"), party_combo)

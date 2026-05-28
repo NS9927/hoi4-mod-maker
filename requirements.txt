@@ -3,7 +3,8 @@ numpy>=1.24
 Pillow>=10.0
 scipy>=1.11
 opencv-python>=4.8
-pyqtdarktheme>=2.1
+#pyqtdarktheme>=2.1 #py3.13用不了啊喂
+PyQt-Fluent-Widgets>=1.11
 
 # dev / test
 pytest>=8.0

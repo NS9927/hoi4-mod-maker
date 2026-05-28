@@ -21,9 +21,7 @@ from data.terrain_types import (
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _SECTION_STYLE, _PRIMARY_BTN_STYLE, _TOOL_BTN_STYLE,
-    _SLIDER_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SPINBOX_STYLE,
-    _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
+    _DIM, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 from ui.i18n import tr
 
@@ -110,7 +108,6 @@ class TerrainPage(QWidget):
         gl = gen_box.layout()
 
         auto_btn = QPushButton(tr("terrain_btn_auto_gen"))
-        auto_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         auto_btn.clicked.connect(self.auto_terrain_requested.emit)
         gl.addWidget(auto_btn)
 
@@ -122,10 +119,8 @@ class TerrainPage(QWidget):
         self._seed_spin = QSpinBox()
         self._seed_spin.setRange(0, 99999)
         self._seed_spin.setValue(42)
-        self._seed_spin.setStyleSheet(_SPINBOX_STYLE)
         seed_row.addWidget(self._seed_spin)
         rand_btn = QPushButton(tr("terrain_btn_random"))
-        rand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         rand_btn.setMaximumWidth(60)
         rand_btn.clicked.connect(self._randomize_seed)
         seed_row.addWidget(rand_btn)
@@ -145,7 +140,6 @@ class TerrainPage(QWidget):
         self._noise_slider = QSlider(Qt.Orientation.Horizontal)
         self._noise_slider.setRange(0, 50)
         self._noise_slider.setValue(20)
-        self._noise_slider.setStyleSheet(_SLIDER_STYLE)
         self._noise_slider.valueChanged.connect(
             lambda v: self._noise_label.setText(str(v))
         )
@@ -165,7 +159,6 @@ class TerrainPage(QWidget):
         self._scatter_slider = QSlider(Qt.Orientation.Horizontal)
         self._scatter_slider.setRange(0, 100)
         self._scatter_slider.setValue(65)
-        self._scatter_slider.setStyleSheet(_SLIDER_STYLE)
         self._scatter_slider.valueChanged.connect(
             lambda v: self._scatter_label.setText(f"{v}%")
         )
@@ -185,7 +178,6 @@ class TerrainPage(QWidget):
         self._mountain_amount_slider = QSlider(Qt.Orientation.Horizontal)
         self._mountain_amount_slider.setRange(-50, 50)
         self._mountain_amount_slider.setValue(0)
-        self._mountain_amount_slider.setStyleSheet(_SLIDER_STYLE)
         self._mountain_amount_slider.valueChanged.connect(
             lambda v: self._mountain_amount_label.setText(
                 f"{v:+d}  ({tr('terrain_mountain_less') if v < 0 else tr('terrain_mountain_more') if v > 0 else tr('terrain_mountain_default')})"
@@ -207,7 +199,6 @@ class TerrainPage(QWidget):
         self._downgrade_strength_slider = QSlider(Qt.Orientation.Horizontal)
         self._downgrade_strength_slider.setRange(0, 100)
         self._downgrade_strength_slider.setValue(50)
-        self._downgrade_strength_slider.setStyleSheet(_SLIDER_STYLE)
         self._downgrade_strength_slider.valueChanged.connect(
             lambda v: self._downgrade_strength_label.setText(f"{v}%")
         )
@@ -215,7 +206,6 @@ class TerrainPage(QWidget):
 
         # 一键降级山脉按钮
         self._downgrade_btn = QPushButton(tr("terrain_btn_downgrade"))
-        self._downgrade_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._downgrade_btn.setToolTip(tr("terrain_btn_downgrade_tip"))
         self._downgrade_btn.clicked.connect(self.downgrade_mountain_requested.emit)
         gl.addWidget(self._downgrade_btn)
@@ -223,7 +213,6 @@ class TerrainPage(QWidget):
         # 选区降级按钮（套索选区）
         self._downgrade_lasso_btn = QPushButton(tr("terrain_btn_downgrade_region"))
         self._downgrade_lasso_btn.setCheckable(True)
-        self._downgrade_lasso_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._downgrade_lasso_btn.setToolTip(tr("terrain_btn_downgrade_region_tip"))
         self._downgrade_lasso_btn.toggled.connect(self.downgrade_lasso_mode_toggled.emit)
         gl.addWidget(self._downgrade_lasso_btn)
@@ -239,14 +228,12 @@ class TerrainPage(QWidget):
         province_btn = QPushButton(tr("terrain_mode_province"))
         province_btn.setCheckable(True)
         province_btn.setChecked(True)
-        province_btn.setStyleSheet(_TOOL_BTN_STYLE)
         province_btn.setMinimumWidth(60)
         province_btn.setToolTip(tr("terrain_mode_province_tip"))
         self._terrain_mode_group.addButton(province_btn, 0)
         mode_row.addWidget(province_btn)
         brush_btn = QPushButton(tr("terrain_mode_brush"))
         brush_btn.setCheckable(True)
-        brush_btn.setStyleSheet(_TOOL_BTN_STYLE)
         brush_btn.setMinimumWidth(60)
         brush_btn.setToolTip(tr("terrain_mode_brush_tip"))
         self._terrain_mode_group.addButton(brush_btn, 1)
@@ -272,7 +259,6 @@ class TerrainPage(QWidget):
         self._brush_size_slider = QSlider(Qt.Orientation.Horizontal)
         self._brush_size_slider.setRange(1, 200)
         self._brush_size_slider.setValue(20)
-        self._brush_size_slider.setStyleSheet(_SLIDER_STYLE)
         self._brush_size_slider.valueChanged.connect(self._on_brush_size)
         bl.addWidget(self._brush_size_slider)
 
@@ -287,7 +273,6 @@ class TerrainPage(QWidget):
         # ── 搜索框（过滤地形按钮）──
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText(tr("terrain_search_placeholder"))
-        self._search_input.setStyleSheet(_LINEEDIT_STYLE)
         self._search_input.textChanged.connect(self._on_search_changed)
         outer.addWidget(self._search_input)
 

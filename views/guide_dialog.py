@@ -3,10 +3,14 @@
 """
 from PyQt5.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QCheckBox, QWidget, QSizePolicy,
+    QCheckBox, QWidget, QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QSettings
 from PyQt5.QtGui import QFont
+
+from qfluentwidgets import (
+    PushButton, PrimaryPushButton, FluentIcon as FI,
+)
 
 from ui.i18n import tr
 
@@ -139,50 +143,18 @@ class GuideDialog(QDialog):
 
         footer_lay.addStretch()
 
-        btn_style = f"""
-            QPushButton {{
-                background: {_INPUT_BG};
-                border: 1px solid {_BORDER};
-                color: {_TEXT};
-                padding: 6px 20px;
-                border-radius: 4px;
-                font-size: 13px;
-            }}
-            QPushButton:hover {{
-                border-color: {_ACCENT};
-                background: rgba(108, 108, 240, 0.12);
-            }}
-            QPushButton:disabled {{
-                color: {_BORDER};
-            }}
-        """
-        start_btn_style = f"""
-            QPushButton {{
-                background: {_ACCENT};
-                border: none;
-                color: white;
-                padding: 6px 20px;
-                border-radius: 4px;
-                font-size: 13px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background: #7c7cff;
-            }}
-        """
-
-        self._btn_prev = QPushButton(tr("guide_prev"))
-        self._btn_prev.setStyleSheet(btn_style)
+        self._btn_prev = PushButton(tr("guide_prev"))
+        self._btn_prev.setIcon(FI.LEFT_ARROW)
         self._btn_prev.clicked.connect(self._prev)
         footer_lay.addWidget(self._btn_prev)
 
-        self._btn_next = QPushButton(tr("guide_next"))
-        self._btn_next.setStyleSheet(btn_style)
+        self._btn_next = PushButton(tr("guide_next"))
+        self._btn_next.setIcon(FI.RIGHT_ARROW)
         self._btn_next.clicked.connect(self._next)
         footer_lay.addWidget(self._btn_next)
 
-        self._btn_start = QPushButton(tr("guide_start"))
-        self._btn_start.setStyleSheet(start_btn_style)
+        self._btn_start = PrimaryPushButton(tr("guide_start"))
+        self._btn_start.setIcon(FI.ACCEPT)
         self._btn_start.clicked.connect(self.accept)
         footer_lay.addWidget(self._btn_start)
 

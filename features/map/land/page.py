@@ -14,9 +14,8 @@ from data.constants import (
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _BORDER, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE, _SLIDER_STYLE,
-    _TOOL_BTN_STYLE, _TILE_BTN_STYLE, _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE,
-    _SPINBOX_STYLE, _color_icon,
+    _DIM, _BORDER, _LABEL_STYLE, _DIM_LABEL_STYLE,
+    _color_icon,
 )
 from ui.i18n import tr
 
@@ -59,7 +58,6 @@ class LandPage(QWidget):
             btn.setIcon(_color_icon(*color))
             btn.setCheckable(True)
             btn.setProperty("tile_id", tile_id)
-            btn.setStyleSheet(_TILE_BTN_STYLE)
             btn.clicked.connect(lambda _, t=tile_id: self._on_tile_click(t))
             self._tile_group.addButton(btn)
             tile_row.addWidget(btn)
@@ -97,7 +95,6 @@ class LandPage(QWidget):
                 btn = QPushButton(label)
                 btn.setCheckable(True)
                 btn.setProperty("tool_id", tid)
-                btn.setStyleSheet(_TOOL_BTN_STYLE)
                 if tid == "transform":
                     btn.setToolTip(tr("land_tool_transform_tip"))
                 elif tid == "fill":
@@ -127,7 +124,6 @@ class LandPage(QWidget):
         self._land_brush_slider = QSlider(Qt.Orientation.Horizontal)
         self._land_brush_slider.setRange(BRUSH_MIN, BRUSH_MAX)
         self._land_brush_slider.setValue(BRUSH_DEFAULT)
-        self._land_brush_slider.setStyleSheet(_SLIDER_STYLE)
         self._land_brush_slider.valueChanged.connect(self._on_land_brush)
         tools_box.layout().addWidget(self._land_brush_slider)
 
@@ -146,7 +142,6 @@ class LandPage(QWidget):
 
         # 平滑海岸线（建议生成省份前使用，所以收进此 section 顶部）
         coast_btn = QPushButton(tr("land_btn_smooth_coast"))
-        coast_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         coast_btn.setToolTip(tr("land_btn_smooth_coast_tip"))
         coast_btn.clicked.connect(self.smooth_coast_requested.emit)
         gen_box.layout().addWidget(coast_btn)
@@ -159,7 +154,6 @@ class LandPage(QWidget):
         self._province_count_spin.setRange(100, 20000)
         self._province_count_spin.setSingleStep(500)
         self._province_count_spin.setValue(12000)
-        self._province_count_spin.setStyleSheet(_SPINBOX_STYLE)
         spin_row.addWidget(self._province_count_spin)
         gen_box.layout().addLayout(spin_row)
 
@@ -177,7 +171,6 @@ class LandPage(QWidget):
         self._sea_density_slider = QSlider(Qt.Orientation.Horizontal)
         self._sea_density_slider.setRange(5, 100)
         self._sea_density_slider.setValue(15)
-        self._sea_density_slider.setStyleSheet(_SLIDER_STYLE)
         self._sea_density_slider.valueChanged.connect(
             lambda v: self._sea_density_label.setText(f"{v}%")
         )
@@ -197,7 +190,6 @@ class LandPage(QWidget):
         self._lake_density_slider = QSlider(Qt.Orientation.Horizontal)
         self._lake_density_slider.setRange(10, 100)
         self._lake_density_slider.setValue(30)
-        self._lake_density_slider.setStyleSheet(_SLIDER_STYLE)
         self._lake_density_slider.valueChanged.connect(
             lambda v: self._lake_density_label.setText(f"{v}%")
         )
@@ -207,13 +199,11 @@ class LandPage(QWidget):
         gen_btn_row = QHBoxLayout()
         gen_btn_row.setSpacing(4)
         gen_btn = QPushButton(tr("land_btn_generate"))
-        gen_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         gen_btn.setToolTip(tr("land_btn_generate_tip"))
         gen_btn.clicked.connect(self._on_generate_provinces)
         gen_btn_row.addWidget(gen_btn)
 
         validate_btn = QPushButton(tr("land_btn_validate"))
-        validate_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         validate_btn.clicked.connect(self.validate_requested.emit)
         gen_btn_row.addWidget(validate_btn)
         gen_box.layout().addLayout(gen_btn_row)
@@ -242,13 +232,11 @@ class LandPage(QWidget):
         self._vanilla_ref_opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._vanilla_ref_opacity_slider.setRange(0, 100)
         self._vanilla_ref_opacity_slider.setValue(30)
-        self._vanilla_ref_opacity_slider.setStyleSheet(_SLIDER_STYLE)
         self._vanilla_ref_opacity_slider.valueChanged.connect(
             lambda v: self._vanilla_ref_opacity_label.setText(f"{v}%")
         )
         self._vanilla_ref_toggle = QPushButton(tr("land_btn_hide"))
         self._vanilla_ref_toggle.setCheckable(True)
-        self._vanilla_ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._vanilla_ref_toggle.setMinimumWidth(50)
         self._vanilla_ref_toggle.toggled.connect(
             lambda on: self._vanilla_ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
@@ -271,13 +259,11 @@ class LandPage(QWidget):
         self._ref_opacity_slider = QSlider(Qt.Orientation.Horizontal)
         self._ref_opacity_slider.setRange(0, 100)
         self._ref_opacity_slider.setValue(40)
-        self._ref_opacity_slider.setStyleSheet(_SLIDER_STYLE)
         self._ref_opacity_slider.valueChanged.connect(
             lambda v: self._ref_opacity_label.setText(f"{v}%")
         )
         self._ref_toggle = QPushButton(tr("land_btn_hide"))
         self._ref_toggle.setCheckable(True)
-        self._ref_toggle.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._ref_toggle.setMinimumWidth(50)
         self._ref_toggle.toggled.connect(
             lambda on: self._ref_toggle.setText(tr("land_btn_show") if on else tr("land_btn_hide"))
@@ -298,7 +284,6 @@ class LandPage(QWidget):
         scale_row.addWidget(self._ref_scale_label)
         scale_row.addStretch()
         self._ref_fit_btn = QPushButton(tr("land_btn_fit_map"))
-        self._ref_fit_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._ref_fit_btn.setMinimumWidth(70)
         scale_row.addWidget(self._ref_fit_btn)
         ref_box.layout().addLayout(scale_row)
@@ -306,7 +291,6 @@ class LandPage(QWidget):
         self._ref_scale_slider = QSlider(Qt.Orientation.Horizontal)
         self._ref_scale_slider.setRange(10, 500)
         self._ref_scale_slider.setValue(100)
-        self._ref_scale_slider.setStyleSheet(_SLIDER_STYLE)
         self._ref_scale_slider.valueChanged.connect(
             lambda v: self._ref_scale_label.setText(f"{v}%")
         )

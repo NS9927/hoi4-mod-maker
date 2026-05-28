@@ -13,8 +13,7 @@ from PyQt5.QtWidgets import (
 
 from ui.styles import (
     make_section as _make_section,
-    _DIM, _ACCENT, _BORDER, _SECTION_STYLE, _LABEL_STYLE, _DIM_LABEL_STYLE,
-    _PRIMARY_BTN_STYLE, _SECONDARY_BTN_STYLE, _LINEEDIT_STYLE,
+    _DIM, _ACCENT, _BORDER, _LABEL_STYLE, _DIM_LABEL_STYLE,
 )
 from ui.i18n import tr
 
@@ -79,13 +78,10 @@ class ProvincePage(QWidget):
 
         self._find_input = QLineEdit()
         self._find_input.setPlaceholderText(tr("province_search_placeholder"))
-        self._find_input.setStyleSheet(_LINEEDIT_STYLE)
-        self._find_input.setValidator(QIntValidator(1, 99999999, self))
         self._find_input.returnPressed.connect(self._on_find_clicked)
         find_row.addWidget(self._find_input, stretch=1)
 
         self._find_btn = QPushButton(tr("province_btn_find"))
-        self._find_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._find_btn.setToolTip(tr("province_btn_find_tip"))
         self._find_btn.clicked.connect(self._on_find_clicked)
         find_row.addWidget(self._find_btn)
@@ -117,19 +113,14 @@ class ProvincePage(QWidget):
 
         self._merge_btn = QPushButton(tr("province_btn_merge"))
         self._merge_btn.setCheckable(True)
-        self._merge_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._merge_btn.setToolTip(tr("province_btn_merge_tip"))
         tools_row.addWidget(self._merge_btn)
 
         self._expand_btn = QPushButton(tr("province_btn_expand"))
         self._expand_btn.setCheckable(True)
-        self._expand_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
-        self._expand_btn.setToolTip(tr("province_btn_expand_tip"))
         tools_row.addWidget(self._expand_btn)
 
         self._split_btn = QPushButton(tr("province_btn_split"))
         self._split_btn.setCheckable(True)
-        self._split_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._split_btn.setToolTip(tr("province_btn_split_tip"))
         tools_row.addWidget(self._split_btn)
 
@@ -142,12 +133,10 @@ class ProvincePage(QWidget):
 
         self._regen_btn = QPushButton(tr("province_btn_select_area"))
         self._regen_btn.setCheckable(True)
-        self._regen_btn.setStyleSheet(_SECONDARY_BTN_STYLE)
         self._regen_btn.setToolTip(tr("province_btn_select_area_tip"))
         regen_row.addWidget(self._regen_btn)
 
         self._regen_exec_btn = QPushButton(tr("province_btn_regen_exec"))
-        self._regen_exec_btn.setStyleSheet(_PRIMARY_BTN_STYLE)
         self._regen_exec_btn.setToolTip(tr("province_btn_regen_exec_tip"))
         regen_row.addWidget(self._regen_exec_btn)
 
@@ -205,13 +194,11 @@ class ProvincePage(QWidget):
         if pid <= 0:
             return
         self.find_province_requested.emit(pid)
-        # 重置输入框红色边框（如果上次查无）
-        self._find_input.setStyleSheet(_LINEEDIT_STYLE)
 
     def mark_find_not_found(self) -> None:
         """外部 handler 在 ID 不存在时调用 — 输入框边框变红。"""
         self._find_input.setStyleSheet(
-            _LINEEDIT_STYLE + "QLineEdit { border: 1px solid #ef4444; }"
+            "QLineEdit { border: 1px solid #ef4444; }"
         )
 
     def _update_mode_visuals(self) -> None:
@@ -228,7 +215,7 @@ class ProvincePage(QWidget):
             (self._split_btn, splitting),
             (self._regen_btn, regening),
         ]:
-            btn.setStyleSheet(_ACTIVE_MODE_BTN_STYLE if active else _SECONDARY_BTN_STYLE)
+            btn.setStyleSheet(_ACTIVE_MODE_BTN_STYLE if active else "")
 
         # 提示条
         if merging:
